@@ -344,7 +344,7 @@ void *sequence_getKmer2(void *elements, int64_t index) {
 }
 
 void *sequence_getKmer3(void *elements, int64_t index) {
-    return index >= 0 ? &(((char *) elements)[index]) : &(((char *) elements)[0]);
+    return index >= 0 ? &(((char *) elements)[index]) : START_KMER;
 }
 
 void *sequence_getEvent(void *elements, int64_t index) {
