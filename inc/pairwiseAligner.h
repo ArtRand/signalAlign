@@ -27,7 +27,6 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 #define CYTOSINE_METHYL_AMBIG "X"
 #define NB_CYTOSINE_OPTIONS 3
 #define CYTOSINES "CEO"
-#define START_KMER "START"
 
 //Sequence
 typedef enum {
@@ -79,6 +78,8 @@ void *sequence_getKmer2(void *elements, int64_t index);
 
 // for HDP, different 'NULL'
 void *sequence_getKmer3(void *elements, int64_t index);
+
+void *sequence_getKmer4(Sequence *sequence, int64_t index);
 
 void *sequence_getEvent(void *elements, int64_t index);
 
@@ -199,7 +200,7 @@ double logAdd(double x, double y);
 
 // HDCell
 typedef struct _path {
-    char *kmer;
+    void *kmer;
     int64_t stateNumber;
     double *cells;
 } Path;
@@ -216,6 +217,8 @@ stList *path_findPotentialMethylation(char *kmer);
 stList *path_getMehtylPermutations(int64_t methylPositions);
 
 double *path_getCell(Path *path);
+
+void path_copyCells(Path *master, Path *copy);
 
 void path_destruct(Path *path);
 

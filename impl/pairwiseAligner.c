@@ -344,8 +344,17 @@ void *sequence_getKmer2(void *elements, int64_t index) {
 }
 
 void *sequence_getKmer3(void *elements, int64_t index) {
-    return index >= 0 ? &(((char *) elements)[index]) : START_KMER;
+    return index >= 0 ? &(((char *) elements)[index]) : &(((char *) elements)[0]);
 }
+
+void *sequence_getKmer4(Sequence *sequence, int64_t index) {
+    if ((index >= sequence->length) || (index < 0)) {
+        return NULL;
+    } else {
+        return &(((char *) sequence->elements)[index]);
+    }
+}
+
 
 void *sequence_getEvent(void *elements, int64_t index) {
     index = index * NB_EVENT_PARAMS;
@@ -386,12 +395,16 @@ Path *path_construct(char *kmer, int64_t stateNumber) {
     Path *path = st_malloc(sizeof(Path));
     path->kmer = kmer;
     path->stateNumber = stateNumber;
-    path->cells = st_malloc(sizeof(double) * stateNumber);
+    //path->cells = st_malloc(sizeof(double) * stateNumber);
+    path->cells = st_calloc(stateNumber, sizeof(double));
     return path;
 }
 
 stList *path_findPotentialMethylation(char *kmer) {
     stList *methyls = stList_construct3(0, &free);
+    if (kmer == NULL) {
+        return methyls;
+    }
     for (int64_t i = 0; i < KMER_LENGTH; i++) {
         char n = *(kmer + i);
         if (strchr(CYTOSINE_METHYL_AMBIG, n)) {
@@ -421,6 +434,8 @@ static bool path_checkKmerLegalTransition(char *kmerOne, char *kmerTwo) {
 bool path_checkLegal(Path *path1, Path *path2) {
     if (path1->stateNumber != path2->stateNumber) {
         return FALSE;
+    } else if (path1->kmer == NULL) {
+        return TRUE;
     } else {
         return path_checkKmerLegalTransition(path1->kmer, path2->kmer);
     }
@@ -429,6 +444,16 @@ bool path_checkLegal(Path *path1, Path *path2) {
 double *path_getCell(Path *path) {
     return path->cells;
 }
+
+void path_copyCells(Path *master, Path *copy) {
+    if (master->stateNumber != copy->stateNumber) {
+        st_errAbort("path_copyCells: master and copy have different stateNumbers\n");
+    }
+    for (int64_t i = 0; i < master->stateNumber; i++) {
+        copy->cells[i] = master->cells[i];
+    }
+}
+
 
 void path_destruct(Path *path) {
     free(path->cells);
@@ -463,20 +488,23 @@ stList *path_getMehtylPermutations(int64_t methylPositions) {
     }
 }
 
-//todo comment this section
+// TODO comment
 HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber) {
-    // make temp kmer from sequence
-    char *kmer_i = (char *)st_malloc((KMER_LENGTH) * sizeof(char));
-    for (int64_t x = 0; x < KMER_LENGTH; x++) {
-        kmer_i[x] = *((char *)nucleotideSequence + x);
+    char *kmer_i;
+    if (nucleotideSequence != NULL) {
+        kmer_i = (char *)st_malloc((KMER_LENGTH) * sizeof(char));
+        for (int64_t x = 0; x < KMER_LENGTH; x++) {
+            kmer_i[x] = *((char *)nucleotideSequence + x);
+        }
+        kmer_i[KMER_LENGTH] = '\0';
+    } else {
+        kmer_i = NULL;
     }
-    kmer_i[KMER_LENGTH] = '\0';
 
     HDCell *cell = st_malloc(sizeof(HDCell));
 
-    // check for ambiguity characters in nucleotideKmer to determine number of paths
-    stList *methylPositions = path_findPotentialMethylation(kmer_i);
-    int64_t nbMethylPositions = stList_length(methylPositions);
+    stList *methylPositions = path_findPotentialMethylation(kmer_i);  // will return empty list for NULL kmer
+    int64_t nbMethylPositions = stList_length(methylPositions);  // NULL kmer will be 0
 
     cell->numberOfPaths = intPow(NB_CYTOSINE_OPTIONS, nbMethylPositions);
 
@@ -484,17 +512,14 @@ HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber) {
         st_errAbort("hdCell_construct: got illegal number of paths: %lld", cell->numberOfPaths);
     }
 
-    cell->paths = (Path **)st_malloc(sizeof(Path *) * cell->numberOfPaths);
-
-    stList *methylationPatterns = path_getMehtylPermutations(nbMethylPositions);
+    cell->paths = (Path **)st_malloc(sizeof(Path *) * cell->numberOfPaths); // todo make this calloc?
 
     if (cell->numberOfPaths > 1) {
+        stList *methylationPatterns = path_getMehtylPermutations(nbMethylPositions);
         for (int64_t i = 0; i < cell->numberOfPaths; i++) {
             char *pattern = stList_get(methylationPatterns, i);
-
             Path *path = path_construct(hdCell_getSubstitutedKmer(methylPositions, nbMethylPositions, pattern,
                                                                   kmer_i), stateNumber);
-
             cell->paths[i] = path;
         }
     } else {
@@ -592,9 +617,7 @@ double cell_dotProduct(double *cell1, double *cell2, int64_t stateNumber) {
 
 double cell_dotProduct2(double *cell, StateMachine *sM, double (*getStateValue)(StateMachine *, int64_t)) {
     double totalProb = cell[0] + getStateValue(sM, 0);
-    st_uglyf("SENTINAL - cell_dotProduct2: cell[0] %f, stateValue[0]: %f\n", cell[0], getStateValue(sM, 0));
     for (int64_t i = 1; i < sM->stateNumber; i++) {
-        st_uglyf("SENTINAL - cell_dotProduct2: i: %lld cell[i]: %f, stateValue %f\n", i, cell[i], getStateValue(sM, i));
         totalProb = logAdd(totalProb, cell[i] + getStateValue(sM, i));
     }
     return totalProb;
@@ -723,7 +746,6 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
     assert(diagonal_getWidth(diagonal) >= 0);
 
     int64_t nCells = diagonal_getWidth(diagonal);
-    //dpDiagonal->cells = (HDCell **) st_malloc(sizeof(HDCell *) * nCells);
     dpDiagonal->cells = (HDCell **) st_calloc(nCells, sizeof(HDCell *));
 
     int64_t xmy = diagonal_getMinXmy(diagonal);
@@ -733,7 +755,8 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
     while (xmy <= maxXmy) {
         int64_t x = diagonal_getXCoordinate(xay, xmy);
 
-        void *k = nucleotideSequence->get(nucleotideSequence->elements, (x - 1));
+        //void *k = nucleotideSequence->get(nucleotideSequence->elements, (x - 1));
+        void *k = sequence_getKmer4(nucleotideSequence, (x -1));
 
         HDCell *hdCell = hdCell_construct(k, stateNumber);
 
@@ -770,7 +793,7 @@ DpDiagonal *dpDiagonal_clone(DpDiagonal *diagonal) { // TODO make a function tha
             if (path1->stateNumber != path2->stateNumber) {
                 st_errAbort("dpDiagonal_clone: paths have different stateNumbers\n");
             }
-            memcpy(path1->cells, path2->cells, sizeof(double) * path1->stateNumber);
+            path_copyCells(path1, path2);
         }
     }
     return diagonal2;
@@ -789,14 +812,14 @@ bool dpDiagonal_equals(DpDiagonal *diagonal1, DpDiagonal *diagonal2) {
         HDCell *hdCell1 = diagonal1->cells[i];
         HDCell *hdCell2 = diagonal2->cells[i];
         if (hdCell1->numberOfPaths != hdCell2->numberOfPaths) {
-            st_uglyf("dpDiagonal_equals: different numberOfPaths\n");
+            fprintf(stderr, "dpDiagonal_equals: different numberOfPaths\n");
             return 0;
         }
         for (int64_t p = 0; p < hdCell1->numberOfPaths; p++) {
             Path *path1 = hdCell_getPath(hdCell1, p);
             Path *path2 = hdCell_getPath(hdCell2, p);
             if (path1->stateNumber != path2->stateNumber) {
-                st_uglyf("dpDiagonal_equals: different stateNumber in paths %lld\n", p);
+                fprintf(stderr, "dpDiagonal_equals: different stateNumber in paths %lld\n", p);
                 return 0;
             }
             for (int64_t s = 0; s < path1->stateNumber; s++) {
@@ -949,7 +972,6 @@ int64_t dpMatrix_getActiveDiagonalNumber(DpMatrix *dpMatrix) {
 }
 
 DpDiagonal *dpMatrix_createDiagonal(DpMatrix *dpMatrix, Diagonal diagonal, Sequence *sX) {
-
     if (sX->type != kmer) {
         st_errAbort("dpMatrix_createDiagonal: wrong king of sequence got: %lld\n", sX->type);
     }
@@ -1086,21 +1108,32 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
         int64_t x = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy);
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
         if (x > 0 && y > 0) {
-            double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
+            HDCell *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
             //st_uglyf("X: %lld Y: %lld cellForward->MatchState: %f ", x, y, cellForward[sM->matchState]);
-            double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
+            HDCell *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
             //st_uglyf("cellBackward->MatchState: %f ", cellBackward[sM->matchState]);
-            double posteriorProbability = exp(
-                    (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-            //st_uglyf("posteriorProb: %f\n", posteriorProbability);
-            if (posteriorProbability >= p->threshold) {
-                if (posteriorProbability > 1.0) {
-                    posteriorProbability = 1.0;
+            for (int64_t fp = 0; fp < cellForward->numberOfPaths; fp++) {
+                Path *pathForward = cellForward->paths[fp];
+                for (int64_t bp = 0; bp < cellBackward->numberOfPaths; bp++) {
+                    Path *pathBackwards = cellBackward->paths[bp];
+                    if (stString_eq(pathForward->kmer, pathBackwards->kmer)) {
+                        double *forwardCells = path_getCell(pathForward);
+                        double *backwardCells = path_getCell(pathBackwards);
+                        double posteriorProbability = exp(
+                                (forwardCells[sM->matchState] + backwardCells[sM->matchState]) - totalProbability);
+                        if (posteriorProbability >= p->threshold) {
+                            if (posteriorProbability > 1.0) {
+                                posteriorProbability = 1.0;
+                            }
+                            //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
+                            //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
+                            posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
+                            stList_append(alignedPairs, stIntTuple_construct4((int64_t) posteriorProbability,
+                                                                              x - 1, y - 1,
+                                                                              (int64_t )pathForward->kmer));
+                        }
+                    }
                 }
-                //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
-                //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
-                posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             //if (posteriorProbability <= p->threshold) {
             //    //st_uglyf("NOT Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));

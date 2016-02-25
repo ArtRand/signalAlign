@@ -346,7 +346,7 @@ double emissions_symbol_getGapProb(const double *emissionGapProbs, void *base);
 
 double emissions_symbol_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
 
-double emissions_kmer_getGapProb(const double *emissionGapProbs, void *kmer);
+double emissions_kmer_getGapProb(const double *emissionGapProbs, void *x_i);
 
 double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
 

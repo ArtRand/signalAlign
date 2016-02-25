@@ -160,11 +160,15 @@ double emissions_symbol_getMatchProb(const double *emissionMatchProbs, void *x, 
     return emissionMatchProbs[iX * SYMBOL_NUMBER_NO_N + iY];
 }
 
-double emissions_kmer_getGapProb(const double *emissionGapProbs, void *kmer) {
-    // make temp kmer meant to work with getKmer
+double emissions_kmer_getGapProb(const double *emissionGapProbs, void *x_i) {
+    // even though this shouldn't happen, check for null x_i and return logzero
+    if (x_i == NULL) {
+        return LOG_ZERO;
+    }
+    // make temp x_i meant to work with getKmer
     char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
     for (int64_t x = 0; x < KMER_LENGTH; x++) {
-        kmer_i[x] = *((char *)kmer+x);
+        kmer_i[x] = *((char *) x_i + x);
     }
     kmer_i[KMER_LENGTH] = '\0';
     int64_t i = emissions_discrete_getKmerIndex(kmer_i);
@@ -579,16 +583,19 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
     return c + a;
 }
 
-double emissions_signal_strawManGetKmerEventMatchProb(const double *eventModel, void *kmer, void *event) {
+double emissions_signal_strawManGetKmerEventMatchProb(const double *eventModel, void *x_i, void *e_j) {
+    if (x_i == NULL) {
+        return LOG_ZERO;
+    }
     // this is meant to work with getKmer (NOT getKmer2)
-    // wrangle event data
-    double eventMean = *(double *) event;
-    double eventNoise = *(double *) ((char *)event + sizeof(double)); // aaah pointers
+    // wrangle e_j data
+    double eventMean = *(double *) e_j;
+    double eventNoise = *(double *) ((char *) e_j + sizeof(double)); // aaah pointers
 
-    // make temp kmer
+    // make temp x_i
     char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
     for (int64_t x = 0; x < KMER_LENGTH; x++) {
-        kmer_i[x] = *((char *)kmer+x);
+        kmer_i[x] = *((char *) x_i + x);
     }
     kmer_i[KMER_LENGTH] = '\0';
 
@@ -609,7 +616,7 @@ double emissions_signal_strawManGetKmerEventMatchProb(const double *eventModel, 
 
     // debugging
     //double prob = l_probEventMean + l_probEventNoise;
-    //st_uglyf("MATCHING--kmer:%s (index: %lld), event mean: %f, \n modelMean: %f, modelLsd: %f probEvent: %f probNoise: %f, combined: %f\n",
+    //st_uglyf("MATCHING--x_i:%s (index: %lld), e_j mean: %f, \n modelMean: %f, modelLsd: %f probEvent: %f probNoise: %f, combined: %f\n",
     //         kmer_i, kmerIndex, eventMean, levelMean, levelStdDev, l_probEventMean, l_probEventNoise, prob);
 
     return l_probEventMean + l_probEventNoise;
@@ -1302,13 +1309,14 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
     HDCell *hdLower = lower == NULL ? NULL : (HDCell *)lower;
     HDCell *hdMiddle = middle == NULL ? NULL : (HDCell *)middle;
     HDCell *hdUpper = upper == NULL ? NULL : (HDCell *)upper;
-
+    //st_uglyf("SENTINAL - at begining of cell calc\n");
     if (hdLower != NULL) {
         for (int64_t p = 0; p < hdCurrent->numberOfPaths; p ++) {
             Path *pathC = hdCell_getPath(hdCurrent, p);
             for (int64_t q = 0; q < hdLower->numberOfPaths; q++) {
                 Path *pathL = hdCell_getPath(hdLower, q);
                 if (path_checkLegal(pathL, pathC)) {
+                    //st_uglyf("SENTINAL - legal LOWER : pathC kmer %s\n", pathC->kmer);
                     double *lowerCells = path_getCell(pathL);
                     double *currentCells = path_getCell(pathC);
                     double eP = sM3->getXGapProbFcn(sM3->model.EMISSION_GAP_X_PROBS, pathC->kmer);
@@ -1325,6 +1333,7 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
             for (int64_t q = 0; q < hdMiddle->numberOfPaths; q++) {
                 Path *pathM = hdCell_getPath(hdMiddle, q);
                 if (path_checkLegal(pathM, pathC)) {
+                    //st_uglyf("SENTINAL - legal MIDDLE : pathC kmer %s\n", pathC->kmer);
                     double *middleCells = path_getCell(pathM);
                     double *curentCells = path_getCell(pathC);
                     double eP = sM3->getMatchProbFcn(sM3->model.EMISSION_MATCH_PROBS, pathC->kmer, cY);
@@ -1341,6 +1350,7 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
             for (int64_t q = 0; q < hdUpper->numberOfPaths; q++) {
                 Path *pathU = hdCell_getPath(hdUpper, q);
                 if (stString_eq(pathC->kmer, pathU->kmer)) {
+                    //st_uglyf("SENTINAL - legal UPPER : pathC kmer %s\n", pathC->kmer);
                     double *upperCells = path_getCell(pathU);
                     double *currentCells = path_getCell(pathC);
                     double eP = sM3->getYGapProbFcn(sM3->model.EMISSION_GAP_Y_PROBS, pathC->kmer, cY);

@@ -15,6 +15,19 @@
 #include "emissionMatrix.h"
 #include "discreteHmm.h"
 
+Sequence *makeTestKmerSequence() {
+    char *s = "ATGXAXA"; // has 2 6mers
+    int64_t lX = sequence_correctSeqLength(strlen(s), kmer);
+    Sequence *seq = sequence_construct(lX, s, sequence_getKmer3, kmer);
+    return seq;
+}
+
+Sequence *makeKmerSequence(char *nucleotides) {
+    int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer);
+    Sequence *seq = sequence_construct(lX, nucleotides, sequence_getKmer3, kmer);
+    return seq;
+}
+
 static void breakpoint(char *msg) {
     st_errAbort("Breakpoint %s\n", msg);
 }
@@ -32,19 +45,33 @@ static void test_findPotentialMethylation(CuTest *testCase) {
 
 // legal path test
 static void test_pathLegalTransitions(CuTest *testCase) {
+    Path *path0 = path_construct(NULL, 3);
     Path *path1 = path_construct("AAETTT", 3);
     Path *path2 = path_construct("AETTTC", 3);
     Path *path3 = path_construct("AETTTC", 2);
     Path *path4 = path_construct("ACTTTC", 3);
+    CuAssertTrue(testCase, path_checkLegal(path0, path1) == TRUE);
     CuAssertTrue(testCase, path_checkLegal(path1, path2) == TRUE);
     CuAssertTrue(testCase, path_checkLegal(path1, path3) == FALSE);
     CuAssertTrue(testCase, path_checkLegal(path1, path4) == FALSE);
+    path_destruct(path0);
     path_destruct(path1);
     path_destruct(path2);
     path_destruct(path3);
     path_destruct(path4);
 }
 
+static void test_getKmer4(CuTest *testCase) {
+    Sequence *sX = makeKmerSequence("ATGCATAGC");
+                                   //ATGCAT
+                                   // TGCATA
+                                   //  GCATAG
+                                   //   CATAGC
+    void *checkMinusOne = sequence_getKmer4(sX, -1);
+    CuAssertTrue(testCase, checkMinusOne == NULL);
+    void *checkGreaterThanLength = sequence_getKmer4(sX, (sX->length + 1));
+    CuAssertTrue(testCase, checkGreaterThanLength == NULL);
+}
 
 // test make potentially methylated kmers
 static void test_methylPermutations(CuTest *testCase) {
@@ -91,19 +118,6 @@ static void test_hdCellConstructWorstCase(CuTest *testCase) {
     hdCell_destruct(cell);
 }
 
-Sequence *makeTestKmerSequence() {
-    char *s = "ATGXAXA"; // has 2 6mers
-    int64_t lX = sequence_correctSeqLength(strlen(s), kmer);
-    Sequence *seq = sequence_construct(lX, s, sequence_getKmer3, kmer);
-    return seq;
-}
-
-Sequence *makeKmerSequence(char *nucleotides) {
-    int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer);
-    Sequence *seq = sequence_construct(lX, nucleotides, sequence_getKmer3, kmer);
-    return seq;
-}
-
 static void test_dpDiagonal(CuTest *testCase) {
     // load model and make stateMachine
     char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
@@ -136,8 +150,10 @@ static void test_dpDiagonal(CuTest *testCase) {
         for (int64_t s = 0; s < path1->stateNumber; s++) {
             CuAssertDblEquals(testCase, path1->cells[s], sM->endStateProb(sM, s), 0.0);
             CuAssertDblEquals(testCase, path2->cells[s], sM->endStateProb(sM, s), 0.0);
-            totalProb = logAdd(totalProb, (1/c1->numberOfPaths) * path1->cells[s]);
-            totalProb = logAdd(totalProb, (1/c1->numberOfPaths) * path2->cells[s]);
+            //totalProb = logAdd(totalProb, (1/c1->numberOfPaths) * path1->cells[s]);
+            //totalProb = logAdd(totalProb, (1/c1->numberOfPaths) * path2->cells[s]);
+            totalProb = logAdd(totalProb, 2 * path1->cells[s]);
+            totalProb = logAdd(totalProb, 2 * path2->cells[s]);
         }
     }
 
@@ -230,9 +246,6 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     }
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixForward, 0), sM, sM->startStateProb);
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
-    //dpDoagonal_setValues(dpMatrix_getDiagonal(dpMatrixForward, 0), sM, sM->startStateProb);
-    //dpDoagonal_setValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
-
 
     //Forward algorithm
     for (int64_t i = 1; i <= lX + lY; i++) {
@@ -249,33 +262,19 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     HDCell *cellF = dpDiagonal_getCell(dpDiagonalF, lX - lY);
     for (int64_t p = 0; p < cellF->numberOfPaths; p++) {
         Path *path = hdCell_getPath(cellF, p);
-        st_uglyf("path %lld's kmer is %s\n", p, path->kmer);
         double *cells = path_getCell(path);
-        for (int64_t s = 0; s < path->stateNumber; s++) {
-            st_uglyf("s:%lld - cells:%f\n", s, cells[s]);
-        }
         totalProbForward = logAdd(totalProbForward, cell_dotProduct2(path->cells, sM, sM->endStateProb));
     }
-    st_uglyf("totalprobforward: %f\n", totalProbForward);
-    breakpoint("HERE!");
 
     double totalProbBackward = LOG_ZERO;
     DpDiagonal *dpDiagonalB = dpMatrix_getDiagonal(dpMatrixBackward, 0);
     HDCell *cellB = dpDiagonal_getCell(dpDiagonalB, 0);
     for (int64_t p = 0; p < cellB->numberOfPaths; p++) {
         Path *path = hdCell_getPath(cellB, p);
-        for (int64_t s = 0; s < path->stateNumber; s++) {
-            st_uglyf("s:%lld - cells:%f\n", s, path->cells[s]);
-        }
         totalProbBackward = logAdd(totalProbBackward, cell_dotProduct2(path->cells, sM, sM->startStateProb));
     }
-    st_uglyf("totalprobBackward: %f\n", totalProbBackward);
-    //double totalProbBackward = cell_dotProduct2(
-    //        dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
 
-    //st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-    CuAssertTrue(testCase, FALSE);
     // Test the posterior probabilities along the diagonals of the matrix.
     for (int64_t i = 0; i <= lX + lY; i++) {
         double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
@@ -285,6 +284,7 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
         //Check the forward and back probabilities are about equal
         CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01);
     }
+
 
     // Now do the posterior probabilities, get aligned pairs with posterior match probs above threshold
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
@@ -314,7 +314,9 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
-        st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
+        char *pairKmer = (char *)stIntTuple_get(pair, 3);
+        //st_uglyf("Pair %f %" PRIi64 " %" PRIi64 " kmer %s\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1,
+        //         x, y, pairKmer);
         //CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
     //CuAssertIntEquals(testCase, 8, (int) stList_length(alignedPairs));
@@ -337,7 +339,10 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
-    //SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_getKmer4);
+
+
+    SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
 
     return suite;
 }
