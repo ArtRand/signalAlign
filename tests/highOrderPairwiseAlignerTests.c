@@ -503,14 +503,83 @@ static void checkAlignedPairsForEchelon(CuTest *testCase, stList *blastPairs, in
     stSortedSet_destruct(pairs);
 }
 
-static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
+static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
     // load the reference sequence and the nanopore read
-    char *ZymoReference = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
+    char *ZymoReference = stString_print("../../signalAlign/tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(ZymoReference, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
-    char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    char *npReadFile = stString_print("../../signalAlign/tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
 
+    // get sequence lengths
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    // load stateMachine from model file
+    char *templateModelFile = stString_print("../../signalAlign/models/template_median68pA.model");
+    StateMachine *sMt = getStrawManStateMachine3(templateModelFile);
+
+    // scale model
+    emissions_signal_scaleModel(sMt, npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                npRead->templateParams.var_sd); // clunky
+
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+    // get anchors using lastz
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+
+    // remap and filter
+    stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
+
+    // make Sequences for reference and template events
+    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
+                                           sequence_sliceNucleotideSequence2, kmer);
+    Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                sequence_sliceEventSequence2, event);
+
+    // do alignment of template events
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       0, 0);
+    checkAlignedPairs(testCase, alignedPairs, lX, lY);
+
+
+    // for ch1_file1 template there should be this many aligned pairs with banding
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+    // used to be 1001 before I added prior skip prob
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 987);
+
+    // check against alignment without banding
+
+    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX,
+                                                          lY, p,
+                                                          sequence_getKmer, sequence_getEvent,
+                                                          diagonalCalculationPosteriorMatchProbs,
+                                                          0, 0);
+
+    checkAlignedPairs(testCase, alignedPairs2, lX, lY);
+    CuAssertTrue(testCase, stList_length(alignedPairs2) == 986);
+
+    // clean
+    pairwiseAlignmentBandingParameters_destruct(p);
+    nanopore_nanoporeReadDestruct(npRead);
+    sequence_sequenceDestroy(refSeq);
+    sequence_sequenceDestroy(templateSeq);
+    stList_destruct(alignedPairs);
+    stList_destruct(alignedPairs2);
+    stateMachine_destruct(sMt);
+}
+
+static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
+    // load the reference sequence and the nanopore read
+    char *ZymoReference = stString_print("../../signalAlign/tests/test_npReads/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+    char *npReadFile = stString_print("../../signalAlign/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
     nanopore_descaleNanoporeRead(npRead);
 
     // get sequence lengths
@@ -564,12 +633,12 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
 
 static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testCase) {
     // load the reference sequence and the nanopore read
-    char *ZymoReference = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
+    char *ZymoReference = stString_print("../../signalAlign/tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(ZymoReference, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
     char *CtoM_referenceSeq = stString_replace(ZymoReferenceSeq, "C", "X");
     // npRead
-    char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    char *npReadFile = stString_print("../../signalAlign/tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
     nanopore_descaleNanoporeRead(npRead);
 
@@ -703,7 +772,7 @@ void updateStateMachineHDP(const char *expectationsFile, StateMachine *sM) {
 
 static void test_hdpHmm_em(CuTest *testCase) {
     // load the reference sequence
-    char *referencePath = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
+    char *referencePath = stString_print("../../signalAlign/tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(referencePath, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
 
@@ -711,7 +780,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
     // load the npRead
-    char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    char *npReadFile = stString_print("../../cPecan/signalAlign/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
     nanopore_descaleNanoporeRead(npRead);
 
@@ -730,8 +799,8 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
     // make initial NanoporeHdp from alignment
 
-    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
-    char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
+    char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
+    char *alignmentFile = stString_print("../../signalAlign/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
     NanoporeHDP *nHdp = flat_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
                                        5.0, 0.5, // base_gamma, leaf_gamma
@@ -779,7 +848,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
         // M step
         // dump hmm (expectations) to disk
-        char *tempHdpHmmFile = stString_print("../../cPecan/tests/test_hdp/tempHdpHmm.hmm");
+        char *tempHdpHmmFile = stString_print("../../signalAlign/tests/test_hdp/tempHdpHmm.hmm");
         FILE *fH = fopen(tempHdpHmmFile, "w");
         hdpHmm_writeToFile(hmmExpectations, fH);
         fclose(fH);
@@ -822,9 +891,10 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_getKmer4);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
-    SUITE_ADD_TEST(suite, test_hdpHmm_em);
+    //SUITE_ADD_TEST(suite, test_hdpHmm_em);
     return suite;
 }
