@@ -10,7 +10,7 @@ signalAlignLib = ${basicLibs}
 
 all : ${libPath}/signalAlignLib.a ${binPath}/signalAlignLibTests ${binPath}/compareDistributions ${binPath}/signalMachine ${binPath}/runSignalAlign ${sonLibrootPath}/nanoporelib.py
 	# disabled right now so that we don't build Lastz every time I do an update
-	cd externalTools && make all
+	#cd externalTools && make all
 	
 clean : 
 	rm -f ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanLibTests  ${libPath}/cPecanLib.a
