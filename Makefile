@@ -8,7 +8,7 @@ libTests = tests/*.c
 signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
-all : ${libPath}/signalAlignLib.a ${binPath}/signalAlignLibTests ${binPath}/compareDistributions ${binPath}/signalMachine ${binPath}/runSignalAlign ${sonLibrootPath}/nanoporelib.py
+all : ${libPath}/signalAlignLib.a ${binPath}/signalAlignLibTests ${binPath}/compareDistributions ${binPath}/signalMachine ${binPath}/runSignalAlign ${sonLibrootPath}/signalAlignLib.py
 	# disabled right now so that we don't build Lastz every time I do an update
 	#cd externalTools && make all
 	
@@ -29,8 +29,8 @@ ${binPath}/runSignalAlign : ${rootPath}scripts/runSignalAlign.py
 	cp ${rootPath}scripts/runSignalAlign.py ${binPath}/runSignalAlign
 	chmod +x ${binPath}/runSignalAlign
 
-${sonLibrootPath}/nanoporelib.py : ${rootPath}scripts/nanoporeLib.py
-	cp ${rootPath}scripts/nanoporeLib.py ${sonLibRootPath}/nanoporeLib.py
+${sonLibrootPath}/signalAlignLib.py : ${rootPath}scripts/signalAlignLib.py
+	cp ${rootPath}scripts/signalAlignLib.py ${sonLibRootPath}/signalAlignLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 	${cxx} ${cflags} -I inc -I ${libPath}/ -c ${libSources}
