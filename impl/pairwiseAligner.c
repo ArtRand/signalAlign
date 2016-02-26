@@ -689,6 +689,7 @@ void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *
     //}
 
     if ((to == match) & (p >= hmmExpectations->threshold)) {
+        //st_uglyf("SENTINAL - adding to expectations kmer %s\n", kmer);
         // add to emissions expectations function here
         hmmExpectations->addToAssignments((Hmm *)hmmExpectations, kmer, event);
     }
@@ -717,7 +718,7 @@ void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int6
 }
 
 static void cell_calculateUpdateExpectation(StateMachine *sM,
-                                            double *current, double *lower, double *middle, double *upper,
+                                            void *current, void *lower, void *middle, void *upper,
                                             void *cX, void *cY,
                                             void *extraArgs) {
     void *extraArgs2[4] = { ((void **)extraArgs)[0], // &totalProbabability
@@ -1126,6 +1127,7 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                                 posteriorProbability = 1.0;
                             }
                             //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
+                            //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, pathForward->kmer, y - 1, *(double *)sY->get(sY->elements, y-1));
                             //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
                             posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
                             stList_append(alignedPairs, stIntTuple_construct4((int64_t) posteriorProbability,
@@ -1695,10 +1697,10 @@ static void convertAlignedPairs(stList *alignedPairs2, int64_t offsetX, int64_t 
      */
     for (int64_t k = 0; k < stList_length(alignedPairs2); k++) {
         stIntTuple *i = stList_get(alignedPairs2, k);
-        assert(stIntTuple_length(i) == 3);
+        assert(stIntTuple_length(i) == 4);
         stList_set(alignedPairs2, k,
-                stIntTuple_construct3(stIntTuple_get(i, 0), stIntTuple_get(i, 1) + offsetX,
-                        stIntTuple_get(i, 2) + offsetY));
+                stIntTuple_construct4(stIntTuple_get(i, 0), stIntTuple_get(i, 1) + offsetX, //TODO make this work with kmers
+                        stIntTuple_get(i, 2) + offsetY, stIntTuple_get(i, 3)));
         stIntTuple_destruct(i);
     }
 }

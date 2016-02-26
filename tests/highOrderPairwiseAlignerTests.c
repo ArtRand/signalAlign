@@ -14,6 +14,8 @@
 #include "multipleAligner.h"
 #include "emissionMatrix.h"
 #include "discreteHmm.h"
+#include "nanopore.h"
+#include "continuousHmm.h"
 
 Sequence *makeTestKmerSequence() {
     char *s = "ATGXAXA"; // has 2 6mers
@@ -262,7 +264,6 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     HDCell *cellF = dpDiagonal_getCell(dpDiagonalF, lX - lY);
     for (int64_t p = 0; p < cellF->numberOfPaths; p++) {
         Path *path = hdCell_getPath(cellF, p);
-        double *cells = path_getCell(path);
         totalProbForward = logAdd(totalProbForward, cell_dotProduct2(path->cells, sM, sM->endStateProb));
     }
 
@@ -314,12 +315,12 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
-        char *pairKmer = (char *)stIntTuple_get(pair, 3);
+        //char *pairKmer = (char *)stIntTuple_get(pair, 3);
         //st_uglyf("Pair %f %" PRIi64 " %" PRIi64 " kmer %s\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1,
         //         x, y, pairKmer);
-        //CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
+        CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
-    //CuAssertIntEquals(testCase, 8, (int) stList_length(alignedPairs));
+    CuAssertIntEquals(testCase, 8, (int) stList_length(alignedPairs));
 
     // clean up
     stateMachine_destruct(sM);
@@ -327,6 +328,485 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     sequence_sequenceDestroy(SsY);
 }
 
+static void test_sm3Hdp_diagonalDPCalculations(CuTest *testCase) {
+    // make some DNA sequences and fake nanopore read data
+    char *sX = "ACGATAXGGACAT";
+    double sY[21] = {
+            58.743435, 0.887833, 0.0571, //ACGATA 0
+            53.604965, 0.816836, 0.0571, //CGATAC 1
+            58.432015, 0.735143, 0.0571, //GATACG 2
+            63.684352, 0.795437, 0.0571, //ATACGG 3
+            //63.520262, 0.757803, 0.0571, //TACGGA skip
+            58.921430, 0.812959, 0.0571, //ACGGAC 4
+            59.895882, 0.740952, 0.0571, //CGGACA 5
+            61.684303, 0.722332, 0.0571, //GGACAT 6
+    };
+
+    // make variables for the (corrected) length of the sequences
+    int64_t lX = sequence_correctSeqLength(strlen(sX), event);
+    int64_t lY = 7;
+
+    // make Sequence objects
+    Sequence *SsX = sequence_construct(lX, sX, sequence_getKmer3, kmer);
+    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
+
+    NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
+    StateMachine *sM = getHdpStateMachine3(nHdp);
+
+    DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
+    DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
+    stList *anchorPairs = stList_construct();
+    Band *band = band_construct(anchorPairs, SsX->length, SsY->length, 2);
+    BandIterator *bandIt = bandIterator_construct(band);
+
+    // Initialize Matrices
+    for (int64_t i = 0; i <= lX + lY; i++) {
+        Diagonal d = bandIterator_getNext(bandIt);
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixBackward, d, SsX));
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixForward, d, SsX));
+    }
+    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixForward, 0), sM, sM->startStateProb);
+    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
+
+    //Forward algorithm
+    for (int64_t i = 1; i <= lX + lY; i++) {
+        diagonalCalculationForward(sM, i, dpMatrixForward, SsX, SsY);
+    }
+
+    //Backward algorithm
+    for (int64_t i = lX + lY; i > 0; i--) {
+        diagonalCalculationBackward(sM, i, dpMatrixBackward, SsX, SsY);
+    }
+
+    //Calculate total probabilities
+    double totalProbForward = LOG_ZERO;
+    DpDiagonal *dpDiagonalF = dpMatrix_getDiagonal(dpMatrixForward, lX + lY);
+    HDCell *cellF = dpDiagonal_getCell(dpDiagonalF, lX - lY);
+    for (int64_t p = 0; p < cellF->numberOfPaths; p++) {
+        Path *path = hdCell_getPath(cellF, p);
+        totalProbForward = logAdd(totalProbForward, cell_dotProduct2(path->cells, sM, sM->endStateProb));
+    }
+
+    double totalProbBackward = LOG_ZERO;
+    DpDiagonal *dpDiagonalB = dpMatrix_getDiagonal(dpMatrixBackward, 0);
+    HDCell *cellB = dpDiagonal_getCell(dpDiagonalB, 0);
+    for (int64_t p = 0; p < cellB->numberOfPaths; p++) {
+        Path *path = hdCell_getPath(cellB, p);
+        totalProbBackward = logAdd(totalProbBackward, cell_dotProduct2(path->cells, sM, sM->startStateProb));
+    }
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.01);
+
+    ;
+    // Test the posterior probabilities along the diagonals of the matrix.
+
+    for (int64_t i = 0; i <= lX + lY; i++) {
+        double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
+                                                                       dpMatrixForward,
+                                                                       dpMatrixBackward,
+                                                                       SsX, SsY);
+        //Check the forward and back probabilities are about equal
+        CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01);
+    }
+
+
+    // Now do the posterior probabilities, get aligned pairs with posterior match probs above threshold
+    stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+    void *extraArgs[1] = { alignedPairs };
+
+    for (int64_t i = 1; i <= lX + lY; i++) {
+        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+        p->threshold = 0.2;
+        diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, SsX, SsY,
+                                               totalProbForward, p, extraArgs);
+        pairwiseAlignmentBandingParameters_destruct(p);
+    }
+
+    // Make a list of the correct anchor points
+    stSortedSet *alignedPairsSet = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
+                                                          (void (*)(void *)) stIntTuple_destruct);
+
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(4, 3));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 4));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(6, 5));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(7, 6));
+
+    // make sure alignedPairs is correct
+    for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
+        stIntTuple *pair = stList_get(alignedPairs, i);
+        int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
+        //char *pairKmer = (char *)stIntTuple_get(pair, 3);
+        //st_uglyf("Pair %f %" PRIi64 " %" PRIi64 " kmer %s\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1,
+        //         x, y, pairKmer);
+        CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
+    }
+    CuAssertIntEquals(testCase, 14, (int) stList_length(alignedPairs));
+
+    // clean up
+    stateMachine_destruct(sM);
+    sequence_sequenceDestroy(SsX);
+    sequence_sequenceDestroy(SsY);
+}
+
+static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
+    st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
+                                                (void (*)(void *)) stIntTuple_destruct);
+    for (int64_t i = 0; i < stList_length(blastPairs); i++) {
+        stIntTuple *j = stList_get(blastPairs, i);
+        CuAssertTrue(testCase, stIntTuple_length(j) == 4);
+
+        int64_t x = stIntTuple_get(j, 1);
+        int64_t y = stIntTuple_get(j, 2);
+        int64_t score = stIntTuple_get(j, 0);
+        CuAssertTrue(testCase, score > 0);
+        CuAssertTrue(testCase, score <= PAIR_ALIGNMENT_PROB_1);
+
+        CuAssertTrue(testCase, x >= 0);
+        CuAssertTrue(testCase, y >= 0);
+        CuAssertTrue(testCase, x < lX);
+        CuAssertTrue(testCase, y < lY);
+
+        //Check is unique
+        stIntTuple *pair = stIntTuple_construct2(x, y);
+        CuAssertTrue(testCase, stSortedSet_search(pairs, pair) == NULL);
+        stSortedSet_insert(pairs, pair);
+    }
+    stSortedSet_destruct(pairs);
+}
+
+static void checkAlignedPairsForEchelon(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
+    st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
+                                                (void (*)(void *)) stIntTuple_destruct);
+    for (int64_t i = 0; i < stList_length(blastPairs); i++) {
+        stIntTuple *j = stList_get(blastPairs, i);
+        CuAssertTrue(testCase, stIntTuple_length(j) == 4);
+
+        int64_t x = stIntTuple_get(j, 1);
+        int64_t y = stIntTuple_get(j, 2);
+        int64_t score = stIntTuple_get(j, 0);
+        CuAssertTrue(testCase, score > 0);
+        CuAssertTrue(testCase, score <= PAIR_ALIGNMENT_PROB_1);
+
+        CuAssertTrue(testCase, x >= 0);
+        CuAssertTrue(testCase, y >= 0);
+        CuAssertTrue(testCase, x < lX);
+        CuAssertTrue(testCase, y < lY);
+
+        stIntTuple *pair = stIntTuple_construct2(x, y);
+        stSortedSet_insert(pairs, pair);
+    }
+    stSortedSet_destruct(pairs);
+}
+
+static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
+    // load the reference sequence and the nanopore read
+    char *ZymoReference = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+    char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+
+    nanopore_descaleNanoporeRead(npRead);
+
+    // get sequence lengths
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
+    StateMachine *sMt = getHdpStateMachine3(nHdp);
+
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = 0.1;
+
+    // get anchors using lastz
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+
+    // remap and filter
+    stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
+
+    // make Sequences for reference and template events
+    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
+                                           sequence_sliceNucleotideSequence2, kmer);
+    Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                sequence_sliceEventSequence2, event);
+
+    // do alignment of template events
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       0, 0);
+    checkAlignedPairs(testCase, alignedPairs, lX, lY);
+    //for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
+    //    stIntTuple *pair = stList_get(alignedPairs, i);
+    //    int64_t x = stIntTuple_length(pair);
+    //    char *pairKmer = (char *)stIntTuple_get(pair, 3);
+    //    st_uglyf("kmer %s\n", pairKmer);
+    //}
+
+    // for ch1_file1 template there should be this many aligned pairs with banding
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
+
+    // clean
+    pairwiseAlignmentBandingParameters_destruct(p);
+    nanopore_nanoporeReadDestruct(npRead);
+    sequence_sequenceDestroy(refSeq);
+    sequence_sequenceDestroy(templateSeq);
+    stList_destruct(alignedPairs);
+    stateMachine_destruct(sMt);
+}
+
+static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testCase) {
+    // load the reference sequence and the nanopore read
+    char *ZymoReference = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+    char *CtoM_referenceSeq = stString_replace(ZymoReferenceSeq, "C", "X");
+    // npRead
+    char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    nanopore_descaleNanoporeRead(npRead);
+
+    // get sequence lengths
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
+    StateMachine *sMt = getHdpStateMachine3(nHdp);
+
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = 0.1;
+
+    // get anchors using lastz
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+
+    // remap and filter
+    stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
+
+    // make Sequences for reference and template events
+    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
+                                           sequence_sliceNucleotideSequence2, kmer);
+    Sequence *CtoM_refSeq = sequence_construct2(lX, CtoM_referenceSeq, sequence_getKmer3,
+                                                sequence_sliceNucleotideSequence2, kmer);
+    Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                sequence_sliceEventSequence2, event);
+
+    // do alignment of template events
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       0, 0);
+
+    stList *alignedPairs2 = getAlignedPairsUsingAnchors(sMt, CtoM_refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                        diagonalCalculationPosteriorMatchProbs,
+                                                        0, 0);
+
+
+    checkAlignedPairs(testCase, alignedPairs, lX, lY);
+    checkAlignedPairsForEchelon(testCase, alignedPairs2, lX, lY);
+
+    // for ch1_file1 template there should be this many aligned pairs with banding
+    //st_uglyf("got %lld alignedPairs on the normal sequence\n", stList_length(alignedPairs));
+    //st_uglyf("got %lld alignedPairs on the methyl sequence\n", stList_length(alignedPairs2));
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
+    //CuAssertTrue(testCase, stList_length(alignedPairs2) == 2887);
+
+    // clean
+    pairwiseAlignmentBandingParameters_destruct(p);
+    nanopore_nanoporeReadDestruct(npRead);
+    sequence_sequenceDestroy(refSeq);
+    sequence_sequenceDestroy(templateSeq);
+    //stList_destruct(alignedPairs);
+    stList_destruct(alignedPairs2);
+    stateMachine_destruct(sMt);
+}
+
+static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
+    // make the hmm object
+    Hmm *hmm = hdpHmm_constructEmpty(0.0, 3, threeStateHdp, 0.02,
+                                     continuousPairHmm_addToTransitionsExpectation,
+                                     continuousPairHmm_setTransitionExpectation,
+                                     continuousPairHmm_getTransitionExpectation);
+    HdpHmm *hdpHmm = (HdpHmm *) hmm;
+
+    // Add some transition expectations
+    int64_t nStates = hdpHmm->baseHmm.stateNumber;
+
+    for (int64_t from = 0; from < nStates; from++) {
+        for (int64_t to = 0; to < nStates; to++) {
+            double dummy = from * nStates + to;
+            hdpHmm->baseHmm.addToTransitionExpectationFcn((Hmm *) hdpHmm, from, to, dummy);
+        }
+    }
+
+    // make a simple nucleotide and event sequence
+    char *sequence = "ACGTCATACATGACTATA";
+    double fakeMeans[3] = { 65.0, 64.0, 63.0 };
+
+    for (int64_t a = 0; a < 3; a++) {
+        hdpHmm->addToAssignments((Hmm *)hdpHmm, sequence + (a * KMER_LENGTH), fakeMeans + a);
+    }
+
+    CuAssertTrue(testCase, hdpHmm->numberOfAssignments == 3);
+
+    // dump the HMM to a file
+    char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
+    CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
+    FILE *fH = fopen(tempFile, "w");
+    hdpHmm_writeToFile((Hmm *) hdpHmm, fH);
+    fclose(fH);
+    hdpHmm_destruct((Hmm *) hdpHmm);
+
+    //Load from a file
+    hmm = hdpHmm_loadFromFile(tempFile, NULL);
+    hdpHmm = (HdpHmm *)hmm;
+    stFile_rmrf(tempFile);
+
+    CuAssertTrue(testCase, (3 == hdpHmm->numberOfAssignments));  // recheck number of assignments
+
+    // Check the transition expectations
+    for (int64_t from = 0; from < nStates; from++) {
+        for (int64_t to = 0; to < nStates; to++) {
+            double retrievedProb = hdpHmm->baseHmm.getTransitionsExpFcn((Hmm *) hdpHmm, from, to);
+            double correctProb = from * nStates + to;
+            CuAssertTrue(testCase, retrievedProb == correctProb);
+        }
+    }
+
+    // normalize
+    hmmDiscrete_normalize2((Hmm *)hdpHmm, FALSE);
+
+    // Recheck transitions
+    for (int64_t from = 0; from < nStates; from++) {
+        for (int64_t to = 0; to < nStates; to++) {
+            double z = from * nStates * nStates + (nStates * (nStates - 1)) / 2;
+            double retrievedNormedProb = hdpHmm->baseHmm.getTransitionsExpFcn((Hmm *) hdpHmm, from, to);
+            CuAssertDblEquals(testCase, (from * nStates + to) / z, retrievedNormedProb, 0.0);
+        }
+    }
+    hdpHmm_destruct((Hmm *) hdpHmm);
+}
+
+void updateStateMachineHDP(const char *expectationsFile, StateMachine *sM) {
+    StateMachine3_HDP *sM3Hdp = (StateMachine3_HDP *)sM;
+    Hmm *transitionsExpectations = hdpHmm_loadFromFile(expectationsFile, sM3Hdp->hdpModel);
+    hdpHmm_loadTransitions((StateMachine *) sM3Hdp, transitionsExpectations);
+    hdpHmm_destruct(transitionsExpectations);
+}
+
+static void test_hdpHmm_em(CuTest *testCase) {
+    // load the reference sequence
+    char *referencePath = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
+    FILE *fH = fopen(referencePath, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+    // load the npRead
+    char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    nanopore_descaleNanoporeRead(npRead);
+
+    // get sequence lengths
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    double pLikelihood = -INFINITY;
+
+    Hmm *hdpHmm = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold,
+                                        continuousPairHmm_addToTransitionsExpectation,
+                                        continuousPairHmm_setTransitionExpectation,
+                                        continuousPairHmm_getTransitionExpectation);
+    //continuousPairHmm_randomize(hdpHmm);
+    hmmDiscrete_randomizeTransitions(hdpHmm);
+
+    // make initial NanoporeHdp from alignment
+
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
+    char *strand = "t";
+    NanoporeHDP *nHdp = flat_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+                                       5.0, 0.5, // base_gamma, leaf_gamma
+                                       0.0, 100.0, 100, modelFile);
+    update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
+
+    // make statemachine
+    StateMachine *sMt = getHdpStateMachine3(nHdp);
+
+    // load (random) transitions into stateMachine
+    continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, hdpHmm);
+
+    // close hmm
+    hdpHmm_destruct(hdpHmm);
+
+    for (int64_t iter = 0; iter < 10; iter++) {
+        Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold,
+                                                     continuousPairHmm_addToTransitionsExpectation,
+                                                     continuousPairHmm_setTransitionExpectation,
+                                                     continuousPairHmm_getTransitionExpectation);
+        // E step
+        // get anchors using lastz
+        stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+
+        // remap and filter
+        stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+        stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
+
+        // make Sequences for reference and template events
+        Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
+                                               sequence_sliceNucleotideSequence2, kmer);
+        Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                    sequence_sliceEventSequence2, event);
+        execute_nhdp_gibbs_sampling(nHdp, 1000, 10000, 100, FALSE);
+        finalize_nhdp_distributions(nHdp);
+
+        getExpectationsUsingAnchors(sMt, hmmExpectations, refSeq, templateSeq, filteredRemappedAnchors,
+                                    p, diagonalCalculation_Expectations, 0, 0);
+
+        // norm
+        //continuousPairHmm_normalize(hmmExpectations);
+        hmmDiscrete_normalize2(hmmExpectations, FALSE);
+
+        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
+
+        // M step
+        // dump hmm (expectations) to disk
+        char *tempHdpHmmFile = stString_print("../../cPecan/tests/test_hdp/tempHdpHmm.hmm");
+        FILE *fH = fopen(tempHdpHmmFile, "w");
+        hdpHmm_writeToFile(hmmExpectations, fH);
+        fclose(fH);
+
+        // load into nHdp
+        updateStateMachineHDP(tempHdpHmmFile, sMt);
+        remove(tempHdpHmmFile);
+
+        // Tests
+        assert(pLikelihood <= hmmExpectations->likelihood * 0.95);
+        if (iter > 1) {
+            CuAssertTrue(testCase, pLikelihood <= hmmExpectations->likelihood * 0.95);
+        }
+        // update
+        pLikelihood = hmmExpectations->likelihood;
+
+        // per iteration clean up
+        //continuousPairHmm_destruct(hmmExpectations);
+        hdpHmm_destruct(hmmExpectations);
+        sequence_sequenceDestroy(refSeq);
+        sequence_sequenceDestroy(templateSeq);
+        stList_destruct(filteredRemappedAnchors);
+    }
+    nanopore_nanoporeReadDestruct(npRead);
+    pairwiseAlignmentBandingParameters_destruct(p);
+    stateMachine_destruct(sMt);
+}
 
 CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
@@ -340,9 +820,11 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_getKmer4);
-
-
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
-
+    SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
+    SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
+    SUITE_ADD_TEST(suite, test_hdpHmm_em);
     return suite;
 }

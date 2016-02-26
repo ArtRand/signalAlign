@@ -1365,7 +1365,7 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
 }
 
 static void stateMachine3HDP_cellCalculate(StateMachine *sM,
-                                           double *current, double *lower, double *middle, double *upper,
+                                           void *current, void *lower, void *middle, void *upper,
                                            void *cX, void *cY,
                                            void (*doTransition)(double *, double *,
                                                                 int64_t, int64_t,
@@ -1373,26 +1373,62 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
                                                                 void *),
                                            void *extraArgs) {
     StateMachine3_HDP *sM3 = (StateMachine3_HDP *) sM;
-    if (lower != NULL) {
-        //double eP = sM3->getXGapProbFcn(sM3->model.EMISSION_GAP_X_PROBS, cX);
-        double eP = -2.3025850929940455; // log(0.1)
-        doTransition(lower, current, match, shortGapX, eP, sM3->TRANSITION_GAP_OPEN_X, extraArgs);
-        doTransition(lower, current, shortGapX, shortGapX, eP, sM3->TRANSITION_GAP_EXTEND_X, extraArgs);
-        doTransition(lower, current, shortGapY, shortGapX, eP, sM3->TRANSITION_GAP_SWITCH_TO_X, extraArgs);
-    }
-    if (middle != NULL) {
-        double eP = sM3->getMatchProbFcn(sM3->hdpModel, cX, cY);
-        doTransition(middle, current, match, match, eP, sM3->TRANSITION_MATCH_CONTINUE, extraArgs);
-        doTransition(middle, current, shortGapX, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_X, extraArgs);
-        doTransition(middle, current, shortGapY, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_Y, extraArgs);
+    HDCell *hdCurrent = current == NULL ? NULL : (HDCell *)current;
+    HDCell *hdLower = lower == NULL ? NULL : (HDCell *)lower;
+    HDCell *hdMiddle = middle == NULL ? NULL : (HDCell *)middle;
+    HDCell *hdUpper = upper == NULL ? NULL : (HDCell *)upper;
 
+    if (hdLower != NULL) {
+        for (int64_t p = 0; p < hdCurrent->numberOfPaths; p ++) {
+            Path *pathC = hdCell_getPath(hdCurrent, p);
+            for (int64_t q = 0; q < hdLower->numberOfPaths; q++) {
+                Path *pathL = hdCell_getPath(hdLower, q);
+                if (path_checkLegal(pathL, pathC)) {
+                    //st_uglyf("SENTINAL - legal LOWER : pathC kmer %s\n", pathC->kmer);
+                    double *lowerCells = path_getCell(pathL);
+                    double *currentCells = path_getCell(pathC);
+                    double eP = -2.3025850929940455; // log(0.1)
+                    doTransition(lowerCells, currentCells, match, shortGapX, eP, sM3->TRANSITION_GAP_OPEN_X, extraArgs);
+                    doTransition(lowerCells, currentCells, shortGapX, shortGapX, eP, sM3->TRANSITION_GAP_EXTEND_X, extraArgs);
+                    doTransition(lowerCells, currentCells, shortGapY, shortGapX, eP, sM3->TRANSITION_GAP_SWITCH_TO_X, extraArgs);
+                }
+            }
+        }
     }
-    if (upper != NULL) {
-        double eP = sM3->getYGapProbFcn(sM3->hdpModel, cX, cY);
-        doTransition(upper, current, match, shortGapY, eP, sM3->TRANSITION_GAP_OPEN_Y, extraArgs);
-        doTransition(upper, current, shortGapY, shortGapY, eP, sM3->TRANSITION_GAP_EXTEND_Y, extraArgs);
-        // shortGapX -> shortGapY not allowed, this would be going from a kmer skip to extra event?
-        //doTransition(upper, current, shortGapX, shortGapY, eP, sM3->TRANSITION_GAP_SWITCH_TO_Y, extraArgs);
+    if (hdMiddle != NULL) {
+        for (int64_t p = 0; p < hdCurrent->numberOfPaths; p++) {
+            Path *pathC = hdCell_getPath(hdCurrent, p);
+            for (int64_t q = 0; q < hdMiddle->numberOfPaths; q++) {
+                Path *pathM = hdCell_getPath(hdMiddle, q);
+                if (path_checkLegal(pathM, pathC)) {
+                    //st_uglyf("SENTINAL - legal MIDDLE : pathC kmer %s\n", pathC->kmer);
+                    double *middleCells = path_getCell(pathM);
+                    double *curentCells = path_getCell(pathC);
+                    double eP = sM3->getMatchProbFcn(sM3->hdpModel, pathC->kmer, cY);
+                    doTransition(middleCells, curentCells, match, match, eP, sM3->TRANSITION_MATCH_CONTINUE, extraArgs);
+                    doTransition(middleCells, curentCells, shortGapX, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_X, extraArgs);
+                    doTransition(middleCells, curentCells, shortGapY, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_Y, extraArgs);
+                }
+            }
+        }
+    }
+    if (hdUpper != NULL) {
+        for (int64_t p = 0; p < hdCurrent->numberOfPaths; p++) {
+            Path *pathC = hdCell_getPath(hdCurrent, p);
+            for (int64_t q = 0; q < hdUpper->numberOfPaths; q++) {
+                Path *pathU = hdCell_getPath(hdUpper, q);
+                if (stString_eq(pathC->kmer, pathU->kmer)) {
+                    //st_uglyf("SENTINAL - legal UPPER : pathC kmer %s\n", pathC->kmer);
+                    double *upperCells = path_getCell(pathU);
+                    double *currentCells = path_getCell(pathC);
+                    double eP = sM3->getYGapProbFcn(sM3->hdpModel, pathC->kmer, cY);
+                    doTransition(upperCells, currentCells, match, shortGapY, eP, sM3->TRANSITION_GAP_OPEN_Y, extraArgs);
+                    doTransition(upperCells, currentCells, shortGapY, shortGapY, eP, sM3->TRANSITION_GAP_EXTEND_Y, extraArgs);
+                    // shortGapX -> shortGapY not allowed, this would be going from a kmer skip to extra event?
+                    //doTransition(upper, current, shortGapX, shortGapY, eP, sM3->TRANSITION_GAP_SWITCH_TO_Y, extraArgs);
+                }
+            }
+        }
     }
 }
 
