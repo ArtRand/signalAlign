@@ -684,72 +684,66 @@ int main(int argc, char *argv[]) {
         StateMachine *sMt, *sMc;
         stList *templateAlignedPairs, *complementAlignedPairs;
         double templatePosteriorScore, complementPosteriorScore;
-        #pragma omp parallel sections
-        {
-            {
-                // Template alignment
-                fprintf(stderr, "vanillaAlign - starting template alignment\n");
 
-                // make template stateMachine
-                sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, template, nHdpT);
+        // Template alignment
+        fprintf(stderr, "vanillaAlign - starting template alignment\n");
 
-                // get aligned pairs
-                templateAlignedPairs = performSignalAlignment(sMt, templateHmmFile, tEventSequence,
-                                                                      npRead->templateEventMap, pA->start2, trimmedRefSeq,
-                                                                      p, anchorPairs);
+        // make template stateMachine
+        sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, template, nHdpT);
 
-                templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
+        // get aligned pairs
+        templateAlignedPairs = performSignalAlignment(sMt, templateHmmFile, tEventSequence,
+                                                      npRead->templateEventMap, pA->start2, templateTargetSeq,
+                                                      p, anchorPairs);
 
-                // sort
-                stList_sort(templateAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
+        templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
-                // write to file
-                if (posteriorProbsFile != NULL) {
-                    writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS,
-                                        npRead->templateParams.scale, npRead->templateParams.shift,
-                                        npRead->templateEvents, trimmedRefSeq, forward, pA->contig1,
-                                        tCoordinateShift, rCoordinateShift_t,
-                                        templateAlignedPairs, template);
-                }
-            }
-            #pragma omp section
-            {
-                // Complement alignment
-                fprintf(stderr, "vanillaAlign - starting complement alignment\n");
-                sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, complement, nHdpC);
+        // sort
+        stList_sort(templateAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
 
-                // get aligned pairs
-                complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, cEventSequence,
-                                                                        npRead->complementEventMap, pA->start2,
-                                                                        rc_trimmedRefSeq, p, anchorPairs);
-
-                complementPosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(complementAlignedPairs);
-
-                // sort
-                stList_sort(complementAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
-
-                // write to file
-                if (posteriorProbsFile != NULL) {
-                    writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS,
-                                        npRead->complementParams.scale, npRead->complementParams.shift,
-                                        npRead->complementEvents, rc_trimmedRefSeq,
-                                        forward, pA->contig1, cCoordinateShift, rCoordinateShift_c,
-                                        complementAlignedPairs, complement);
-                }
-            }
+        // write to file
+        if (posteriorProbsFile != NULL) {
+            writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS,
+                                npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateEvents, trimmedRefSeq, forward, pA->contig1,
+                                tCoordinateShift, rCoordinateShift_t,
+                                templateAlignedPairs, template);
         }
-        fprintf(stdout, "%s %lld\t%lld(%f)\t", readLabel, stList_length(anchorPairs),
-                stList_length(templateAlignedPairs), templatePosteriorScore);
-        fprintf(stdout, "%lld(%f)\n", stList_length(complementAlignedPairs), complementPosteriorScore);
-        // final alignment clean up
-        stateMachine_destruct(sMt);
-        sequence_sequenceDestroy(tEventSequence);
-        stList_destruct(templateAlignedPairs);
-        stateMachine_destruct(sMc);
-        sequence_sequenceDestroy(cEventSequence);
-        stList_destruct(complementAlignedPairs);
-        fprintf(stderr, "vanillaAlign - SUCCESS: finished alignment of query %s, exiting\n", readLabel);
-    }
 
+        // Complement alignment
+        fprintf(stderr, "vanillaAlign - starting complement alignment\n");
+        sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, complement, nHdpC);
+
+        // get aligned pairs
+        complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, cEventSequence,
+                                                                npRead->complementEventMap, pA->start2,
+                                                                complementTargetSeq, p, anchorPairs);
+
+        complementPosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(complementAlignedPairs);
+
+        // sort
+        stList_sort(complementAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
+
+        // write to file
+        if (posteriorProbsFile != NULL) {
+            writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS,
+                                npRead->complementParams.scale, npRead->complementParams.shift,
+                                npRead->complementEvents, rc_trimmedRefSeq,
+                                forward, pA->contig1, cCoordinateShift, rCoordinateShift_c,
+                                complementAlignedPairs, complement);
+
+            fprintf(stdout, "%s %lld\t%lld(%f)\t", readLabel, stList_length(anchorPairs),
+                    stList_length(templateAlignedPairs), templatePosteriorScore);
+            fprintf(stdout, "%lld(%f)\n", stList_length(complementAlignedPairs), complementPosteriorScore);
+            // final alignment clean up
+            stateMachine_destruct(sMt);
+            sequence_sequenceDestroy(tEventSequence);
+            stList_destruct(templateAlignedPairs);
+            stateMachine_destruct(sMc);
+            sequence_sequenceDestroy(cEventSequence);
+            stList_destruct(complementAlignedPairs);
+            fprintf(stderr, "vanillaAlign - SUCCESS: finished alignment of query %s, exiting\n", readLabel);
+        }
+    }
     return 0;
 }
