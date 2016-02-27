@@ -232,7 +232,7 @@ stList *performSignalAlignmentP(StateMachine *sM, Sequence *sY, int64_t *eventMa
                                                          double totalProbability, PairwiseAlignmentParameters *p,
                                                          void *extraArgs)) {
     int64_t lX = sequence_correctSeqLength(strlen(target), kmer);
-    
+
     // remap anchor pairs
     stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
