@@ -43,10 +43,10 @@ void write_kmer_distr(NanoporeHDP* nhdp, char* kmer, double* eval_grid, int64_t 
 }
 
 void write_all_kmer_distrs(NanoporeHDP* nhdp, double* eval_grid, int64_t grid_length, char *workingDirectory) {
-    char x_filename[FILENAME_BUFFER_LEN];
-    char distributions[FILENAME_BUFFER_LEN];
-    sprintf(x_filename, "%s/x_vals.txt", workingDirectory);
-    sprintf(distributions, "%s/distributions.tsv", workingDirectory);
+    char *x_filename = stString_print("%s/x_vals.txt", workingDirectory);
+    char *distributions = stString_print("%s/distributions.tsv", workingDirectory);
+    //sprintf(x_filename, "%s/x_vals.txt", workingDirectory);
+    //sprintf(distributions, "%s/distributions.tsv", workingDirectory);
     FILE* x_vals = fopen(x_filename, "w");
     FILE *distributionFileHandle = fopen(distributions, "a");
 
