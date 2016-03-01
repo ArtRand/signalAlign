@@ -15,6 +15,7 @@
 #define SYMBOL_NUMBER_NO_N 4
 #define SYMBOL_NUMBER_EPIGENETIC_C 6
 #define MODEL_PARAMS 5 // level_mean, level_sd, fluctuation_mean, fluctuation_noise, fluctuation_lambda
+#define SIX_LETTER_ALPHA "ACEGOT"
 
 
 typedef enum {

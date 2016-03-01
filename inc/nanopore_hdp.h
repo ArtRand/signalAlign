@@ -8,7 +8,7 @@
 
 #ifndef nanopore_hdp_h
 #define nanopore_hdp_h
-
+#define NULL_HYPERPARAMETER -1
 #include <stdbool.h>
 #include <inttypes.h>
 #include "hdp.h"
@@ -108,8 +108,9 @@ NanoporeHDP* multiset_hdp_model(const char* alphabet, int64_t alphabet_size, int
                                 double sampling_grid_start, double sampling_grid_stop, int64_t sampling_grid_length,
                                 const char* model_filepath);
 NanoporeHDP* multiset_hdp_model_2(const char* alphabet, int64_t alphabet_size, int64_t kmer_length,
-                                  double base_gamma_alpha, double base_gamma_beta, double middle_gamma_alpha,
-                                  double middle_gamma_beta, double leaf_gamma_alpha, double leaf_gamma_beta,
+                                  double base_gamma_alpha, double base_gamma_beta,
+                                  double middle_gamma_alpha, double middle_gamma_beta,
+                                  double leaf_gamma_alpha, double leaf_gamma_beta,
                                   double sampling_grid_start, double sampling_grid_stop, int64_t sampling_grid_length,
                                   const char* model_filepath);
 
@@ -131,7 +132,14 @@ NanoporeHDP* deserialize_nhdp(const char* filepath);
 void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
                                                const char *templateModelFile, const char* complementModelFile,
                                                const char *alignments,
-                                               const char *templateHDP, const char *complementHDP);
+                                               const char *templateHDP, const char *complementHDP,
+                                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbsose,
+                                               double baseGamma, double middleGamma, double leafGamma,
+                                               double baseGammaAlpha, double baseGammaBeta,
+                                               double middleGammaAlpha, double middleGammaBeta,
+                                               double leafGammaAlpha, double leafGammaBeta,
+                                               double samplingGridStart, double samplingGridEnd,
+                                               int64_t samplingGridLength);
 
 // n^k
 int64_t power(int64_t n, int64_t k);

@@ -169,7 +169,7 @@ stList *getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap, int64
 StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentParameters npp, StateMachineType type,
                                 Strand strand, NanoporeHDP *nHdp) {
     if ((type != threeState) && (type != threeStateHdp)) {
-        st_errAbort("vanillaAlign - incompatable stateMachine type request");
+        st_errAbort("signalAlign - incompatable stateMachine type request");
     }
 
     if (type == threeState) {
@@ -182,7 +182,7 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
         return sM;
     }
     else {
-        st_errAbort("vanillaAlign - ERROR: buildStateMachine, didn't get correct input\n");
+        st_errAbort("signalAlign - ERROR: buildStateMachine, didn't get correct input\n");
     }
     return 0;
 }
@@ -192,11 +192,11 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
     Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, nHdp);
     hmmContinuous_destruct(hdpHmm, hdpHmm->type);
 
-    fprintf(stderr, "vanillaAlign - Running Gibbs on HDP\n");
+    fprintf(stderr, "signalAlign - Running Gibbs on HDP\n");
     execute_nhdp_gibbs_sampling(nHdp, 10000, 100000, 100, FALSE);
     finalize_nhdp_distributions(nHdp);
 
-    fprintf(stderr, "vanillaAlign - Serializing HDP to %s\n", nHdpOutFile);
+    fprintf(stderr, "signalAlign - Serializing HDP to %s\n", nHdpOutFile);
     serialize_nhdp(nHdp, nHdpOutFile);
     destroy_nanopore_hdp(nHdp);
 }
@@ -249,7 +249,7 @@ stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, Sequence *
                                int64_t mapOffset,
                                char *target, PairwiseAlignmentParameters *p, stList *unmappedAncors) {
     if ((sM->type != threeState) && (sM->type != threeStateHdp)) {
-        st_errAbort("vanillaAlign - You're trying to do the wrong king of alignment");
+        st_errAbort("signalAlign - You're trying to do the wrong king of alignment");
     }
 
     // load HMM if given
@@ -353,7 +353,7 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
 
     // load HMM
     if (inputHmm != NULL) {
-        fprintf(stderr, "vanillaAlign - loading HMM from file, %s\n", inputHmm);
+        fprintf(stderr, "signalAlign - loading HMM from file, %s\n", inputHmm);
         loadHmmRoutine(inputHmm, sM, type);
     }
 
@@ -374,11 +374,8 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
 int main(int argc, char *argv[]) {
     StateMachineType sMtype = threeState;
     // HDP stuff
-    char *alignments = NULL;
-    bool build = FALSE;
-    int64_t hdpType = 99;
 
-    int64_t j;
+    int64_t j = 0;
     int64_t diagExpansion = 50;
     double threshold = 0.01;
     int64_t constraintTrim = 14;
@@ -402,11 +399,8 @@ int main(int argc, char *argv[]) {
         static struct option long_options[] = {
                 {"help",                    no_argument,        0,  'h'},
                 {"sm3Hdp",                  no_argument,        0,  'd'},
-                {"buildHDP",                no_argument,        0,  'U'},
                 {"sparse_output",           no_argument,        0,  's'},
-                {"HdpType",                 required_argument,  0,  'p'},
                 {"substitute",              required_argument,  0,  'M'},
-                {"alignments",              required_argument,  0,  'a'},
                 {"templateModel",           required_argument,  0,  'T'},
                 {"complementModel",         required_argument,  0,  'C'},
                 {"readLabel",               required_argument,  0,  'L'},
@@ -442,18 +436,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'd':
                 sMtype = threeStateHdp;
-                break;
-            case 'U':
-                build = TRUE;
-                break;
-            case 'a':
-                alignments = stString_copy(optarg);
-                break;
-            case 'p':
-                j = sscanf(optarg, "%" PRIi64 "", &hdpType);
-                assert (j == 1);
-                assert (hdpType >= 0);
-                assert (hdpType <=3);
                 break;
             case 'M':
                 cytosine_substitute = stString_copy(optarg);
@@ -516,7 +498,8 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
-    // HDP build option
+
+    /* DEPRECIATED
     if (build) {
         fprintf(stderr, "signalAlign - NOTICE: Building HDP\n");
         if ((templateHdp == NULL) || (complementHdp == NULL)) {
@@ -528,8 +511,8 @@ int main(int argc, char *argv[]) {
                 st_errAbort("Invalid HDP type");
             }
             NanoporeHdpType type = (NanoporeHdpType) hdpType;
-            nanoporeHdp_buildNanoporeHdpFromAlignment(type, templateModelFile, complementModelFile, alignments,
-                                                      templateHdp, complementHdp);
+            //nanoporeHdp_buildNanoporeHdpFromAlignment(type, templateModelFile, complementModelFile, alignments,
+            //                                          templateHdp, complementHdp);
             return 0;
         } else {
 
@@ -557,12 +540,13 @@ int main(int argc, char *argv[]) {
             return 0;
         }
     }
+    */
 
     if (sMtype == threeState) {
-        fprintf(stderr, "signalAlign - using strawMan model\n");
+        fprintf(stderr, "signalAlign - using three-state HMM model\n");
     }
     if (sMtype == threeStateHdp) {
-        fprintf(stderr, "signalAlign - using strawMan-HDP model\n");
+        fprintf(stderr, "signalAlign - using three-state HMM-HDP model\n");
     }
 
     NanoporeHDP *nHdpT, *nHdpC;
@@ -570,12 +554,14 @@ int main(int argc, char *argv[]) {
     #pragma omp parallel sections
     {
         {
-            nHdpT = (templateHdp != NULL) ? deserialize_nhdp(templateHdp) : NULL;
+            //nHdpT = (templateHdp != NULL) ? deserialize_nhdp(templateHdp) : NULL;
+            nHdpT = (templateHdp == NULL) ? NULL : deserialize_nhdp(templateHdp);
         }
 
         #pragma omp section
         {
-            nHdpC = (complementHdp != NULL) ? deserialize_nhdp(complementHdp) : NULL;
+            //nHdpC = (complementHdp != NULL) ? deserialize_nhdp(complementHdp) : NULL;
+            nHdpC = (complementHdp == NULL) ? NULL : deserialize_nhdp(complementHdp);
         }
     }
 
@@ -657,10 +643,6 @@ int main(int argc, char *argv[]) {
 
     if ((templateExpectationsFile != NULL) && (complementExpectationsFile != NULL)) {
         // Expectation Routine //
-        if ((sMtype != threeState) && (sMtype != vanilla) && (sMtype != threeStateHdp)) {
-            st_errAbort("vanillaAlign - getting expectations not allowed for this HMM type, yet");
-        }
-
         // make empty HMM to collect expectations
         Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold);
         Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold);

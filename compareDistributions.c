@@ -23,31 +23,39 @@ char* kmer_from_index(int64_t index, const char* alphabet, int64_t alphabet_size
     return kmer;
 }
 
-void write_kmer_distr(NanoporeHDP* nhdp, char* kmer, double* eval_grid, int64_t grid_length, char *workingDirectory) {
-    char filename[FILENAME_BUFFER_LEN];
-    sprintf(filename, "%s/%s_distr.txt", workingDirectory, kmer);
-    FILE* out = fopen(filename, "w");
-    
+void write_kmer_distr(NanoporeHDP* nhdp, char* kmer, double* eval_grid, int64_t grid_length, FILE *out) {
+    //char filename[FILENAME_BUFFER_LEN];
+    //sprintf(filename, "%s/%s_distr.txt", workingDirectory, kmer);
+    //FILE* out = fopen(filename, "w");
+
+    fprintf(out, "%s\t", kmer);
+
     double density;
     for (int64_t i = 0; i < grid_length - 1; i++) {
         density = get_nanopore_kmer_density(nhdp, kmer, eval_grid + i);
-        fprintf(out, "%.17lg\n", density);
+        fprintf(out, "%.17lg\t", density);
     }
 
     density = get_nanopore_kmer_density(nhdp, kmer, eval_grid + (grid_length - 1));
-    fprintf(out, "%.17lg", density);
+    fprintf(out, "%.17lg\n", density);
     
-    fclose(out);
+    //fclose(out);
 }
 
 void write_all_kmer_distrs(NanoporeHDP* nhdp, double* eval_grid, int64_t grid_length, char *workingDirectory) {
     char x_filename[FILENAME_BUFFER_LEN];
+    char distributions[FILENAME_BUFFER_LEN];
     sprintf(x_filename, "%s/x_vals.txt", workingDirectory);
+    sprintf(distributions, "%s/distributions.tsv", workingDirectory);
     FILE* x_vals = fopen(x_filename, "w");
+    FILE *distributionFileHandle = fopen(distributions, "a");
+
     for (int64_t i = 0; i < grid_length - 1; i++) {
         fprintf(x_vals, "%.17lg\n", eval_grid[i]);
     }
+
     fprintf(x_vals, "%.17lg", eval_grid[grid_length - 1]);
+
     fclose(x_vals);
     
     int64_t alphabet_size = get_nanopore_hdp_alphabet_size(nhdp);
@@ -59,25 +67,27 @@ void write_all_kmer_distrs(NanoporeHDP* nhdp, double* eval_grid, int64_t grid_le
     for (int64_t kmer_index = 0; kmer_index < num_kmers; kmer_index++) {
         char* kmer = kmer_from_index(kmer_index, alphabet, alphabet_size, kmer_length);
         
-        write_kmer_distr(nhdp, kmer, eval_grid, grid_length, workingDirectory);
+        write_kmer_distr(nhdp, kmer, eval_grid, grid_length, distributionFileHandle);
         
         free(kmer);
     }
-    
+
     free(alphabet);
+    fclose(distributionFileHandle);
 }
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
-        fprintf(stderr, "USAGE: compareDistributions [NanoporeHDP_file] [distribution_directory]\n");
+        fprintf(stderr, "USAGE_NEW: compareDistributions [NanoporeHDP_file] [distribution_directory]\n");
         exit(EXIT_FAILURE);
     }
 
     char *modelFile = argv[1];
     fprintf(stderr, "[compareDistributions] NOTICE: Loading NanoporeHDP from %s\n", modelFile);
 
-    char *workingDirectoryPath = argv[2];
-    fprintf(stderr, "[compareDistributions] NOTICE: Putting distribution files in %s\n", workingDirectoryPath);
+    char *workingDirectory = argv[2];
+    //FILE *fH = fopen(destinationFile, "w");
+    fprintf(stderr, "[compareDistributions] NOTICE: Putting distributions in %s\n", workingDirectory);
 
     NanoporeHDP *nHdp= deserialize_nhdp(modelFile);
 
@@ -87,7 +97,7 @@ int main(int argc, char *argv[]) {
 
     double *evaluationGrid = linspace(gridStart, gridStop, gridLength);
 
-    write_all_kmer_distrs(nHdp, evaluationGrid, gridLength, workingDirectoryPath);
+    write_all_kmer_distrs(nHdp, evaluationGrid, gridLength, workingDirectory);
 
     free(evaluationGrid);
     destroy_nanopore_hdp(nHdp);

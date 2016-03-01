@@ -488,8 +488,9 @@ NanoporeHDP* flat_hdp_model(const char* alphabet, int64_t alphabet_size, int64_t
 }
 
 NanoporeHDP* flat_hdp_model_2(const char* alphabet, int64_t alphabet_size, int64_t kmer_length,
-                              double base_gamma_alpha, double base_gamma_beta, double leaf_gamma_alpha,
-                              double leaf_gamma_beta, double sampling_grid_start, double sampling_grid_stop,
+                              double base_gamma_alpha, double base_gamma_beta,
+                              double leaf_gamma_alpha, double leaf_gamma_beta,
+                              double sampling_grid_start, double sampling_grid_stop,
                               int64_t sampling_grid_length, const char* model_filepath) {
     
     double* gamma_alpha = (double*) malloc(sizeof(double) * 2);
@@ -877,37 +878,69 @@ NanoporeHDP* deserialize_nhdp(const char* filepath) {
     return nhdp;
 }
 
-static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile) {
+static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile,
+                                               double baseGamma, double middleGamma, double leafGamma,
+                                               double baseGammaAlpha, double baseGammaBeta,
+                                               double middleGammaAlpha, double middleGammaBeta,
+                                               double leafGammaAlpha, double leafGammaBeta,
+                                               double samplingGridStart, double samplingGridEnd,
+                                               int64_t samplingGridLength) {
     if (nHdpType == singleLevelFixed) {
-        NanoporeHDP *nHdp = flat_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                           5.0, 0.5,
-                                           30.0, 90.0, 1200, modelFile);
+        if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
+            st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "
+                                "for this NanoporeHdpType\n");
+        }
+
+        NanoporeHDP *nHdp = flat_hdp_model(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+                                           baseGamma, leafGamma,
+                                           samplingGridStart, samplingGridEnd, samplingGridLength, modelFile);
+
         return nHdp;
     }
     if (nHdpType == singleLevelPrior) {
-        NanoporeHDP *nHdp = flat_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                             5.0, 0.5, 5.0, 0.5, // base_alpha, base_beta, leaf_alpha, leaf_beta
-                                             30.0, 90, 1200,
+        if ((baseGammaAlpha == NULL_HYPERPARAMETER) || (baseGammaBeta == NULL_HYPERPARAMETER) ||
+                (leafGammaAlpha == NULL_HYPERPARAMETER) || (leafGammaBeta == NULL_HYPERPARAMETER)) {
+            st_errAbort("loadNanoporeHdpFromScratch: You need to provide a alphas and betas for the base and the leaf"
+                                "distributions for the prior for this NanoporeHdp");
+        }
+
+        NanoporeHDP *nHdp = flat_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+                                             baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta,
+                                             samplingGridStart, samplingGridEnd, samplingGridLength,
                                              modelFile);
         return nHdp;
     }
     if (nHdpType == multisetFixed) {
-        NanoporeHDP *nHdp = multiset_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                               1.0, 1.0, 1.0,
-                                               30.0, 90.0, 1200,
+        if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER) ||
+                (middleGamma == NULL_HYPERPARAMETER)) {
+            st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma, middle gamma, and leaf gamma "
+                                "for this NanoporeHdpType\n");
+        }
+
+        NanoporeHDP *nHdp = multiset_hdp_model(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+                                               baseGamma, middleGamma, leafGamma,
+                                               samplingGridStart, samplingGridEnd, samplingGridLength,
                                                modelFile);
         return nHdp;
     }
     if (nHdpType == multisetPrior) {
-        NanoporeHDP *nHdp = multiset_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                                 5.0, 0.5,
-                                                 5.0, 0.5,
-                                                 5.0, 0.5,
-                                                 30.0, 90.0, 1200,
+        if ((baseGammaAlpha == NULL_HYPERPARAMETER) || (baseGammaBeta == NULL_HYPERPARAMETER) ||
+            (middleGammaAlpha == NULL_HYPERPARAMETER) || (middleGammaBeta == NULL_HYPERPARAMETER) ||
+            (leafGammaAlpha == NULL_HYPERPARAMETER) || (leafGammaBeta == NULL_HYPERPARAMETER)) {
+            st_errAbort("loadNanoporeHdpFromScratch: You need to provide a alphas and betas for the base, middle, "
+                                "and the leaf distributions for the prior for this NanoporeHdp");
+        }
+
+        NanoporeHDP *nHdp = multiset_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+                                                 baseGammaAlpha, baseGammaBeta,
+                                                 middleGammaAlpha, middleGammaBeta,
+                                                 leafGammaAlpha, leafGammaBeta,
+                                                 samplingGridStart, samplingGridEnd, samplingGridLength,
                                                  modelFile);
         return nHdp;
+
     } else {
-        fprintf(stderr, "vanillaAlign - error making HDP from scratch\n");
+        fprintf(stderr, "loadNanoporeHdpFromScratch: - error making HDP from scratch\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -915,34 +948,51 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
 void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
                                                const char *templateModelFile, const char* complementModelFile,
                                                const char *alignments,
-                                               const char *templateHDP, const char *complementHDP) {
-    fprintf(stderr, "vanillaAlign - Building Nanopore HDP\n");
+                                               const char *templateHDP, const char *complementHDP,
+                                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbsose,
+                                               double baseGamma, double middleGamma, double leafGamma,
+                                               double baseGammaAlpha, double baseGammaBeta,
+                                               double middleGammaAlpha, double middleGammaBeta,
+                                               double leafGammaAlpha, double leafGammaBeta,
+                                               double samplingGridStart, double samplingGridEnd,
+                                               int64_t samplingGridLength) {
+    fprintf(stderr, "Building Nanopore HDP\n");
 #pragma omp parallel sections
  {
     {
-        fprintf(stderr, "vanillaAlign - Updating Template HDP from alignments...\n");
-        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile);
+        fprintf(stderr, "Updating Template HDP from alignments...\n");
+        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile,
+                                                        baseGamma, middleGamma, leafGamma,
+                                                        baseGammaAlpha, baseGammaBeta,
+                                                        middleGammaAlpha, middleGammaBeta,
+                                                        leafGammaAlpha, leafGammaBeta,
+                                                        samplingGridStart, samplingGridEnd, samplingGridLength);
         update_nhdp_from_alignment_with_filter(nHdpT, alignments, FALSE, "t");
 
-        fprintf(stderr, "vanillaAlign - Running Gibbs for template...\n");
-        execute_nhdp_gibbs_sampling(nHdpT, 10000, 100000, 100, FALSE);
+        fprintf(stderr, "Running Gibbs for template...\n");
+        execute_nhdp_gibbs_sampling(nHdpT, nbSamples, burnIn, thinning, verbsose);
         finalize_nhdp_distributions(nHdpT);
 
-        fprintf(stderr, "vanillaAlign - Serializing template to %s...\n", templateHDP);
+        fprintf(stderr, "Serializing template to %s...\n", templateHDP);
         serialize_nhdp(nHdpT, templateHDP);
         destroy_nanopore_hdp(nHdpT);
     }
 #pragma omp section
     {
-        fprintf(stderr, "vanillaAlign - Updating Complement HDP from alignments...\n");
-        NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile);
+        fprintf(stderr, "Updating Complement HDP from alignments...\n");
+        NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile,
+                                                        baseGamma, middleGamma, leafGamma,
+                                                        baseGammaAlpha, baseGammaBeta,
+                                                        middleGammaAlpha, middleGammaBeta,
+                                                        leafGammaAlpha, leafGammaBeta,
+                                                        samplingGridStart, samplingGridEnd, samplingGridLength);
         update_nhdp_from_alignment_with_filter(nHdpC, alignments, FALSE, "c");
 
-        fprintf(stderr, "vanillaAlign - Running Gibbs for complement...\n");
-        execute_nhdp_gibbs_sampling(nHdpC, 10000, 100000, 100, FALSE);
+        fprintf(stderr, "Running Gibbs for complement...\n");
+        execute_nhdp_gibbs_sampling(nHdpC, nbSamples, burnIn, thinning, verbsose);
         finalize_nhdp_distributions(nHdpC);
 
-        fprintf(stderr, "vanillaAlign - Serializing complement to %s...\n", complementHDP);
+        fprintf(stderr, "Serializing complement to %s...\n", complementHDP);
         serialize_nhdp(nHdpC, complementHDP);
         destroy_nanopore_hdp(nHdpC);
     }

@@ -764,8 +764,8 @@ class ComplementModel(NanoporeModel):
 class SignalAlignment(object):
     def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
                  in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
-                 threshold, diagonal_expansion, sparse_output,
-                 constraint_trim, target_regions=None, cytosine_substitution=None):
+                 threshold, diagonal_expansion, constraint_trim,
+                 target_regions=None, cytosine_substitution=None, sparse_output=False):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.reference = reference  # reference sequence
         self.destination = destination  # place where the alignments go, should already exist
