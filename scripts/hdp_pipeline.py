@@ -143,6 +143,7 @@ if args.mC_alns is not None: build_alignment_command += "-mC={mC} ".format(mC=ar
 if args.hmC_alns is not None: build_alignment_command += "-hmC={hmC} ".format(hmC=args.hmC_alns)
 pipeline_log.write("[pipeline] NOTICE: Making build alignment using files from:\n\t{C}\n\t{mC}\n\t{hmC}\n"
                    "".format(C=args.C_alns, mC=args.mC_alns, hmC=args.hmC_alns))
+pipeline_log.write("[pipeline] Command: {}".format(build_alignment_command))
 check_call(build_alignment_command.split(), stderr=pipeline_log, stdout=pipeline_log)
 
 # initial HDP
@@ -164,8 +165,8 @@ build_initial_hdp_command = "./buildHdpUtil {verbose}-p {hdpType} -v {tHdpLoc} -
                                       samples=args.gibbs_samples, burnIn=args.burnIn, thin=args.thinning,
                                       start=args.grid_start, end=args.grid_end, len=args.grid_length,
                                       verbose=verbose_flag)
-
 build_initial_hdp_command += get_initial_hdp_args(args=args, hdp_type=get_hdp_type(args.hdp_type))
+pipeline_log.write("[pipeline] Command: {}".format(build_initial_hdp_command))
 check_call(build_initial_hdp_command.split(), stdout=initial_hdp_build_out, stderr=initial_hdp_build_err)
 initial_hdp_build_out.close()
 initial_hdp_build_err.close()
@@ -194,6 +195,7 @@ if args.cytosine_sub is not None:
                                                           "directory.  Just use C if you don't want a change."
     for substitution in args.cytosine_sub:
         train_models_command += "-cs={sub} ".format(sub=substitution)
+pipeline_log.write("[pipeline] Command: {}".format(train_models_command))
 check_call(train_models_command.split(), stdout=train_hdp_out, stderr=train_hdp_err)
 
 # get HDP distributions
@@ -206,6 +208,7 @@ compare_distributions_commands = [
     "./compareDistributions {tHdp} {tDir}".format(tHdp=template_trained_hdp_location, tDir=template_distr_dir),
     "./compareDistributions {cHdp} {cDir}".format(cHdp=complement_trained_hdp_location, cDir=complement_distr_dir)
 ]
+pipeline_log.write("[pipeline] Commands {}".format(compare_distributions_commands))
 procs = [Popen(x.split(), stdout=pipeline_log, stderr=pipeline_log) for x in compare_distributions_commands]
 status = [p.wait() for p in procs]
 
