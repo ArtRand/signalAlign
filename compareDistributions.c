@@ -23,32 +23,33 @@ char* kmer_from_index(int64_t index, const char* alphabet, int64_t alphabet_size
     return kmer;
 }
 
-void write_kmer_distr(NanoporeHDP* nhdp, char* kmer, double* eval_grid, int64_t grid_length, FILE *out) {
+void write_kmer_distr(NanoporeHDP* nhdp, char* kmer, double* eval_grid, int64_t grid_length, char *workingDirectory) {
     //char filename[FILENAME_BUFFER_LEN];
+    char *filename = stString_print("%s/%s_distr.txt", workingDirectory, kmer);
     //sprintf(filename, "%s/%s_distr.txt", workingDirectory, kmer);
-    //FILE* out = fopen(filename, "w");
+    FILE* out = fopen(filename, "w");
 
-    fprintf(out, "%s\t", kmer);
+    //fprintf(out, "%s\t", kmer);
 
     double density;
     for (int64_t i = 0; i < grid_length - 1; i++) {
         density = get_nanopore_kmer_density(nhdp, kmer, eval_grid + i);
-        fprintf(out, "%.17lg\t", density);
+        fprintf(out, "%.17lg\n", density);
     }
 
     density = get_nanopore_kmer_density(nhdp, kmer, eval_grid + (grid_length - 1));
     fprintf(out, "%.17lg\n", density);
     
-    //fclose(out);
+    fclose(out);
 }
 
 void write_all_kmer_distrs(NanoporeHDP* nhdp, double* eval_grid, int64_t grid_length, char *workingDirectory) {
     char *x_filename = stString_print("%s/x_vals.txt", workingDirectory);
-    char *distributions = stString_print("%s/distributions.tsv", workingDirectory);
+    //char *distributions = stString_print("%s/distributions.tsv", workingDirectory);
     //sprintf(x_filename, "%s/x_vals.txt", workingDirectory);
     //sprintf(distributions, "%s/distributions.tsv", workingDirectory);
     FILE* x_vals = fopen(x_filename, "w");
-    FILE *distributionFileHandle = fopen(distributions, "a");
+    //FILE *distributionFileHandle = fopen(distributions, "a");
 
     for (int64_t i = 0; i < grid_length - 1; i++) {
         fprintf(x_vals, "%.17lg\n", eval_grid[i]);
@@ -67,13 +68,13 @@ void write_all_kmer_distrs(NanoporeHDP* nhdp, double* eval_grid, int64_t grid_le
     for (int64_t kmer_index = 0; kmer_index < num_kmers; kmer_index++) {
         char* kmer = kmer_from_index(kmer_index, alphabet, alphabet_size, kmer_length);
         
-        write_kmer_distr(nhdp, kmer, eval_grid, grid_length, distributionFileHandle);
+        write_kmer_distr(nhdp, kmer, eval_grid, grid_length, workingDirectory);
         
         free(kmer);
     }
 
     free(alphabet);
-    fclose(distributionFileHandle);
+    //fclose(workingDirectory);
 }
 
 int main(int argc, char *argv[]) {
