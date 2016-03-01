@@ -122,14 +122,25 @@ def get_model(type, symbol_set_size, threshold):
 
 def add_and_norm_expectations(path, files, model, hmm_file):
     model.likelihood = 0
+    files_added_successfully = 0
+    files_with_problems = 0
     for f in files:
-        model.add_expectations_file(path + f)
-        os.remove(path + f)
+        try:
+            model.add_expectations_file(path + f)
+            os.remove(path + f)
+            files_added_successfully += 1
+        except Exception as e:
+            print("Problem adding expectations file {file} got error {e}".format(file=path + f, e=e),
+                  file=sys.stderr)
+            os.remove(path + f)
+            files_with_problems += 1
     model.normalize()
     model.write(hmm_file)
     model.running_likelihoods.append(model.likelihood)
     if type(model) is HdpSignalHmm:
         model.reset_assignments()
+    print("[trainModels] NOTICE: Added {success} expectations files successfully, {problem} files had problems\n"
+          "".format(success=files_added_successfully, problem=files_with_problems), file=sys.stderr)
 
 
 def build_hdp(hdp_type, template_hdp_path, complement_hdp_path, alignments,
