@@ -111,7 +111,7 @@ def main(arguments):
                                                     args.threshold, args.max_assignments)
 
     complement_build_alignment = make_build_alignment(C_alns, mC_alns, hmC_alns, 'c',
-                                                    args.threshold, args.max_assignments)
+                                                      args.threshold, args.max_assignments)
 
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t0.0\t{event}\t0.0\n"
 

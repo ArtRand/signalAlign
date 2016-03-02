@@ -135,15 +135,16 @@ pipeline_log.write("[pipeline] Command Line: {}\n".format(command_line))
 # build alignment
 signalAlign_directory = "../../signalAlign/"
 build_alignment_location = working_directory + "buildAlignment.tsv"
-build_alignment_command = "{sA}scripts/makeBuildAlignments.py -o={bA} -t={threshold} " \
+build_alignment_command = "{sA}scripts/makeBuildAlignments.py -o={bA} -t={threshold} -n={nbAssignments} " \
                           "".format(sA=signalAlign_directory, C=args.C_alns, mC=args.mC_alns, threshold=args.threshold,
-                                    hmC=args.hmC_alns, bA=build_alignment_location)
+                                    hmC=args.hmC_alns, bA=build_alignment_location,
+                                    nbAssignments=args.max_assignments)
 if args.C_alns is not None: build_alignment_command += "-C={C} ".format(C=args.C_alns)
 if args.mC_alns is not None: build_alignment_command += "-mC={mC} ".format(mC=args.mC_alns)
 if args.hmC_alns is not None: build_alignment_command += "-hmC={hmC} ".format(hmC=args.hmC_alns)
 pipeline_log.write("[pipeline] NOTICE: Making build alignment using files from:\n\t{C}\n\t{mC}\n\t{hmC}\n"
                    "".format(C=args.C_alns, mC=args.mC_alns, hmC=args.hmC_alns))
-pipeline_log.write("[pipeline] Command: {}".format(build_alignment_command))
+pipeline_log.write("[pipeline] Command: {}\n".format(build_alignment_command))
 check_call(build_alignment_command.split(), stderr=pipeline_log, stdout=pipeline_log)
 
 # initial HDP
@@ -166,7 +167,7 @@ build_initial_hdp_command = "./buildHdpUtil {verbose}-p {hdpType} -v {tHdpLoc} -
                                       start=args.grid_start, end=args.grid_end, len=args.grid_length,
                                       verbose=verbose_flag)
 build_initial_hdp_command += get_initial_hdp_args(args=args, hdp_type=get_hdp_type(args.hdp_type))
-pipeline_log.write("[pipeline] Command: {}".format(build_initial_hdp_command))
+pipeline_log.write("[pipeline] Command: {}\n".format(build_initial_hdp_command))
 check_call(build_initial_hdp_command.split(), stdout=initial_hdp_build_out, stderr=initial_hdp_build_err)
 initial_hdp_build_out.close()
 initial_hdp_build_err.close()
@@ -196,7 +197,7 @@ if args.cytosine_sub is not None:
                                                           "directory.  Just use C if you don't want a change."
     for substitution in args.cytosine_sub:
         train_models_command += "-cs={sub} ".format(sub=substitution)
-pipeline_log.write("[pipeline] Command: {}".format(train_models_command))
+pipeline_log.write("[pipeline] Command: {}\n".format(train_models_command))
 check_call(train_models_command.split(), stdout=train_hdp_out, stderr=train_hdp_err)
 
 # get HDP distributions
@@ -207,6 +208,8 @@ template_untrained_distr_dir = working_directory + "template_distrs_untrained/"
 complement_untrained_distr_dir = working_directory + "complement_distrs_untrained/"
 os.makedirs(template_trained_distr_dir)
 os.makedirs(complement_trained_distr_dir)
+os.makedirs(template_untrained_distr_dir)
+os.makedirs(complement_untrained_distr_dir)
 compare_distributions_commands = [
     "./compareDistributions {tHdp} {tDir}".format(tHdp=template_trained_hdp_location,
                                                   tDir=template_trained_distr_dir),
@@ -221,7 +224,7 @@ for command in compare_distributions_commands:
     pipeline_log.write("[pipeline] Command {}\n".format(command))
 procs = [Popen(x.split(), stdout=pipeline_log, stderr=pipeline_log) for x in compare_distributions_commands]
 status = [p.wait() for p in procs]
-pipeline_log.write("\n[pipeline] DONE.\n")
+pipeline_log.write("[pipeline] DONE.\n")
 pipeline_log.close()
 
 
