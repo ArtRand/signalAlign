@@ -58,8 +58,7 @@ def parse_args():
     parser.add_argument('--samples', '-s', action='store', type=int, default=100000, dest='gibbs_samples')
     parser.add_argument('--burnIn', '-I', action='store', type=int, default=1000000, dest='burnIn')
     parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
-    parser.add_argument('--verbose', action='store_true', default=False, dest='verbose')
-
+   
     args = parser.parse_args()
     return args
 
