@@ -77,9 +77,9 @@ def make_build_alignment(c_alns, mc_alns, hmc_alns, strand, threshold, max_assig
     mC_trans_table = string.maketrans("C", "E")
     hmC_trans_table = string.maketrans("C", "O")
 
-    C_table = collect_assignments(c_alns, "t", threshold, max_assignments, C_trans_table)
-    mC_table = collect_assignments(mc_alns, "t", threshold, max_assignments, mC_trans_table)
-    hmC_table = collect_assignments(hmc_alns, "t", threshold, max_assignments, hmC_trans_table)
+    C_table = collect_assignments(c_alns, strand, threshold, max_assignments, C_trans_table)
+    mC_table = collect_assignments(mc_alns, strand, threshold, max_assignments, mC_trans_table)
+    hmC_table = collect_assignments(hmc_alns, strand, threshold, max_assignments, hmC_trans_table)
 
     nb_c_assignments = C_table.shape[0] if C_table is not None else "None"
     nb_mc_assignments = mC_table.shape[0] if mC_table is not None else "None"
