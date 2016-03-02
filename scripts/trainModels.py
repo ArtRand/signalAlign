@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument('--samples', '-s', action='store', type=int, default=100000, dest='gibbs_samples')
     parser.add_argument('--burnIn', '-I', action='store', type=int, default=1000000, dest='burnIn')
     parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
-   
+
     args = parser.parse_args()
     return args
 
@@ -309,6 +309,7 @@ def main(argv):
         if args.stateMachineType == "threeStateHdp":
             build_hdp(template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
                       template_assignments=template_hmm, complement_assignments=complement_hmm,
+                      samples=args.gibbs_samples, burn_in=args.burnIn, thinning=args.thinning,
                       verbose=args.verbose)
 
         # log the running likelihood
