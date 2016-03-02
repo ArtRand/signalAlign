@@ -182,14 +182,15 @@ copyfile(complement_hdp_location, complement_trained_hdp_location)
 train_hdp_out = open(working_directory + "train_hdp.out", 'w')
 train_hdp_err = open(working_directory + "train_hdp.err", 'w')
 train_models_command = "./trainModels -r={ref} -i={iter} -a={amount} -smt=threeStateHdp -tH={tHdp} " \
-                       "-cH={cHdp} -o={wd} -t={threshold} " \
+                       "-cH={cHdp} -o={wd} -t={threshold} -s={samples} -I={burnIn} -th={thinning} " \
                        "".format(ref=args.ref, iter=args.iter, amount=args.amount, tHdp=template_trained_hdp_location,
-                                 cHdp=complement_trained_hdp_location, wd=working_directory, threshold=args.threshold)
+                                 cHdp=complement_trained_hdp_location, wd=working_directory, threshold=args.threshold,
+                                 samples=args.gibbs_samples, burnIn=args.burnIn, thinning=args.thinning)
 assert (len(args.files_dir) >= 1), "ERROR: need to provide at least 1 directory of reads to train on."
 for directory in args.files_dir:
     train_models_command += "-d={dir} ".format(dir=directory)
 if args.cytosine_sub is not None:
-    pipeline_log.write("[pipeline] NOTICE: using cytosine sibstitutions\n")
+    pipeline_log.write("[pipeline] NOTICE: using cytosine substitutions\n")
     # TODO fill with None?
     assert len(args.cytosine_sub) == len(args.files_dir), "ERROR: need to provide a cytosine substitution for each " \
                                                           "directory.  Just use C if you don't want a change."
@@ -200,19 +201,27 @@ check_call(train_models_command.split(), stdout=train_hdp_out, stderr=train_hdp_
 
 # get HDP distributions
 pipeline_log.write("[pipeline] NOTICE: running compareDistributions.\n")
-template_distr_dir = working_directory + "template_distrs/"
-complement_distr_dir = working_directory + "complement_distrs/"
-os.makedirs(template_distr_dir)
-os.makedirs(complement_distr_dir)
+template_trained_distr_dir = working_directory + "template_distrs/"
+complement_trained_distr_dir = working_directory + "complement_distrs/"
+template_untrained_distr_dir = working_directory + "template_distrs_untrained/"
+complement_untrained_distr_dir = working_directory + "complement_distrs_untrained/"
+os.makedirs(template_trained_distr_dir)
+os.makedirs(complement_trained_distr_dir)
 compare_distributions_commands = [
-    "./compareDistributions {tHdp} {tDir}".format(tHdp=template_trained_hdp_location, tDir=template_distr_dir),
-    "./compareDistributions {cHdp} {cDir}".format(cHdp=complement_trained_hdp_location, cDir=complement_distr_dir)
+    "./compareDistributions {tHdp} {tDir}".format(tHdp=template_trained_hdp_location,
+                                                  tDir=template_trained_distr_dir),
+    "./compareDistributions {cHdp} {cDir}".format(cHdp=complement_trained_hdp_location,
+                                                  cDir=complement_trained_distr_dir),
+    "./compareDistributions {tHdp} {tDir}".format(tHdp=template_hdp_location,
+                                                  tDir=template_untrained_distr_dir),
+    "./compareDistributions {cHdp} {cDir}".format(cHdp=complement_hdp_location,
+                                                  cDir=complement_untrained_distr_dir)
 ]
-pipeline_log.write("[pipeline] Commands {}".format(compare_distributions_commands))
+for command in compare_distributions_commands:
+    pipeline_log.write("[pipeline] Command {}\n".format(command))
 procs = [Popen(x.split(), stdout=pipeline_log, stderr=pipeline_log) for x in compare_distributions_commands]
 status = [p.wait() for p in procs]
-
-pipeline_log.write("[pipeline] DONE.\n")
+pipeline_log.write("\n[pipeline] DONE.\n")
 pipeline_log.close()
 
 

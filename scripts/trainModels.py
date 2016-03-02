@@ -54,6 +54,12 @@ def parse_args():
     parser.add_argument('--cytosine_substitution', '-cs', action='append', default=None,
                         dest='cytosine_sub', required=False, type=str,
                         help="mutate cytosines to this letter in the reference")
+    # gibbs
+    parser.add_argument('--samples', '-s', action='store', type=int, default=100000, dest='gibbs_samples')
+    parser.add_argument('--burnIn', '-I', action='store', type=int, default=1000000, dest='burnIn')
+    parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
+    parser.add_argument('--verbose', action='store_true', default=False, dest='verbose')
+
     args = parser.parse_args()
     return args
 
@@ -143,17 +149,23 @@ def add_and_norm_expectations(path, files, model, hmm_file):
           "".format(success=files_added_successfully, problem=files_with_problems), file=sys.stderr)
 
 
-def build_hdp(hdp_type, template_hdp_path, complement_hdp_path, alignments,
-              template_assignments=None, complement_assignments=None, verbose=False):
+def build_hdp(template_hdp_path, complement_hdp_path, template_assignments, complement_assignments, samples,
+              burn_in, thinning, verbose=False):
     assert (template_assignments is not None) and (complement_assignments is not None), \
         "trainModels - ERROR: missing assignments"
-    command = "./buildHdpUtil -v {tHdpP} -w {cHdpP}" \
-              " -E {tExpectations} -W {cExpectations}".format(tHdpP=template_hdp_path,
+
+    if verbose is True:
+        verbose_flag = "-o "
+    else:
+        verbose_flag = ""
+
+    command = "./buildHdpUtil {verbose}-v {tHdpP} -w {cHdpP} -E {tExpectations} -W {cExpectations} " \
+              "-n {samples} -I {burnIn} -t {thinning}".format(tHdpP=template_hdp_path,
                                                               cHdpP=complement_hdp_path,
                                                               tExpectations=template_assignments,
-                                                              cExpectations=complement_assignments)
-    if verbose is True:
-        command += "-o "
+                                                              cExpectations=complement_assignments,
+                                                              samples=samples, burnIn=burn_in, thinning=thinning,
+                                                              verbose=verbose_flag)
     os.system(command)  # todo try checkoutput
     print("trainModels - built HDP.", file=sys.stderr)
     return
@@ -162,12 +174,6 @@ def build_hdp(hdp_type, template_hdp_path, complement_hdp_path, alignments,
 def main(argv):
     # parse command line arguments
     args = parse_args()
-
-    # build the HDP if that's what we're doing
-    #if args.buildHDP is not None:
-    #    assert (None not in [args.buildHDP, args.templateHDP, args.complementHDP, args.buildAlignments])
-    #    build_hdp(hdp_type=args.buildHDP, template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
-    #              alignments=args.buildAlignments)
 
     start_message = """\n
     # Starting Baum-Welch training.
@@ -302,8 +308,8 @@ def main(argv):
 
         # Build HDP from last round of assignments
         if args.stateMachineType == "threeStateHdp":
-            build_hdp(hdp_type=None, template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
-                      alignments=None, template_assignments=template_hmm, complement_assignments=complement_hmm,
+            build_hdp(template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
+                      template_assignments=template_hmm, complement_assignments=complement_hmm,
                       verbose=args.verbose)
 
         # log the running likelihood
