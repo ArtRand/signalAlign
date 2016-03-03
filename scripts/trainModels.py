@@ -56,7 +56,7 @@ def parse_args():
                         help="mutate cytosines to this letter in the reference")
     # gibbs
     parser.add_argument('--samples', '-s', action='store', type=int, default=100000, dest='gibbs_samples')
-    parser.add_argument('--burnIn', '-I', action='store', type=int, default=1000000, dest='burnIn')
+    #parser.add_argument('--burnIn', '-I', action='store', type=int, default=1000000, dest='burnIn')
     parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
 
     args = parser.parse_args()

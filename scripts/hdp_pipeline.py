@@ -171,7 +171,7 @@ build_initial_hdp_command = "./buildHdpUtil {verbose}-p {hdpType} -v {tHdpLoc} -
                             "-n {samples} -I {burnIn} -t {thin} -s {start} -e {end} -k {len} " \
                             "".format(hdpType=get_hdp_type(args.hdp_type), tHdpLoc=template_hdp_location,
                                       cHdpLoc=complement_hdp_location, buildAln=build_alignment_location,
-                                      samples=args.gibbs_samples, burnIn=30 * approx_total_build_assignments,
+                                      samples=args.gibbs_samples, burnIn=32 * approx_total_build_assignments,
                                       thin=args.thinning,
                                       start=args.grid_start, end=args.grid_end, len=args.grid_length,
                                       verbose=verbose_flag)
@@ -182,7 +182,7 @@ initial_hdp_build_out.close()
 initial_hdp_build_err.close()
 
 if args.no_train is True:
-    pipeline_log.write("[pipeline] No training option, exiting.")
+    pipeline_log.write("[pipeline] No training option, exiting.\n")
     sys.exit(0)
 
 # trainModels
@@ -199,7 +199,7 @@ train_models_command = "./trainModels -r={ref} -i={iter} -a={amount} -smt=threeS
                        "-cH={cHdp} -o={wd} -t={threshold} -s={samples} -I={burnIn} -th={thinning} " \
                        "".format(ref=args.ref, iter=args.iter, amount=args.amount, tHdp=template_trained_hdp_location,
                                  cHdp=complement_trained_hdp_location, wd=working_directory, threshold=args.threshold,
-                                 samples=args.gibbs_samples, burnIn=args.burnIn, thinning=args.thinning)
+                                 samples=args.gibbs_samples, thinning=args.thinning)
 assert (len(args.files_dir) >= 1), "ERROR: need to provide at least 1 directory of reads to train on."
 for directory in args.files_dir:
     train_models_command += "-d={dir} ".format(dir=directory)
