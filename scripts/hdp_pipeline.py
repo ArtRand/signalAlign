@@ -60,13 +60,14 @@ def parse_args():
                         required=False)
     # gibbs
     parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
-    parser.add_argument('--burnIn', '-I', action='store', type=int, default=100000, dest='burnIn')
+    #parser.add_argument('--burnIn', '-I', action='store', type=int, default=100000, dest='burnIn')
     parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
     parser.add_argument('--verbose', action='store_true', default=False, dest='verbose')
     # sample grid
     parser.add_argument('--grid_start', action='store', type=float, default=30.0, dest='grid_start')
     parser.add_argument('--grid_end', action='store', type=float, default=90.0, dest='grid_end')
     parser.add_argument('--grid_length', action='store', type=int, default=1200, dest='grid_length')
+    parser.add_argument('--no_train', action='store_true', default=False, dest='no_train')
     # train models
     parser.add_argument('--file_directory', '-d', action='append', default=None,
                         dest='files_dir', required=False, type=str,
@@ -139,9 +140,16 @@ build_alignment_command = "{sA}scripts/makeBuildAlignments.py -o={bA} -t={thresh
                           "".format(sA=signalAlign_directory, C=args.C_alns, mC=args.mC_alns, threshold=args.threshold,
                                     hmC=args.hmC_alns, bA=build_alignment_location,
                                     nbAssignments=args.max_assignments)
-if args.C_alns is not None: build_alignment_command += "-C={C} ".format(C=args.C_alns)
-if args.mC_alns is not None: build_alignment_command += "-mC={mC} ".format(mC=args.mC_alns)
-if args.hmC_alns is not None: build_alignment_command += "-hmC={hmC} ".format(hmC=args.hmC_alns)
+approx_total_build_assignments = 0
+if args.C_alns is not None:
+    build_alignment_command += "-C={C} ".format(C=args.C_alns)
+    approx_total_build_assignments += args.max_assignments
+if args.mC_alns is not None:
+    build_alignment_command += "-mC={mC} ".format(mC=args.mC_alns)
+    approx_total_build_assignments += args.max_assignments
+if args.hmC_alns is not None:
+    build_alignment_command += "-hmC={hmC} ".format(hmC=args.hmC_alns)
+    approx_total_build_assignments += args.max_assignments
 pipeline_log.write("[pipeline] NOTICE: Making build alignment using files from:\n\t{C}\n\t{mC}\n\t{hmC}\n"
                    "".format(C=args.C_alns, mC=args.mC_alns, hmC=args.hmC_alns))
 pipeline_log.write("[pipeline] Command: {}\n".format(build_alignment_command))
@@ -163,7 +171,8 @@ build_initial_hdp_command = "./buildHdpUtil {verbose}-p {hdpType} -v {tHdpLoc} -
                             "-n {samples} -I {burnIn} -t {thin} -s {start} -e {end} -k {len} " \
                             "".format(hdpType=get_hdp_type(args.hdp_type), tHdpLoc=template_hdp_location,
                                       cHdpLoc=complement_hdp_location, buildAln=build_alignment_location,
-                                      samples=args.gibbs_samples, burnIn=args.burnIn, thin=args.thinning,
+                                      samples=args.gibbs_samples, burnIn=30 * approx_total_build_assignments,
+                                      thin=args.thinning,
                                       start=args.grid_start, end=args.grid_end, len=args.grid_length,
                                       verbose=verbose_flag)
 build_initial_hdp_command += get_initial_hdp_args(args=args, hdp_type=get_hdp_type(args.hdp_type))
@@ -171,6 +180,10 @@ pipeline_log.write("[pipeline] Command: {}\n".format(build_initial_hdp_command))
 check_call(build_initial_hdp_command.split(), stdout=initial_hdp_build_out, stderr=initial_hdp_build_err)
 initial_hdp_build_out.close()
 initial_hdp_build_err.close()
+
+if args.no_train is True:
+    pipeline_log.write("[pipeline] No training option, exiting.")
+    sys.exit(0)
 
 # trainModels
 assert (os.path.isfile(template_hdp_location) and os.path.isfile(complement_hdp_location)), "ERROR: couldn't find HDPs"

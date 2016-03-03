@@ -42,8 +42,8 @@ def parse_args():
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for complement events, if you don't want the default")
-    parser.add_argument('--un-banded', '-ub', action='store_true', dest='banded',
-                        default=False, help='flag, use banded alignment heuristic')
+    parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
+                        default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False, default=4,
                         type=int, help="number of jobs to run concurrently")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
@@ -163,7 +163,8 @@ def build_hdp(template_hdp_path, complement_hdp_path, template_assignments, comp
                                                               cHdpP=complement_hdp_path,
                                                               tExpectations=template_assignments,
                                                               cExpectations=complement_assignments,
-                                                              samples=samples, burnIn=burn_in, thinning=thinning,
+                                                              samples=samples, burnIn=burn_in,
+                                                              thinning=thinning,
                                                               verbose=verbose_flag)
     os.system(command)  # todo try checkoutput
     print("trainModels - built HDP.", file=sys.stderr)
@@ -307,9 +308,13 @@ def main(argv):
 
         # Build HDP from last round of assignments
         if args.stateMachineType == "threeStateHdp":
+            assert isinstance(template_model, HdpSignalHmm) and isinstance(complement_model, HdpSignalHmm)
+
+            total_assignments = max(template_model.assignments_record[-1], complement_model.assignments_record[-1])
+
             build_hdp(template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
                       template_assignments=template_hmm, complement_assignments=complement_hmm,
-                      samples=args.gibbs_samples, burn_in=args.burnIn, thinning=args.thinning,
+                      samples=args.gibbs_samples, thinning=args.thinning, burn_in=30 * total_assignments,
                       verbose=args.verbose)
 
         # log the running likelihood

@@ -499,49 +499,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* DEPRECIATED
-    if (build) {
-        fprintf(stderr, "signalAlign - NOTICE: Building HDP\n");
-        if ((templateHdp == NULL) || (complementHdp == NULL)) {
-            st_errAbort("Need to specify where to put the HDP files");
-        }
-        // option for building from alignment
-        if (alignments != NULL) {
-            if (!((hdpType >= 0) && (hdpType <= 3))) {
-                st_errAbort("Invalid HDP type");
-            }
-            NanoporeHdpType type = (NanoporeHdpType) hdpType;
-            //nanoporeHdp_buildNanoporeHdpFromAlignment(type, templateModelFile, complementModelFile, alignments,
-            //                                          templateHdp, complementHdp);
-            return 0;
-        } else {
-
-            #pragma omp parallel sections
-            {
-                {
-                if (templateExpectationsFile != NULL) {
-                    if (templateHdp == NULL) {
-                        st_errAbort("Need to provide HDP file");
-                    }
-                    updateHdpFromAssignments(templateHdp, templateExpectationsFile, templateHdp);
-                }
-                }
-
-                #pragma omp section
-                {
-                if (complementExpectationsFile != NULL) {
-                    if (complementHdp == NULL) {
-                        st_errAbort("Need to provide HDP file");
-                    }
-                    updateHdpFromAssignments(complementHdp, complementExpectationsFile, complementHdp);
-                }
-                }
-            }
-            return 0;
-        }
-    }
-    */
-
     if (sMtype == threeState) {
         fprintf(stderr, "signalAlign - using three-state HMM model\n");
     }

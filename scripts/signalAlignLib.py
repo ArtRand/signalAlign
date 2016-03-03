@@ -602,7 +602,7 @@ class NanoporeRead(object):
                     [noise_mean] [noise_sd] [noise_lambda ] (.../kmer) \n
         """
 
-        assert self.is_open
+        assert self.is_open, "ERROR: Fast5 file is not open"
 
         lambdas = []
 
@@ -623,7 +623,6 @@ class NanoporeRead(object):
             print("0", end=' ', file=destination) # placeholder for correlation parameter
             i = 0
             for kmer, level_mean, level_sd, noise_mean, noise_sd, weight in model:
-                #lam = self.calculate_lambda(noise_mean, noise_sd)
                 lam = lambdas[i]
                 print(level_mean, (level_sd * 1.75), noise_mean, noise_sd, lam, end=' ', file=destination)
                 i += 1
@@ -639,7 +638,7 @@ class NanoporeRead(object):
                             0.088, 0.087, 0.084, 0.085, 0.083, 0.082, 0.085, 0.083, 0.084, 0.082,
                             0.080, 0.085, 0.088, 0.086, 0.087, 0.089, 0.085, 0.090, 0.087, 0.096]
 
-        got_model = self.export_model(t_skip_prob_bins, template_model_address, destination)
+        got_model = self.export_model(t_skip_prob_bins, self.template_model_address, destination)
 
         return got_model
 
@@ -650,7 +649,7 @@ class NanoporeRead(object):
                             0.127, 0.123, 0.117, 0.115, 0.113, 0.113, 0.115, 0.109, 0.109, 0.107,
                             0.104, 0.105, 0.108, 0.106, 0.111, 0.114, 0.118, 0.119, 0.110, 0.119]
 
-        got_model = self.export_model(c_skip_prob_bins, complement_model_address, destination)
+        got_model = self.export_model(c_skip_prob_bins, self.complement_model_address, destination)
 
         return got_model
 
@@ -1063,6 +1062,7 @@ class HdpSignalHmm(SignalHmm):
         self.threshold = threshold
         self.kmer_assignments = []
         self.event_assignments = []
+        self.assignments_record = []
 
     def add_expectations_file(self, expectations_file):
         fH = open(expectations_file, 'r')
@@ -1152,6 +1152,7 @@ class HdpSignalHmm(SignalHmm):
                 self.transitions[i + to_state] = self.transitions[i + to_state] / j
 
     def reset_assignments(self):
+        self.assignments_record.append(self.number_of_assignments)
         self.event_assignments = []
         self.kmer_assignments = []
         self.number_of_assignments = 0

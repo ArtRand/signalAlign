@@ -132,8 +132,8 @@ void normal_inverse_gamma_params_from_minION(const char* model_filepath, double*
     double* means = (double*) malloc(sizeof(double) * table_length);
     double* precisions = (double*) malloc(sizeof(double) * table_length);
     
-    int64_t mean_offset = MODEL_ROW_HEADER_LENGTH + MODEL_MEAN_ENTRY;
-    int64_t noise_offset = MODEL_ROW_HEADER_LENGTH + MODEL_NOISE_ENTRY;
+    int64_t mean_offset = MODEL_ROW_HEADER_LENGTH + MODEL_MEAN_ENTRY;  // 1
+    int64_t noise_offset = MODEL_ROW_HEADER_LENGTH + MODEL_NOISE_ENTRY;  // 2
     char* mean_str;
     char* noise_str;
     double noise;
@@ -142,15 +142,13 @@ void normal_inverse_gamma_params_from_minION(const char* model_filepath, double*
         sscanf(mean_str, "%lf", &(means[i]));
         
         noise_str = (char*) stList_get(tokens, noise_offset + i * MODEL_ENTRY_LENGTH);
-        sscanf(mean_str, "%lf", &noise);
+        sscanf(noise_str, "%lf", &noise);
         precisions[i] = 1.0 / (noise * noise);
     }
     
     free(line);
     stList_destruct(tokens);
-    
     mle_normal_inverse_gamma_params(means, precisions, table_length, mu_out, nu_out, alpha_out, beta_out);
-    
     free(means);
     free(precisions);
     
@@ -849,7 +847,6 @@ void serialize_nhdp(NanoporeHDP* nhdp, const char* filepath) {
 }
 
 NanoporeHDP* deserialize_nhdp(const char* filepath) {
-    //st_uglyf("SENTINAL - deserializing HDP from %s\n", filepath);
     FILE* in = fopen(filepath, "r");
     
     char* line = stFile_getLineFromFile(in);
@@ -969,7 +966,9 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
                                                         samplingGridStart, samplingGridEnd, samplingGridLength);
         update_nhdp_from_alignment_with_filter(nHdpT, alignments, FALSE, "t");
 
-        fprintf(stderr, "Running Gibbs for template...\n");
+        fprintf(stderr, "Running Gibbs for template doing %lld samples, %lld burn in, %lld thinning.\n",
+                nbSamples, burnIn, thinning);
+
         execute_nhdp_gibbs_sampling(nHdpT, nbSamples, burnIn, thinning, verbsose);
         finalize_nhdp_distributions(nHdpT);
 
@@ -988,7 +987,8 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
                                                         samplingGridStart, samplingGridEnd, samplingGridLength);
         update_nhdp_from_alignment_with_filter(nHdpC, alignments, FALSE, "c");
 
-        fprintf(stderr, "Running Gibbs for complement...\n");
+        fprintf(stderr, "Running Gibbs for complement doing %lld samples, %lld burn in, %lld thinning.\n",
+                nbSamples, burnIn, thinning);
         execute_nhdp_gibbs_sampling(nHdpC, nbSamples, burnIn, thinning, verbsose);
         finalize_nhdp_distributions(nHdpC);
 

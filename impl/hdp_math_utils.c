@@ -748,25 +748,25 @@ double trigamma(double x) {
     return hurwitz_zeta(2.0, x);
 }
 
-double newton_approx_alpha(int64_t length, double sum_log_tau, double sum_tau) {
+double newton_approx_alpha(int64_t length, double sum_log_tau, double sum_tau, double tol) {
     double constant = sum_log_tau / length - log( sum_tau / length);
-    
-    double alpha = (double) 1.0;
-    
+
+    double alpha = 1.0;
+
     double f_alpha;
     double df_alpha;
     double alpha_prime;
     while (true) {
         f_alpha = log(alpha) - digamma(alpha) + constant;
         df_alpha = 1.0 / alpha - trigamma(alpha);
-        
+
         if (df_alpha == 0.0 || df_alpha != df_alpha) {
             fprintf(stderr, "MLE estimation of alpha numerically unstable at designated starting value.\n");
             exit(EXIT_FAILURE);
         }
-        
+
         alpha_prime = alpha - f_alpha / df_alpha;
-        if (fabs(alpha - alpha_prime) < MACHEP) {
+        if (fabs(alpha - alpha_prime) < tol) {
             return alpha_prime;
         }
         alpha = alpha_prime;
@@ -782,27 +782,27 @@ void mle_normal_inverse_gamma_params(double* mus, double* taus, int64_t length, 
         sum_tau += taus[i];
         sum_log_tau += log(taus[i]);
     }
-    
+
     double mu_0 = 0.0;
     for (int64_t i = 0; i < length; i++) {
         mu_0 += mus[i] * taus[i];
     }
-    
+
     mu_0 /= sum_tau;
-    
+
     double sum_weighted_sq_devs = 0.0;
     double dev;
     for (int64_t i = 0; i < length; i++) {
         dev = mus[i] - mu_0;
         sum_weighted_sq_devs += taus[i] * dev * dev;
     }
-    
+
     double nu = ((double) length) / sum_weighted_sq_devs;
-    
-    double alpha = newton_approx_alpha(length, sum_log_tau, sum_tau);
-    
+
+    double alpha = newton_approx_alpha(length, sum_log_tau, sum_tau, .000000001);
+
     double beta = length * alpha / sum_tau;
-    
+
     *mu_0_out = mu_0;
     *nu_out = nu;
     *alpha_out = alpha;

@@ -10,7 +10,7 @@ signalAlignLib = ${basicLibs}
 
 all : ${libPath}/signalAlignLib.a ${binPath}/signalAlignLibTests ${binPath}/compareDistributions \
       ${binPath}/signalMachine ${binPath}/runSignalAlign ${sonLibrootPath}/signalAlignLib.py \
-      ${binPath}/buildHdpUtil ${binPath}/trainModels ${binPath}/hdp_pipeline
+      ${binPath}/buildHdpUtil ${binPath}/trainModels ${binPath}/hdp_pipeline ${binPath}/testSignalAlign
 	# disabled right now so that we don't build Lastz every time I do an update
 	#cd externalTools && make all
 	
@@ -41,6 +41,10 @@ ${binPath}/trainModels : ${rootPath}scripts/trainModels.py
 ${binPath}/hdp_pipeline : ${rootPath}scripts/hdp_pipeline.py
 	cp ${rootPath}scripts/hdp_pipeline.py ${binPath}/hdp_pipeline
 	chmod +x ${binPath}/hdp_pipeline
+
+${binPath}/testSignalAlign : ${rootPath}scripts/testSignalAlign.py
+	cp ${rootPath}scripts/testSignalAlign.py ${binPath}/testSignalAlign
+	chmod +x ${binPath}/testSignalAlign
 
 
 ${sonLibrootPath}/signalAlignLib.py : ${rootPath}scripts/signalAlignLib.py

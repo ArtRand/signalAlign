@@ -19,13 +19,14 @@ void printStartMessage(int64_t hdpType, char *alignmentsFile, char *templateHdpO
 }
 
 void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile, const char *nHdpOutFile,
-                              bool verbose) {
+                              int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose) {
     NanoporeHDP *nHdp = deserialize_nhdp(nHdpFile);
     Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, nHdp);
     hmmContinuous_destruct(hdpHmm, hdpHmm->type);
 
-    fprintf(stderr, "signalAlign - Running Gibbs on HDP\n");
-    execute_nhdp_gibbs_sampling(nHdp, 10000, 100000, 100, verbose);
+    fprintf(stderr, "signalAlign - Running Gibbs on HDP doing %lld samples %lld burn in %lld thinning\n",
+            nbSamples, burnIn, thinning);
+    execute_nhdp_gibbs_sampling(nHdp, nbSamples, burnIn, thinning, verbose);
     finalize_nhdp_distributions(nHdp);
 
     fprintf(stderr, "signalAlign - Serializing HDP to %s\n", nHdpOutFile);
@@ -240,7 +241,7 @@ int main(int argc, char *argv[]) {
                         st_errAbort("Need to provide HDP file");
                     }
                     updateHdpFromAssignments(templateHdpOutfile, templateExpectationsFile, templateHdpOutfile,
-                                             verbose);
+                                             nbSamples, burnIn, thinning, verbose);
                 }
             }
 #pragma omp section
@@ -250,7 +251,7 @@ int main(int argc, char *argv[]) {
                         st_errAbort("Need to provide HDP file");
                     }
                     updateHdpFromAssignments(complementHdpOutfile, complementExpectationsFile, complementHdpOutfile,
-                                             verbose);
+                                             nbSamples, burnIn, thinning, verbose);
                 }
             }
         }
