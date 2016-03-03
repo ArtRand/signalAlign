@@ -196,7 +196,7 @@ copyfile(complement_hdp_location, complement_trained_hdp_location)
 train_hdp_out = open(working_directory + "train_hdp.out", 'w')
 train_hdp_err = open(working_directory + "train_hdp.err", 'w')
 train_models_command = "./trainModels -r={ref} -i={iter} -a={amount} -smt=threeStateHdp -tH={tHdp} " \
-                       "-cH={cHdp} -o={wd} -t={threshold} -s={samples} -I={burnIn} -th={thinning} " \
+                       "-cH={cHdp} -o={wd} -t={threshold} -s={samples} -th={thinning} " \
                        "".format(ref=args.ref, iter=args.iter, amount=args.amount, tHdp=template_trained_hdp_location,
                                  cHdp=complement_trained_hdp_location, wd=working_directory, threshold=args.threshold,
                                  samples=args.gibbs_samples, thinning=args.thinning)
