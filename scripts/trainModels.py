@@ -154,7 +154,7 @@ def build_hdp(template_hdp_path, complement_hdp_path, template_assignments, comp
         "trainModels - ERROR: missing assignments"
 
     if verbose is True:
-        verbose_flag = "-o "
+        verbose_flag = "--verbose "
     else:
         verbose_flag = ""
 
@@ -166,6 +166,7 @@ def build_hdp(template_hdp_path, complement_hdp_path, template_assignments, comp
                                                               samples=samples, burnIn=burn_in,
                                                               thinning=thinning,
                                                               verbose=verbose_flag)
+    print("[trainModels] Running command:{}".format(command), file=sys.stderr)
     os.system(command)  # todo try checkoutput
     print("trainModels - built HDP.", file=sys.stderr)
     return

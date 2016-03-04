@@ -164,7 +164,7 @@ complement_hdp_location = working_directory + "complement." + args.hdp_type + ".
 initial_hdp_build_out = open(working_directory + "build_initial_hdp.out", 'w')
 initial_hdp_build_err = open(working_directory + "build_initial_hdp.err", 'w')
 if args.verbose is True:
-    verbose_flag = "-o "
+    verbose_flag = "--verbose "
 else:
     verbose_flag = ""
 build_initial_hdp_command = "./buildHdpUtil {verbose}-p {hdpType} -v {tHdpLoc} -w {cHdpLoc} -l {buildAln} " \

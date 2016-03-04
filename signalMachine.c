@@ -604,43 +604,35 @@ int main(int argc, char *argv[]) {
         Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold);
         Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold);
 
-        #pragma omp parallel sections
-        {
-            {
-                // get expectations for template
-                fprintf(stderr, "signalAlign - getting expectations for template\n");
-                getSignalExpectations(templateModelFile, templateHmmFile, nHdpT,
-                                      templateExpectations, sMtype, npRead->templateParams,
-                                      tEventSequence, npRead->templateEventMap, pA->start2, templateTargetSeq, p,
-                                      anchorPairs, template);
+        // get expectations for template
+        fprintf(stderr, "signalAlign - getting expectations for template\n");
+        getSignalExpectations(templateModelFile, templateHmmFile, nHdpT,
+                              templateExpectations, sMtype, npRead->templateParams,
+                              tEventSequence, npRead->templateEventMap, pA->start2, templateTargetSeq, p,
+                              anchorPairs, template);
 
-                // write to file
-                fprintf(stderr, "signalAlign - writing expectations to file: %s\n", templateExpectationsFile);
-                if (sMtype == threeStateHdp) {
-                    fprintf(stderr, "signalAlign - got %lld HDP assignments\n",
-                            hmmContinuous_howManyAssignments(templateExpectations));
-                }
-                hmmContinuous_writeToFile(templateExpectationsFile, templateExpectations, sMtype);
-            }
-
-            #pragma omp section
-            {
-                // get expectations for the complement
-                fprintf(stderr, "signalAlign - getting expectations for complement\n");
-                getSignalExpectations(complementModelFile, complementHmmFile, nHdpC,
-                                      complementExpectations, sMtype,
-                                      npRead->complementParams, cEventSequence, npRead->complementEventMap, pA->start2,
-                                      complementTargetSeq, p, anchorPairs, complement);
-
-                // write to file
-                fprintf(stderr, "signalAlign - writing expectations to file: %s\n", complementExpectationsFile);
-                if (sMtype == threeStateHdp) {
-                    fprintf(stderr, "signalAlign - got %lld HDP assignments\n",
-                            hmmContinuous_howManyAssignments(complementExpectations));
-                }
-                hmmContinuous_writeToFile(complementExpectationsFile, complementExpectations, sMtype);
-            }
+        // write to file
+        fprintf(stderr, "signalAlign - writing expectations to file: %s\n", templateExpectationsFile);
+        if (sMtype == threeStateHdp) {
+            fprintf(stderr, "signalAlign - got %lld template HDP assignments\n",
+                    hmmContinuous_howManyAssignments(templateExpectations));
         }
+        hmmContinuous_writeToFile(templateExpectationsFile, templateExpectations, sMtype);
+
+        // get expectations for the complement
+        fprintf(stderr, "signalAlign - getting expectations for complement\n");
+        getSignalExpectations(complementModelFile, complementHmmFile, nHdpC,
+                              complementExpectations, sMtype,
+                              npRead->complementParams, cEventSequence, npRead->complementEventMap, pA->start2,
+                              complementTargetSeq, p, anchorPairs, complement);
+
+        // write to file
+        fprintf(stderr, "signalAlign - writing expectations to file: %s\n", complementExpectationsFile);
+        if (sMtype == threeStateHdp) {
+            fprintf(stderr, "signalAlign - got %lld complement HDP assignments\n",
+                    hmmContinuous_howManyAssignments(complementExpectations));
+        }
+        hmmContinuous_writeToFile(complementExpectationsFile, complementExpectations, sMtype);
 
         hmmContinuous_destruct(templateExpectations, sMtype);
         hmmContinuous_destruct(complementExpectations, sMtype);

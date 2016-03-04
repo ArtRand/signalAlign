@@ -13,7 +13,9 @@ void usage() {
 void printStartMessage(int64_t hdpType, char *alignmentsFile, char *templateHdpOutfile, char *complementHdpOutfile) {
     fprintf(stderr, "Building Nanopore HDP\n");
     fprintf(stderr, "Making HDP type %lld\n", hdpType);
-    fprintf(stderr, "Using alignment from %s\n", alignmentsFile);
+    if (alignmentsFile != NULL) {
+        fprintf(stderr, "Using alignment from %s\n", alignmentsFile);
+    }
     fprintf(stderr, "Putting template here: %s\n", templateHdpOutfile);
     fprintf(stderr, "Putting complement here: %s\n", complementHdpOutfile);
 }
@@ -213,7 +215,7 @@ int main(int argc, char *argv[]) {
     }
 
     if ((templateHdpOutfile == NULL) || (complementHdpOutfile == NULL)) {
-        st_errAbort("Need to specify where to put the HDP files");
+        st_errAbort("[buildHdpUtil] ERROR: Need to specify where to put the HDP files");
     }
 
     printStartMessage(hdpType, alignmentsFile, templateHdpOutfile, complementHdpOutfile);
