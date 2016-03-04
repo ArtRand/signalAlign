@@ -619,8 +619,8 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     //}
 
     // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2886);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -682,9 +682,9 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     checkAlignedPairsForEchelon(testCase, alignedPairs2, lX, lY);
 
     // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("got %lld alignedPairs on the normal sequence\n", stList_length(alignedPairs));
+    //st_uglyf("got %lld alignedPairs on the normal sequence\n", stList_length(alignedPairs));
     //st_uglyf("got %lld alignedPairs on the methyl sequence\n", stList_length(alignedPairs2));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2886);
     //CuAssertTrue(testCase, stList_length(alignedPairs2) == 2887);
 
     // clean
