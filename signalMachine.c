@@ -24,7 +24,7 @@ void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
 }
 
 void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *matchModel, double scale, double shift,
-                         double *events, char *target, bool forward, char *contig,
+                         double *events, char *target, bool forward, char *contig, StateMachineType type,
                          int64_t eventSequenceOffset, int64_t referenceSequenceOffset,
                          stList *alignedPairs, Strand strand) {
     // label for tsv output
@@ -65,7 +65,8 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         double eventMean = events[(y * NB_EVENT_PARAMS)];
         double eventNoise = events[(y * NB_EVENT_PARAMS) + 1];
         double eventDuration = events[(y * NB_EVENT_PARAMS) + 2];
-        double descaledMean = (eventMean - shift) / scale;
+        //double descaledMean = (eventMean - shift) / scale;
+        double descaledMean = type == threeStateHdp ? eventMean : (eventMean - shift) / scale;
 
         // make the kmer string at the target index,
         char *k_i = st_malloc(KMER_LENGTH * sizeof(char));
@@ -79,7 +80,8 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         // get the expected event mean amplitude and noise
         double E_levelu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS)];
         double E_noiseu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS + 2)];
-        double deScaled_E_levelu = (E_levelu - shift) / scale;
+        //double deScaled_E_levelu = (E_levelu - shift) / scale;
+        double deScaled_E_levelu = type == threeStateHdp ? E_levelu : (E_levelu - shift) / scale;
 
         // make reference kmer
         char *refKmer;
@@ -178,7 +180,7 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
         return sM;
     }
     if (type == threeStateHdp) {
-        StateMachine *sM = getHdpStateMachine3(nHdp);
+        StateMachine *sM = getHdpStateMachine3(nHdp, modelFile);
         return sM;
     }
     else {
@@ -262,24 +264,6 @@ stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, Sequence *
                                                    unmappedAncors, sequence_getKmer3,
                                                    diagonalCalculationPosteriorMatchProbs);
     return alignedPairs;
-
-    // decision tree for different stateMachine types
-    /*
-    if ((sM->type == threeState)) {
-        stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset, target, p,
-                                                       unmappedAncors, sequence_getKmer,
-                                                       diagonalCalculationPosteriorMatchProbs, banded);
-        return alignedPairs;
-    } else if (sM->type == threeStateHdp) {
-        stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset, target, p,
-                                                       unmappedAncors, sequence_getKmer3,
-                                                       diagonalCalculationPosteriorMatchProbs, banded);
-        return alignedPairs;
-    } else {
-        st_errAbort("vanillaAlign - ERROR: incorrect stateMachine not correct type\n");
-    }
-    return 0;
-    */
 }
 
 char *getSubSequence(char *seq, int64_t start, int64_t end, bool strand) {
@@ -511,13 +495,11 @@ int main(int argc, char *argv[]) {
     #pragma omp parallel sections
     {
         {
-            //nHdpT = (templateHdp != NULL) ? deserialize_nhdp(templateHdp) : NULL;
             nHdpT = (templateHdp == NULL) ? NULL : deserialize_nhdp(templateHdp);
         }
 
         #pragma omp section
         {
-            //nHdpC = (complementHdp != NULL) ? deserialize_nhdp(complementHdp) : NULL;
             nHdpC = (complementHdp == NULL) ? NULL : deserialize_nhdp(complementHdp);
         }
     }
@@ -680,7 +662,7 @@ int main(int argc, char *argv[]) {
             } else {
                 writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS,
                                     npRead->templateParams.scale, npRead->templateParams.shift,
-                                    npRead->templateEvents, trimmedRefSeq, forward, pA->contig1,
+                                    npRead->templateEvents, trimmedRefSeq, forward, pA->contig1, sMt->type,
                                     tCoordinateShift, rCoordinateShift_t,
                                     templateAlignedPairs, template);
             }
@@ -709,7 +691,7 @@ int main(int argc, char *argv[]) {
                 writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS,
                                     npRead->complementParams.scale, npRead->complementParams.shift,
                                     npRead->complementEvents, rc_trimmedRefSeq,
-                                    forward, pA->contig1, cCoordinateShift, rCoordinateShift_c,
+                                    forward, pA->contig1, sMc->type,cCoordinateShift, rCoordinateShift_c,
                                     complementAlignedPairs, complement);
             }
         }

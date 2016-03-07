@@ -198,7 +198,6 @@ struct _StateMachine3 {
 typedef struct _StateMachine3_HDP StateMachine3_HDP;
 
 struct _StateMachine3_HDP {
-    //3 state state machine, allowing for symmetry in x and y.
     StateMachine model;
     double TRANSITION_MATCH_CONTINUE; //0.9703833696510062f
     double TRANSITION_MATCH_FROM_GAP_X; //1.0 - gapExtend - gapSwitch = 0.280026392297485
@@ -374,7 +373,7 @@ double emissions_signal_getDurationProb(void *event, int64_t n);
 
 StateMachine *getStrawManStateMachine3(const char *modelFile);
 
-StateMachine *getHdpStateMachine3(NanoporeHDP *hdp);
+StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile);
 
 StateMachine *getStateMachine4(const char *modelFile);
 

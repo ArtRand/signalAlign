@@ -34,7 +34,7 @@ def parse_args():
                         dest='max_assignments',
                         help='total number of assignments to collect FOR EACH GROUP')
     # initial HDP
-    parser.add_argument('--threshold', '-t', action='store', type=float, default=0.2, dest='threshold')
+    parser.add_argument('--threshold', '-t', action='store', type=float, default=0.9, dest='threshold')
     parser.add_argument('--hdp_type', action='store', type=str, required=True, dest='hdp_type',
                         help="Build Hdp, specify type, options: "
                              "singleLevelFixed, singleLevelPrior, multisetFixed, multisetPrior")
@@ -60,7 +60,6 @@ def parse_args():
                         required=False)
     # gibbs
     parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
-    #parser.add_argument('--burnIn', '-I', action='store', type=int, default=100000, dest='burnIn')
     parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
     parser.add_argument('--verbose', action='store_true', default=False, dest='verbose')
     # sample grid

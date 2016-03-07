@@ -1805,16 +1805,17 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
 }
 
 
-StateMachine *getHdpStateMachine3(NanoporeHDP *hdp) {
-    StateMachine *sM3 = stateMachine3Hdp_construct(threeStateHdp, NUM_OF_KMERS,
-                                                   stateMachine3_setTransitionsToNanoporeDefaults,
-                                                   emissions_signal_initEmissionsToZero,
-                                                   hdp,
-                                                   emissions_kmer_getGapProb,
-                                                   get_nanopore_kmer_density,
-                                                   get_nanopore_kmer_density,
-                                                   cell_signal_updateTransAndKmerSkipExpectations2);
-    return sM3;
+StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile) {
+    StateMachine *sM3Hdp = stateMachine3Hdp_construct(threeStateHdp, NUM_OF_KMERS,
+                                                      stateMachine3_setTransitionsToNanoporeDefaults,
+                                                      emissions_signal_initEmissionsToZero,
+                                                      hdp,
+                                                      emissions_kmer_getGapProb,
+                                                      get_nanopore_kmer_density,
+                                                      get_nanopore_kmer_density,
+                                                      cell_signal_updateTransAndKmerSkipExpectations2);
+    emissions_signal_loadPoreModel(sM3Hdp, modelFile, sM3Hdp->type);
+    return sM3Hdp;
 }
 
 StateMachine *getStateMachine4(const char *modelFile) {
