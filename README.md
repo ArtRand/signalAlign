@@ -41,7 +41,7 @@ $ ./hdp_pipeline \
 > -n=10000 --hdp_type=multisetPrior -Ba=1 -Bb=1 -Ma=1 -Mb=1 -La=1 -Lb=1 -s=10000 -th=200 --verbose --no_train 
 > -o=/projects/nanopore-working/zymo/signalAlign_results/03_03_hdpPipeline/multisetPrior_11_11_11_10K/
 ```
-##### compare_distributions
+##### compareDistributions
 This C program will evaluate the nanopore HDP over a reasonable range and output the kmer densities in a directory. You **should** make a 
 new directory for the files (there will be 46,656 of them). Usage:
 ```
