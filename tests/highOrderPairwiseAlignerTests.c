@@ -328,6 +328,20 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     sequence_sequenceDestroy(SsY);
 }
 
+static void print_stateMachine_transitions(StateMachine *sM) {
+    StateMachine3_HDP *sMhdp = (StateMachine3_HDP *)sM;
+    st_uglyf("Match continue %f\n", sMhdp->TRANSITION_MATCH_CONTINUE);
+    st_uglyf("Match to gap x %f\n", sMhdp->TRANSITION_GAP_OPEN_X);
+    st_uglyf("Match to gap y %f\n", sMhdp->TRANSITION_GAP_OPEN_Y);
+
+    st_uglyf("gap X continue %f\n", sMhdp->TRANSITION_GAP_EXTEND_X);
+    st_uglyf("gap X to match %f\n", sMhdp->TRANSITION_MATCH_FROM_GAP_X);
+    st_uglyf("gap X from gap Y %f\n", sMhdp->TRANSITION_GAP_SWITCH_TO_X);
+
+    st_uglyf("gap Y continue %f\n", sMhdp->TRANSITION_GAP_EXTEND_Y);
+    st_uglyf("gap Y to match %f\n", sMhdp->TRANSITION_MATCH_FROM_GAP_Y);
+    st_uglyf("gap Y from gap X %f\n", sMhdp->TRANSITION_GAP_SWITCH_TO_Y);
+}
 static void test_sm3Hdp_diagonalDPCalculations(CuTest *testCase) {
     // make some DNA sequences and fake nanopore read data
     char *sX = "ACGATAXGGACAT";
@@ -352,7 +366,6 @@ static void test_sm3Hdp_diagonalDPCalculations(CuTest *testCase) {
     char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
     StateMachine *sM = getHdpStateMachine3(nHdp, modelFile);
-
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
     stList *anchorPairs = stList_construct();
@@ -588,7 +601,6 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
     StateMachine *sMt = getHdpStateMachine3(nHdp, modelFile);
-
     // parameters for pairwise alignment using defaults
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
     p->threshold = 0.1;
