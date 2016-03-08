@@ -4,9 +4,9 @@ Code in this repo is based on cPecan (https://github.com/benedictpaten/cPecan)
 
 ### Getting Around:
 Most of the scripts and programs you want are in ../sonLib/bin make sure you can find:
-1. runSignalAlign 
-2. hdp_pipeline
-3. compareDistributions
+>1. runSignalAlign 
+>2. hdp_pipeline
+>3. compareDistributions
 
 ##### runSignalAlign
 This is a python script that will produce event-to-nucleotide alignments. Most of the flags are described if you do
