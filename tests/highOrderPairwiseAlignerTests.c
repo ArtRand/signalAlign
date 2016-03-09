@@ -827,7 +827,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
     // close hmm
     hdpHmm_destruct(hdpHmm);
-    
+
     for (int64_t iter = 0; iter < 10; iter++) {
         Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold,
                                                      continuousPairHmm_addToTransitionsExpectation,
