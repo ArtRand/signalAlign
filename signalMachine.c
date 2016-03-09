@@ -363,8 +363,8 @@ int main(int argc, char *argv[]) {
     int64_t diagExpansion = 50;
     double threshold = 0.01;
     int64_t constraintTrim = 14;
-    char *templateModelFile = stString_print("../../signalAlign/models/template_median68pA.model");
-    char *complementModelFile = stString_print("../../signalAlign/models/complement_median68pA_pop2.model");
+    char *templateModelFile = stString_print("../../signalAlign/models/testModel_template.model");
+    char *complementModelFile = stString_print("../../signalAlign/models/testModel_complement.model");
     char *readLabel = NULL;
     char *npReadFile = NULL;
     char *targetFile = NULL;
