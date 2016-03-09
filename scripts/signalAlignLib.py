@@ -51,7 +51,7 @@ def get_bwa_index(reference, dest):
     return bwa_ref_index
 
 
-def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_model_path, complement_model_path):
+def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
     """process a MinION .fast5 file into a npRead file for use with signalAlign also extracts
     the 2D read into fasta format
     """
@@ -122,30 +122,30 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
         print("", end="\n", file=out_file)
 
         # make the 2d read
-        #npRead.extract_2d_read(temp_fasta)
         write_fasta(id=fast5, sequence=npRead.alignment_table_sequence, destination=temp_fasta)
 
         # handle models
         # template model
         if npRead.template_model_id == "template_median68pA.model":
             print("signalAlign - found default template model", file=sys.stderr)
-            template_model_path = None
+            default_template_model = True
         else:
-            template_model_file = open(template_model_path, "w")
-            got_template_model = npRead.export_template_model(template_model_file)
-            # TODO put fail check here
+            print("signalAlign - WARNING: found non-default template model", file=sys.stderr)
+            default_template_model = False
 
         # complement model
         if npRead.complement_model_id == "complement_median68pA_pop2.model":
             print("signalAlign - found default complement model", file=sys.stderr)
-            complement_model_path = None
+            default_complement_model = True
+        elif npRead.complement_model_id == "complement_median68pA_pop1.model":
+            print("signalAlign - found pop2 complement model", file=sys.stderr)
+            default_complement_model = False
         else:
-            complement_model_file = open(complement_model_path, "w")
-            got_complement_model = npRead.export_complement_model(complement_model_file)
-            # todo put fail check
+            print("signalAlign - WARNING: found non-default complement model", file=sys.stderr)
+            default_complement_model = False
 
         npRead.close()
-        return True, template_model_path, complement_model_path
+        return True, default_template_model, default_complement_model
     else:
         npRead.close()
         print("problem making npRead for {fast5}".format(fast5=fast5), file=sys.stderr)
@@ -771,8 +771,8 @@ class SignalAlignment(object):
         self.stateMachineType = stateMachineType  # flag for vanillaAlign
         self.banded = banded
         self.bwa_index = bwa_index  # index of reference sequence
-        self.in_templateModel = None  # initialize to none
-        self.in_complementModel = None  # initialize to none
+        #self.in_templateModel = None  # initialize to none
+        #self.in_complementModel = None  # initialize to none
         self.threshold = threshold
         self.diagonal_expansion = diagonal_expansion
         self.constraint_trim = constraint_trim
@@ -819,15 +819,11 @@ class SignalAlignment(object):
         # read-specific files, could be removed later but are kept right now to make it easier to rerun commands
         temp_np_read = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
         temp_2d_read = temp_folder.add_file_path("temp_2Dseq_{read}.fa".format(read=read_label))
-        temp_t_model = temp_folder.add_file_path("template_model.model")
-        temp_c_model = temp_folder.add_file_path("complement_model.model")
 
         # make the npRead and fasta todo make this assert
-        success, temp_t_model, temp_c_model = get_npRead_2dseq_and_models(fast5=self.in_fast5,
-                                                                          npRead_path=temp_np_read,
-                                                                          twod_read_path=temp_2d_read,
-                                                                          template_model_path=temp_t_model,
-                                                                          complement_model_path=temp_c_model)
+        success, def_template_model, def_complement_model = get_npRead_2dseq_and_models(fast5=self.in_fast5,
+                                                                                        npRead_path=temp_np_read,
+                                                                                        twod_read_path=temp_2d_read)
 
         if success is False:
             return False
@@ -875,18 +871,20 @@ class SignalAlignment(object):
         # flags
 
         # input (match) models
-        if self.in_templateModel is not None:
-            template_model_flag = "-T {model_loc} ".format(model_loc=self.in_templateModel)
-        if temp_t_model is not None:
-            template_model_flag = "-T {t_model} ".format(t_model=temp_t_model)
+        assert (os.path.exists("../../signalAlign/models/testModel_template.model")), \
+            "Didn't find default template look-up table"
+        template_model_flag = "-T {t_model} ".format(t_model="../../signalAlign/models/testModel_template.model")
+
+        if def_complement_model is True:
+            assert (os.path.exists("../../signalAlign/models/testModel_complement.model")), \
+                "Didn't find default complement look-up table"
+            complement_model_flag = "-C {c_model} " \
+                                    "".format(c_model="../../signalAlign/models/testModel_complement.model")
         else:
-            template_model_flag = ""
-        if self.in_complementModel is not None:
-            complement_model_flag = "-C {model_loc} ".format(model_loc=self.in_complementModel)
-        if temp_c_model is not None:
-            complement_model_flag = "-C {c_model} ".format(c_model=temp_c_model)
-        else:
-            complement_model_flag = ""
+            assert (os.path.exists("../../signalAlign/models/testModel_complement_pop1.model")), \
+                "Didn't find pop1 complement look-up table"
+            complement_model_flag = "-C {c_model} " \
+                                    "".format(c_model="../../signalAlign/models/testModel_complement_pop1.model")
 
         # input HMMs
         if self.in_templateHmm is not None:
@@ -899,7 +897,7 @@ class SignalAlignment(object):
             complement_hmm_flag = ""
 
         # input HDPs
-        if (self.in_templateHdp is not None) or (self.in_complementHdp is not None):
+        if (self.in_templateHdp is not None) and (self.in_complementHdp is not None):
             hdp_flags = "-v {tHdp_loc} -w {cHdp_loc} ".format(tHdp_loc=self.in_templateHdp,
                                                               cHdp_loc=self.in_complementHdp)
         else:
@@ -950,18 +948,18 @@ class SignalAlignment(object):
                 "{expansion}{trim} {hdp}-L {readLabel} -t {templateExpectations} -c {complementExpectations} " \
                 "{cytosine}"\
                 .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag,
-                        ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
-                        c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
-                        templateExpectations=template_expectations_file_path, hdp=hdp_flags,
-                        complementExpectations=complement_expectations_file_path,
-                        thresh=threshold_flag, expansion=diag_expansion_flag, trim=trim_flag, cytosine=cytosine_flag)
+                        ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
+                        c_hmm=complement_hmm_flag, templateExpectations=template_expectations_file_path, hdp=hdp_flags,
+                        complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
+                        c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
+                        trim=trim_flag, cytosine=cytosine_flag)
         else:
             command = \
                 "echo {cigar} | {vA} {sparse}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
                 "{expansion}{trim} -u {posteriors} {hdp}-L {readLabel} {cytosine}"\
                 .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, sparse=sparse_flag,
-                        ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
-                        c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
+                        ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
+                        t_model=template_model_flag, c_model=complement_model_flag, c_hmm=complement_hmm_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag, cytosine=cytosine_flag, hdp=hdp_flags)
 
