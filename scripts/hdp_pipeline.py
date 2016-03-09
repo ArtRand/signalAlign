@@ -38,6 +38,10 @@ def parse_args():
     parser.add_argument('--hdp_type', action='store', type=str, required=True, dest='hdp_type',
                         help="Build Hdp, specify type, options: "
                              "singleLevelFixed, singleLevelPrior, multisetFixed, multisetPrior")
+    parser.add_argument('--template_model', '-tM', action='store', type=str, default=None, dest='template_lookup',
+                        required=False, help="Input template lookup table")
+    parser.add_argument('--complement_model', '-cM', action='store', type=str, default=None, dest='complement_lookup',
+                        required=False, help="Input complement lookup table")
     # fixed concentration models
     parser.add_argument('--base_gamma', '-B', action='store', type=float, default=None, dest='base_gamma',
                         required=False)
@@ -139,8 +143,8 @@ build_alignment_command = "{sA}scripts/makeBuildAlignments.py -o={bA} -t={thresh
                           "".format(sA=signalAlign_directory, C=args.C_alns, mC=args.mC_alns, threshold=args.threshold,
                                     hmC=args.hmC_alns, bA=build_alignment_location,
                                     nbAssignments=args.max_assignments)
-approx_total_build_assignments = 0
-if args.C_alns is not None:
+approx_total_build_assignments = 0  # keep track of about how many assignments we're going to get for gibbs burn in
+if args.C_alns is not None:  # add the alignments to the command
     build_alignment_command += "-C={C} ".format(C=args.C_alns)
     approx_total_build_assignments += args.max_assignments
 if args.mC_alns is not None:
@@ -162,25 +166,23 @@ template_hdp_location = working_directory + "template." + args.hdp_type + ".nhdp
 complement_hdp_location = working_directory + "complement." + args.hdp_type + ".nhdp"
 initial_hdp_build_out = open(working_directory + "build_initial_hdp.out", 'w')
 initial_hdp_build_err = open(working_directory + "build_initial_hdp.err", 'w')
-if args.verbose is True:
-    verbose_flag = "--verbose "
-else:
-    verbose_flag = ""
+template_lookup_table = " -T" + args.template_lookup if args.template_lookup is not None else ""
+complement_lookup_table = " -C" + args.complement_lookup if args.complement_lookup is not None else ""
+verbose_flag = "--verbose " if args.verbose is True else ""
 build_initial_hdp_command = "./buildHdpUtil {verbose}-p {hdpType} -v {tHdpLoc} -w {cHdpLoc} -l {buildAln} " \
-                            "-n {samples} -I {burnIn} -t {thin} -s {start} -e {end} -k {len} " \
+                            "-n {samples} -I {burnIn} -t {thin} -s {start} -e {end} -k {len}{tL}{cL} " \
                             "".format(hdpType=get_hdp_type(args.hdp_type), tHdpLoc=template_hdp_location,
                                       cHdpLoc=complement_hdp_location, buildAln=build_alignment_location,
                                       samples=args.gibbs_samples, burnIn=32 * approx_total_build_assignments,
-                                      thin=args.thinning,
-                                      start=args.grid_start, end=args.grid_end, len=args.grid_length,
-                                      verbose=verbose_flag)
+                                      thin=args.thinning, start=args.grid_start, end=args.grid_end,
+                                      len=args.grid_length, verbose=verbose_flag, tL=template_lookup_table,
+                                      cL=complement_lookup_table)
 build_initial_hdp_command += get_initial_hdp_args(args=args, hdp_type=get_hdp_type(args.hdp_type))
 pipeline_log.write("[pipeline] Command: {}\n".format(build_initial_hdp_command))
 check_call(build_initial_hdp_command.split(), stdout=initial_hdp_build_out, stderr=initial_hdp_build_err)
 initial_hdp_build_out.close()
 initial_hdp_build_err.close()
-
-if args.no_train is True:
+if args.no_train is True:  # optionally quit here if we're not going to train the models
     pipeline_log.write("[pipeline] No training option, exiting.\n")
     sys.exit(0)
 

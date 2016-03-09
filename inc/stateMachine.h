@@ -12,7 +12,7 @@
 #include "nanopore_hdp.h"
 
 #define SYMBOL_NUMBER 5
-#define SYMBOL_NUMBER_NO_N 4
+#define SYMBOL_NUMBER_NO_N 6
 #define SYMBOL_NUMBER_EPIGENETIC_C 6
 #define MODEL_PARAMS 5 // level_mean, level_sd, fluctuation_mean, fluctuation_noise, fluctuation_lambda
 #define SIX_LETTER_ALPHA "ACEGOT"
@@ -333,7 +333,7 @@ void stateMachine3Vanilla_setStrandTransitionsToDefaults(StateMachine *sM, Stran
 // emissions defaults
 void emissions_discrete_initEmissionsToZero(StateMachine *sM);
 
-void emissions_symbol_setEmissionsToDefaults(StateMachine *sM);
+//void emissions_symbol_setEmissionsToDefaults(StateMachine *sM);
 
 /*
 * For a discrete HMM the gap and match matrices are defined by the number of symbols in the set (nK). The gap

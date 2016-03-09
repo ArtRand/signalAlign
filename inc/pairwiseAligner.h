@@ -27,6 +27,8 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 #define CYTOSINE_METHYL_AMBIG "X"
 #define NB_CYTOSINE_OPTIONS 3
 #define CYTOSINES "CEO"
+#define KMER_LENGTH 6
+#define NUM_OF_KMERS 46656
 
 //Sequence
 typedef enum {

@@ -609,7 +609,7 @@ class NanoporeRead(object):
         if model_address in self.fastFive:
             model = self.fastFive[model_address]
             # line 1
-            print("0", end=' ', file=destination) # placeholder for correlation parameter
+            print("0", end=' ', file=destination)  # placeholder for correlation parameter
             for kmer, level_mean, level_sd, noise_mean, noise_sd, weight in model:
                 lam = self.calculate_lambda(noise_mean, noise_sd)
                 lambdas.append(lam)

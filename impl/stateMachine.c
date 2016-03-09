@@ -44,7 +44,7 @@ static inline void emissions_discrete_initializeEmissionsMatrices(StateMachine *
     sM->EMISSION_GAP_Y_PROBS = st_malloc(sM->parameterSetSize*sizeof(double));
     sM->EMISSION_MATCH_PROBS = st_malloc(sM->parameterSetSize*sM->parameterSetSize*sizeof(double));
 }
-
+/*
 void emissions_symbol_setEmissionsToDefaults(StateMachine *sM) {
     // initialize
     emissions_discrete_initializeEmissionsMatrices(sM);
@@ -68,7 +68,7 @@ void emissions_symbol_setEmissionsToDefaults(StateMachine *sM) {
     memcpy(sM->EMISSION_GAP_X_PROBS, G, sizeof(double)*SYMBOL_NUMBER_NO_N);
     memcpy(sM->EMISSION_GAP_Y_PROBS, G, sizeof(double)*SYMBOL_NUMBER_NO_N);
 }
-
+*/
 static inline void emissions_discrete_initMatchProbsToZero(double *emissionMatchProbs, int64_t symbolSetSize) {
     memset(emissionMatchProbs, 0, symbolSetSize*symbolSetSize*sizeof(double));
 }
@@ -96,12 +96,16 @@ int64_t emissions_discrete_getBaseIndex(void *base) {
             return 0;
         case 'C':
             return 1;
-        case 'G':
+        case 'E':
             return 2;
-        case 'T':
+        case 'G':
             return 3;
+        case 'O':
+            return 4;
+        case 'T':
+            return 5;
         default: // N or n. Hack to make sure that we get a zero model mean
-            return NUM_OF_KMERS + 1; // 11/10/15 change debugging segfaults on ecoli
+            return NUM_OF_KMERS + 1;
     }
 }
 
@@ -110,7 +114,6 @@ int64_t emissions_discrete_getKmerIndex(void *kmer) {
     if (kmerLen == 0) {
         return NUM_OF_KMERS + 1;
     }
-    //int64_t axisLength = intPow(SYMBOL_NUMBER_NO_N, KMER_LENGTH);
     int64_t axisLength = NUM_OF_KMERS;
     int64_t l = axisLength / SYMBOL_NUMBER_NO_N;
     int64_t i = 0;
@@ -120,7 +123,7 @@ int64_t emissions_discrete_getKmerIndex(void *kmer) {
         i += 1;
         l = l / SYMBOL_NUMBER_NO_N;
     }
-    int64_t last = strlen(kmer) - 1;
+    int64_t last = KMER_LENGTH - 1;
     x += emissions_discrete_getBaseIndex((char *)kmer + last);
 
     return x;
@@ -236,8 +239,7 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
      *  the model file has the format:
      *  line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean]
      *              [noise_sd] [noise_lambda ](.../kmer) \n
-     *  line 2: skip bins \n
-     *  line 3: [correlation coefficient] [level_mean] [level_sd, scaled]
+     *  line 2: [correlation coefficient] [level_mean] [level_sd, scaled]
      *              [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
      */
 
@@ -248,7 +250,8 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     stList *tokens = stString_split(string);
     // check to make sure that the model will fit in the stateMachine
     if (stList_length(tokens) != 1 + (sM->parameterSetSize * MODEL_PARAMS)) {
-        st_errAbort("This stateMachine is not correct for signal model (match emissions)\n");
+        st_errAbort("This stateMachine is not correct for signal model (match emissions) got %lld, should be %llf\n",
+                    stList_length(tokens), 1 + (sM->parameterSetSize * MODEL_PARAMS));
     }
     // load the model into the state machine emissions
     for (int64_t i = 0; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i++) {
@@ -258,34 +261,6 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
         }
     }
     // clean up match emissions line
-    free(string);
-    stList_destruct(tokens);
-
-    // Line 2: parse X Gap emissions line
-    string = stFile_getLineFromFile(fH);
-    tokens = stString_split(string);
-    // check for correctness
-    if (stList_length(tokens) != 30) {
-        st_errAbort("Did not get expected number of kmer skip bins, expected 30, got %lld\n",
-                    stList_length(tokens));
-    }
-
-    // load in the kmer skip 'bins' for the vanilla and echelon models
-    if (type == vanilla || type == echelon) {
-        // load X Gap emissions into stateMachine
-        for (int64_t i = 0; i < 30; i++) {
-            int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_X_PROBS[i]));
-            int64_t a = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_X_PROBS[i+30]));
-            if (j != 1) {
-                st_errAbort("emissions_signal_loadPoreModel: error loading vanilla alpha kmer skip bins\n");
-            }
-            if (a != 1) {
-                st_errAbort("emissions_signal_loadPoreModel: error loading vanilla kmer beta skip bins\n");
-            }
-        }
-    }
-
-    // clean up X Gap emissions line
     free(string);
     stList_destruct(tokens);
 

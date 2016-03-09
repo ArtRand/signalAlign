@@ -566,7 +566,9 @@ double hdCell_totalProbability(HDCell *cell1, HDCell *cell2) {
             Path *path2 = hdCell_getPath(cell2, y);
             if (stString_eq(path1->kmer, path2->kmer)) {
                 totalProbability = logAdd(totalProbability,
-                                          cell_dotProduct(path1->cells, path2->cells, path1->stateNumber));
+                                          cell_dotProduct(path1->cells,
+                                                          path2->cells,
+                                                          path1->stateNumber));
             }
         }
     }

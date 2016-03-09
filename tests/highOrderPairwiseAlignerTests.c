@@ -45,7 +45,6 @@ static void test_findPotentialMethylation(CuTest *testCase) {
     CuAssertTrue(testCase, methyl_2 == 5);
 }
 
-// legal path test
 static void test_pathLegalTransitions(CuTest *testCase) {
     Path *path0 = path_construct(NULL, 3);
     Path *path1 = path_construct("AAETTT", 3);
@@ -75,7 +74,6 @@ static void test_getKmer4(CuTest *testCase) {
     CuAssertTrue(testCase, checkGreaterThanLength == NULL);
 }
 
-// test make potentially methylated kmers
 static void test_methylPermutations(CuTest *testCase) {
     CuAssertTrue(testCase, path_getMehtylPermutations(0) == NULL);
     for (int64_t i = 1; i < 6; i++) {
@@ -122,11 +120,11 @@ static void test_hdCellConstructWorstCase(CuTest *testCase) {
 
 static void test_dpDiagonal(CuTest *testCase) {
     // load model and make stateMachine
-    char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
+    char *testModel = stString_print("../../signalAlign/models/testModel_template.model");
     char *canonicalAlphabet = "ACGT\0";
 
-    NanoporeHDP *nHdp = flat_hdp_model(canonicalAlphabet, 4, KMER_LENGTH, 1.0, 1.0, 40.0, 100.0, 100, modelFile);
-    StateMachine *sM = getHdpStateMachine3(nHdp, modelFile);
+    NanoporeHDP *nHdp = flat_hdp_model(canonicalAlphabet, 4, KMER_LENGTH, 1.0, 1.0, 40.0, 100.0, 100, testModel);
+    StateMachine *sM = getHdpStateMachine3(nHdp, testModel);
     Diagonal diagonal = diagonal_construct(3, -1, 1); // makes a diagonal with 2 cells
 
     Sequence *seq = makeTestKmerSequence();  // ATGXAXA
@@ -231,7 +229,7 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
 
     // make stateMachine, forward and reverse DP matrices and banding stuff
-    char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
+    char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
     StateMachine *sM = getStrawManStateMachine3(modelFile);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
@@ -363,9 +361,10 @@ static void test_sm3Hdp_diagonalDPCalculations(CuTest *testCase) {
     // make Sequence objects
     Sequence *SsX = sequence_construct(lX, sX, sequence_getKmer3, kmer);
     Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
-    char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
+    char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
     StateMachine *sM = getHdpStateMachine3(nHdp, modelFile);
+
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
     stList *anchorPairs = stList_construct();
@@ -529,7 +528,7 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
     int64_t lY = npRead->nbTemplateEvents;
 
     // load stateMachine from model file
-    char *templateModelFile = stString_print("../../signalAlign/models/template_median68pA.model");
+    char *templateModelFile = stString_print("../../signalAlign/models/testModel_template.model");
     StateMachine *sMt = getStrawManStateMachine3(templateModelFile);
 
     // scale model
@@ -598,7 +597,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     // get sequence lengths
     int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
     int64_t lY = npRead->nbTemplateEvents;
-    char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
+    char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
     StateMachine *sMt = getHdpStateMachine3(nHdp, modelFile);
     // parameters for pairwise alignment using defaults
@@ -657,7 +656,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     // get sequence lengths
     int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
     int64_t lY = npRead->nbTemplateEvents;
-    char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
+    char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
     StateMachine *sMt = getHdpStateMachine3(nHdp, modelFile);
 
@@ -792,8 +791,9 @@ static void test_hdpHmm_em(CuTest *testCase) {
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
     // load the npRead
-    char *npReadFile = stString_print("../../cPecan/signalAlign/test_npReads/ZymoC_ch_1_file1.npRead");
+    char *npReadFile = stString_print("../../signalAlign/tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+
     nanopore_descaleNanoporeRead(npRead);
 
     // get sequence lengths
@@ -806,15 +806,15 @@ static void test_hdpHmm_em(CuTest *testCase) {
                                         continuousPairHmm_addToTransitionsExpectation,
                                         continuousPairHmm_setTransitionExpectation,
                                         continuousPairHmm_getTransitionExpectation);
+
     //continuousPairHmm_randomize(hdpHmm);
     hmmDiscrete_randomizeTransitions(hdpHmm);
 
     // make initial NanoporeHdp from alignment
-
-    char *modelFile = stString_print("../../signalAlign/models/template_median68pA.model");
+    char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
     char *alignmentFile = stString_print("../../signalAlign/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
-    NanoporeHDP *nHdp = flat_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+    NanoporeHDP *nHdp = flat_hdp_model("ACEGOT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
                                        5.0, 0.5, // base_gamma, leaf_gamma
                                        0.0, 100.0, 100, modelFile);
     update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
@@ -827,7 +827,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
     // close hmm
     hdpHmm_destruct(hdpHmm);
-
+    
     for (int64_t iter = 0; iter < 10; iter++) {
         Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold,
                                                      continuousPairHmm_addToTransitionsExpectation,
@@ -907,6 +907,6 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
-    //SUITE_ADD_TEST(suite, test_hdpHmm_em);
+    SUITE_ADD_TEST(suite, test_hdpHmm_em);
     return suite;
 }

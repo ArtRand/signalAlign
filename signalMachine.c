@@ -254,7 +254,7 @@ stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, Sequence *
         st_errAbort("signalAlign - You're trying to do the wrong king of alignment");
     }
 
-    // load HMM if given
+    // load HMM, if given
     if (hmmFile != NULL) {
         fprintf(stderr, "loading HMM from file, %s\n", hmmFile);
         loadHmmRoutine(hmmFile, sM, sM->type);

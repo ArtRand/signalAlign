@@ -910,15 +910,8 @@ void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMac
 }
 
 Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold) {
-    if ((type != threeStateHdp) && (type != threeState) && (type != vanilla)) {
+    if ((type != threeStateHdp) && (type != threeState)) {
         st_errAbort("hmmContinuous_getEmptyHmm - ERROR: got unsupported HMM type %i\n", type);
-    }
-    if (type == vanilla) {
-        Hmm *hmm = vanillaHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, vanilla,
-                                             vanillaHmm_addToKmerSkipBinExpectation,
-                                             vanillaHmm_setKmerSkipBinExpectation,
-                                             vanillaHmm_getKmerSkipBinExpectation);
-        return hmm;
     }
     if (type == threeState) {
         Hmm *hmm = continuousPairHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, threeState,
