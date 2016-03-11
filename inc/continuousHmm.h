@@ -1,6 +1,6 @@
 #ifndef CONTINUOUS_HMM_H
 #define CONTINUOUS_HMM_H
-
+#define NORMAL_DISTRIBUTION_PARAMS 2
 #include "stateMachine.h"
 
 
@@ -11,9 +11,19 @@ typedef struct _hmmContinuous {
 } HmmContinuous;
 
 typedef struct _strawManHmm {
-    HmmContinuous baseContinuousHmm;
+    Hmm baseHmm; // TODO TODO COMMENT HOW THIS WORKS
     double *transitions;
-    double *individualKmerGapProbs; // for learning skip probs/kmer
+    double *eventExpectations;
+    double *eventModel;
+    double *posteriors;
+    int64_t (*getElementIndexFcn)(void *);
+    void (*addToEmissionExpectationFcn)(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p);
+    void (*setEmissionExpectationFcn)(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p);
+    double *(*getEmissionExpFcn)(Hmm *hmm, int64_t kmerIndex);
+    double *(*getPosteriorExpFcn)(Hmm *hmm, int64_t kmerIndex);
+    double *(*getEventModelEntry)(Hmm *hmm, int64_t kmerIndex);
+    bool hasModel;
+    bool hasExpectations;
 } ContinuousPairHmm;
 
 typedef struct _vanillaHmm {
@@ -25,7 +35,6 @@ typedef struct _vanillaHmm {
 } VanillaHmm;
 
 typedef struct _hdpHmm {
-    //ContinuousPairHmm baseContinuousPairHmm;
     Hmm baseHmm;
     double *transitions;
     double threshold;
@@ -36,15 +45,8 @@ typedef struct _hdpHmm {
     NanoporeHDP *nhdp;
 } HdpHmm;
 
-Hmm *continuousPairHmm_constructEmpty(
-        double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
-        void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
-        void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
-        double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to),
-        void (*addToKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore, double p),
-        void (*setKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore, double p),
-        double (*getKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore),
-        int64_t (*getElementIndexFcn)(void *));
+Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPseudocount,
+                                 int64_t stateNumber, int64_t symbolSetSize, StateMachineType type);
 
 void continuousPairHmm_addToTransitionsExpectation(Hmm *hmm, int64_t from, int64_t to, double p);
 
@@ -52,13 +54,15 @@ void continuousPairHmm_setTransitionExpectation(Hmm *hmm, int64_t from, int64_t 
 
 double continuousPairHmm_getTransitionExpectation(Hmm *hmm, int64_t from, int64_t to);
 
-void continuousPairHmm_addToKmerGapExpectation(Hmm *hmm, int64_t state, int64_t kmerIndex, int64_t ignore, double p);
+void continuousPairHmm_addToEmissionExpectation(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p);
 
-void continuousPairHmm_setKmerGapExpectation(Hmm *hmm, int64_t state, int64_t kmerIndex, int64_t ignore, double p);
+void continuousPairHmm_setEmissionExpectation(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p);
 
-double continuousPairHmm_getKmerGapExpectation(Hmm *hmm, int64_t state, int64_t kmerIndex, int64_t ignore);
+double *continuousPairHmm_getEmissionExpectation(Hmm *hmm, int64_t kmerIndex);
 
-void continuousPairHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm);
+double *continuousPairHmm_getEmissionPosterior(Hmm *hmm, int64_t kmerIndex);
+
+void continuousPairHmm_loadIntoStateMachine(StateMachine *sM, Hmm *hmm);
 
 void continuousPairHmm_normalize(Hmm *hmm);
 
@@ -66,35 +70,11 @@ void continuousPairHmm_randomize(Hmm *hmm);
 
 void continuousPairHmm_destruct(Hmm *hmm);
 
-void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
+void continuousPairHmm_dump(Hmm *hmm, FILE *fileHandle);
 
 Hmm *continuousPairHmm_loadFromFile(const char *fileName);
 
-Hmm *vanillaHmm_constructEmpty(double pseudocount,
-                               int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
-                               void (*addToKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
-                               void (*setKmerBinFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
-                               double (*getKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore));
-
-void vanillaHmm_addToKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignore, double p);
-
-void vanillaHmm_setKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignore, double p);
-
-double vanillaHmm_getKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignore);
-
-void vanillaHmm_normalizeKmerSkipBins(Hmm *hmm);
-
-void vanillaHmm_randomizeKmerSkipBins(Hmm *hmm);
-
-void vanillaHmm_loadKmerSkipBinExpectations(StateMachine *sM, Hmm *hmm);
-
-void vanillaHmm_implantMatchModelsintoHmm(StateMachine *sM, Hmm *hmm);
-
-void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
-
-Hmm *vanillaHmm_loadFromFile(const char *fileName);
-
-void vanillaHmm_destruct(Hmm *hmm);
+void continuousPairHmm_loadModelFromFile(ContinuousPairHmm *hmm, const char *modelFile);
 
 Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, StateMachineType type, double threshold,
                            void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),

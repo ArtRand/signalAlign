@@ -562,7 +562,7 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
     // for ch1_file1 template there should be this many aligned pairs with banding
     //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
     // used to be 1001 before I added prior skip prob
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 987);
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 1069);
 
     // check against alignment without banding
 
@@ -573,7 +573,8 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
                                                           0, 0);
 
     checkAlignedPairs(testCase, alignedPairs2, lX, lY);
-    CuAssertTrue(testCase, stList_length(alignedPairs2) == 986);
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs2));
+    CuAssertTrue(testCase, stList_length(alignedPairs2) == 1069);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -708,6 +709,132 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     stateMachine_destruct(sMt);
 }
 
+static void test_cpHmmEmissionsAgainstStateMachine(CuTest *testCase, StateMachine *sM, ContinuousPairHmm *cpHmm) {
+    for (int64_t i = 0; i < NUM_OF_KMERS; i++) {
+        double E_mean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+        double E_noise = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i) + 1);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)],
+                          cpHmm->eventModel[i * NORMAL_DISTRIBUTION_PARAMS], 0.0);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS + 1)],
+                          cpHmm->eventModel[i * NORMAL_DISTRIBUTION_PARAMS + 1], 0.0);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)], E_mean, 0.0);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS + 1)], E_noise, 0.0);
+    }
+}
+
+static void test_continuousPairHmm(CuTest *testCase) {
+    Hmm *hmm = continuousPairHmm_construct(0.0, 0.0, 3, NUM_OF_KMERS, threeState);
+    ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
+    CuAssertTrue(testCase, cpHmm->hasExpectations == FALSE);
+    CuAssertTrue(testCase, cpHmm->hasModel == FALSE);
+
+    int64_t nStates = cpHmm->baseHmm.stateNumber;
+    CuAssertTrue(testCase, nStates == 3);
+    // Add some transition expectations
+    for (int64_t from = 0; from < nStates; from++) {
+        for (int64_t to = 0; to < nStates; to++) {
+            double dummy = from * nStates + to;
+            cpHmm->baseHmm.addToTransitionExpectationFcn((Hmm *)cpHmm, from, to, dummy);
+        }
+    }
+
+    // Add fake event model
+    const char *model = "../../signalAlign/models/testModel_template.model";
+    if (!stFile_exists(model)) {
+        st_errAbort("Didn't find model file %s\n", model);
+    }
+
+    continuousPairHmm_loadModelFromFile(cpHmm, model);
+    CuAssertTrue(testCase, cpHmm->hasModel);
+    CuAssertTrue(testCase, cpHmm->hasExpectations);
+    StateMachine *sM = getStrawManStateMachine3(model);
+    test_cpHmmEmissionsAgainstStateMachine(testCase, sM, cpHmm);
+    char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
+    CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
+    FILE *fH = fopen(tempFile, "w");
+    continuousPairHmm_dump((Hmm *)cpHmm, fH);
+    continuousPairHmm_destruct((Hmm *)cpHmm);
+    hmm = continuousPairHmm_loadFromFile(tempFile);
+    stFile_rmrf(tempFile);
+    cpHmm = (ContinuousPairHmm *)hmm;
+    CuAssertTrue(testCase, cpHmm->hasModel);
+    CuAssertTrue(testCase, cpHmm->hasExpectations);
+    test_cpHmmEmissionsAgainstStateMachine(testCase, sM, cpHmm);
+
+    // check the transitions
+    for (int64_t from = 0; from < nStates; from++) {
+        for (int64_t to = 0; to < nStates; to++) {
+            double retrievedProb = cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, from, to);
+            double correctProb = from * nStates + to;
+            CuAssertTrue(testCase, retrievedProb == correctProb);
+        }
+    }
+    // check the posteriors
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        CuAssertDblEquals(testCase, 0.0, *(cpHmm->getPosteriorExpFcn((Hmm *)cpHmm, i)), 0.0);
+    }
+    continuousPairHmm_loadModelFromFile(cpHmm, model);
+    test_cpHmmEmissionsAgainstStateMachine(testCase, sM, cpHmm);
+    // change the expectations
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        double mean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+        cpHmm->addToEmissionExpectationFcn((Hmm *)cpHmm, i, mean, 1);
+    }
+    // check it
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        double x = *(cpHmm->getEmissionExpFcn((Hmm *)cpHmm, i));
+        double y = *(cpHmm->getEmissionExpFcn((Hmm *)cpHmm, i) + 1);
+        double E_mean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+        double E_sd = 0;
+        CuAssertDblEquals(testCase, E_mean, x, 0.0);
+        CuAssertDblEquals(testCase, E_sd, y, 0.0);
+    }
+
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        double mean = 2 * *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+        cpHmm->addToEmissionExpectationFcn((Hmm *)cpHmm, i, mean, 1);
+    }
+
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        double x = *(cpHmm->getEmissionExpFcn((Hmm *)cpHmm, i));
+        double y = *(cpHmm->getEmissionExpFcn((Hmm *)cpHmm, i) + 1);
+        double E_mean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i)) * 3;
+        double E_sd = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i)) * *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+        CuAssertDblEquals(testCase, E_mean, x, 0.0);
+        CuAssertDblEquals(testCase, E_sd, y, 0.0);
+    }
+
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        CuAssertDblEquals(testCase, 2, *(cpHmm->getPosteriorExpFcn((Hmm *)cpHmm, i)), 0.0);
+    }
+
+    continuousPairHmm_normalize((Hmm *)cpHmm);
+
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        CuAssertDblEquals(testCase, 2, *(cpHmm->getPosteriorExpFcn((Hmm *)cpHmm, i)), 0.0);
+    }
+
+    // Recheck transitions
+    for (int64_t from = 0; from < nStates; from++) {
+        for (int64_t to = 0; to < nStates; to++) {
+            double z = from * nStates * nStates + (nStates * (nStates - 1)) / 2;
+            double retrievedNormedProb = cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, from, to);
+            CuAssertDblEquals(testCase, (from * nStates + to) / z, retrievedNormedProb, 0.0);
+        }
+    }
+
+    // check the emissions
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        double origMean = sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)];
+        double newMean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+        double sd = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i) + 1);
+        CuAssertDblEquals(testCase, 1.5 * origMean, newMean, 0.00001);
+        CuAssertDblEquals(testCase, sqrt((origMean * origMean) / 2), sd, 0.0);
+    }
+
+    continuousPairHmm_destruct((Hmm *)cpHmm);
+}
+
 static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     // make the hmm object
     Hmm *hmm = hdpHmm_constructEmpty(0.0, 3, threeStateHdp, 0.02,
@@ -761,7 +888,7 @@ static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     }
 
     // normalize
-    hmmDiscrete_normalize2((Hmm *)hdpHmm, FALSE);
+    hmmDiscrete_normalizeTransitions((Hmm *) hdpHmm);
 
     // Recheck transitions
     for (int64_t from = 0; from < nStates; from++) {
@@ -823,7 +950,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
     StateMachine *sMt = getHdpStateMachine3(nHdp, modelFile);
 
     // load (random) transitions into stateMachine
-    continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, hdpHmm);
+    continuousPairHmm_loadIntoStateMachine(sMt, hdpHmm);
 
     // close hmm
     hdpHmm_destruct(hdpHmm);
@@ -854,7 +981,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
         // norm
         //continuousPairHmm_normalize(hmmExpectations);
-        hmmDiscrete_normalize2(hmmExpectations, FALSE);
+        hmmDiscrete_normalizeTransitions(hmmExpectations);
 
         st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
 
@@ -891,7 +1018,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
 CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-
+    /*
     SUITE_ADD_TEST(suite, test_findPotentialMethylation);
     SUITE_ADD_TEST(suite, test_pathLegalTransitions);
     SUITE_ADD_TEST(suite, test_methylPermutations);
@@ -907,6 +1034,8 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
-    SUITE_ADD_TEST(suite, test_hdpHmm_em);
+    */
+    SUITE_ADD_TEST(suite, test_continuousPairHmm);
+    //SUITE_ADD_TEST(suite, test_hdpHmm_em);
     return suite;
 }

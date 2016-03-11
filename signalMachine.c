@@ -660,7 +660,7 @@ int main(int argc, char *argv[]) {
                 writePosteriorProbsSparse(posteriorProbsFile, readLabel, trimmedRefSeq, forward, pA->contig1,
                                           tCoordinateShift, rCoordinateShift_t, templateAlignedPairs, template);
             } else {
-                writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS,
+                writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_MATRIX,
                                     npRead->templateParams.scale, npRead->templateParams.shift,
                                     npRead->templateEvents, trimmedRefSeq, forward, pA->contig1, sMt->type,
                                     tCoordinateShift, rCoordinateShift_t,
@@ -688,7 +688,7 @@ int main(int argc, char *argv[]) {
                 writePosteriorProbsSparse(posteriorProbsFile, readLabel, rc_trimmedRefSeq, forward, pA->contig1,
                                           cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complement);
             } else {
-                writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS,
+                writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_MATRIX,
                                     npRead->complementParams.scale, npRead->complementParams.shift,
                                     npRead->complementEvents, rc_trimmedRefSeq,
                                     forward, pA->contig1, sMc->type,cCoordinateShift, rCoordinateShift_c,

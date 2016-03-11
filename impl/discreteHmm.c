@@ -45,11 +45,11 @@ Hmm *hmmDiscrete_constructEmpty(double pseudocount, int64_t stateNumber, int64_t
     hmmD->baseHmm.setTransitionFcn = setTransitionFcn;                   // set
     hmmD->baseHmm.getTransitionsExpFcn = getTransitionsExpFcn;           // get
     // emissions
-    hmmD->baseHmm.addToEmissionExpectationFcn = addEmissionsExpFcn;      // add
-    hmmD->baseHmm.setEmissionExpectationFcn = setEmissionExpFcn;         // set
-    hmmD->baseHmm.getEmissionExpFcn = getEmissionExpFcn;                 // get
+    hmmD->addToEmissionExpectationFcn = addEmissionsExpFcn;      // add
+    hmmD->setEmissionExpectationFcn = setEmissionExpFcn;         // set
+    hmmD->getEmissionExpFcn = getEmissionExpFcn;                 // get
     // indexing
-    hmmD->baseHmm.getElementIndexFcn = getElementIndexFcn;               // indexing
+    hmmD->getElementIndexFcn = getElementIndexFcn;               // indexing
 
     return (Hmm *) hmmD;
 }
@@ -99,14 +99,14 @@ void hmmDiscrete_randomizeTransitions(Hmm *hmm) {
 }
 
 void hmmDiscrete_randomizeEmissions(Hmm *hmm) {
-    if (hmm->symbolSetSize <= 0) {
-        st_errAbort("hmmDiscrete_randomizeEmissions: got NULL for symbolSetSize\n");
+    HmmDiscrete *hmmD = (HmmDiscrete *)hmm;
+    if (hmmD->baseHmm.symbolSetSize <= 0) {
+        st_errAbort("hmmDiscrete_randomizeEmissions: got 0 for symbolSetSize\n");
     }
-    for (int64_t state = 0; state < hmm->stateNumber; state++) {
-        for (int64_t x = 0; x < hmm->symbolSetSize; x++) {
-            for (int64_t y = 0; y < hmm->symbolSetSize; y++) {
-                //hmmDiscrete_setEmissionExpectation((Hmm *)hmmD, state, x, y, st_random());
-                hmm->setEmissionExpectationFcn(hmm, state, x, y, st_random());
+    for (int64_t state = 0; state < hmmD->baseHmm.stateNumber; state++) {
+        for (int64_t x = 0; x < hmmD->baseHmm.symbolSetSize; x++) {
+            for (int64_t y = 0; y < hmmD->baseHmm.symbolSetSize; y++) {
+                hmmD->setEmissionExpectationFcn(hmm, state, x, y, st_random());
             }
         }
     }
@@ -119,10 +119,10 @@ void hmmDiscrete_randomize(Hmm *hmm) {
     // Emissions
     hmmDiscrete_randomizeEmissions(hmm);
 
-    hmmDiscrete_normalize2((Hmm *)hmmD, TRUE);
+    hmmDiscrete_normalizeTransitions((Hmm *) hmmD);
 }
 
-void hmmDiscrete_normalize2(Hmm *hmm, bool normalizeEmissions) {
+void hmmDiscrete_normalizeTransitions(Hmm *hmm) {
     // Transitions
     for (int64_t from = 0; from < hmm->stateNumber; from++) {
         double total = 0.0;
@@ -134,23 +134,26 @@ void hmmDiscrete_normalize2(Hmm *hmm, bool normalizeEmissions) {
             hmm->setTransitionFcn(hmm, from, to, newProb);
         }
     }
-    if (normalizeEmissions) {
-        for (int64_t state = 0; state < hmm->stateNumber; state++) {
-            double total = 0.0;
-            for (int64_t x = 0; x < hmm->symbolSetSize; x++) {
-                for (int64_t y = 0; y < hmm->symbolSetSize; y++) {
-                    total += hmm->getEmissionExpFcn(hmm, state, x, y);
-                }
+}
+void hmmDiscrete_normalize(Hmm *hmm) {
+    hmmDiscrete_normalizeTransitions(hmm);
+    HmmDiscrete *hmmD = (HmmDiscrete *)hmm;
+    for (int64_t state = 0; state < hmmD->baseHmm.stateNumber; state++) {
+        double total = 0.0;
+        for (int64_t x = 0; x < hmmD->baseHmm.symbolSetSize; x++) {
+            for (int64_t y = 0; y < hmmD->baseHmm.symbolSetSize; y++) {
+                total += hmmD->getEmissionExpFcn((Hmm *)hmmD, state, x, y);
             }
-            for (int64_t x = 0; x < hmm->symbolSetSize; x ++) {
-                for (int64_t y = 0; y < hmm->symbolSetSize; y++) {
-                    double newProb = hmm->getEmissionExpFcn(hmm, state, x, y) / total;
-                    hmm->setEmissionExpectationFcn(hmm, state, x, y, newProb);
-                }
+        }
+        for (int64_t x = 0; x < hmmD->baseHmm.symbolSetSize; x ++) {
+            for (int64_t y = 0; y < hmmD->baseHmm.symbolSetSize; y++) {
+                double newProb = hmmD->getEmissionExpFcn((Hmm *)hmmD, state, x, y) / total;
+                hmmD->setEmissionExpectationFcn((Hmm *)hmmD, state, x, y, newProb);
             }
         }
     }
 }
+
 
 // writers
 void hmmDiscrete_write(Hmm *hmm, FILE *fileHandle) {

@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <stdint.h>
+#include <discreteHmm.h>
 #include "nanopore.h"
 #include "sonLib.h"
 #include "bioioC.h"
@@ -630,36 +631,39 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
 
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
-    Hmm *hmmExpectations = ((void **) extraArgs)[1];
+    HmmDiscrete *hmmExpectations = ((void **) extraArgs)[1];
 
     int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the base/kmer index
     int64_t y = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[3]);
 
     //Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
-    hmmExpectations->addToTransitionExpectationFcn(hmmExpectations, from, to, p);
+    hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
 
-    if(x < hmmExpectations->symbolSetSize && y < hmmExpectations->symbolSetSize) { //Ignore gaps involving Ns.
-        hmmExpectations->addToEmissionExpectationFcn(hmmExpectations, to, x, y, p);
+    if(x < hmmExpectations->baseHmm.symbolSetSize && y < hmmExpectations->baseHmm.symbolSetSize) { //Ignore gaps involving Ns.
+        hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, to, x, y, p);
     }
 }
 
-void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
-                                                    double eP, double tP, void *extraArgs) {
+void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
+                                    double eP, double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
-    Hmm *hmmExpectations = ((void **) extraArgs)[1];
-
-    int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the kmer index
-
+    ContinuousPairHmm *hmmExpectations = ((void **) extraArgs)[1];
+    if ((hmmExpectations->hasExpectations == FALSE) || (hmmExpectations->hasModel == FALSE)) {
+        st_errAbort("cell_signal_updateExpectations: Hmm needs to have model and expectations\n");
+    }
+    int64_t kmerIndex = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the kmer index
+    double eventMean = *(double *)((void **) extraArgs)[3];
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
 
     // update transitions expectation
-    hmmExpectations->addToTransitionExpectationFcn(hmmExpectations, from, to, p);
+    hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
     //
-    if (to == shortGapX) {
-        hmmExpectations->addToEmissionExpectationFcn(hmmExpectations, 0, x, 0, p);
+    if (to == match) {
+        st_uglyf("SENTINAL - adding to expectations kmer %s, event %f\n", kmer, eventMean);
+        hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, kmerIndex, eventMean, p);
     }
 }
 
@@ -674,21 +678,11 @@ void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *
 
     double *event = (double *)((void **) extraArgs)[3];  // pointer to the event mean
 
-    // kmer index
-    //int64_t kmerIdx = hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getElementIndexFcn(
-    //        ((void **) extraArgs)[2]); // this gives you the kmer index
-
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
 
     // update transitions expectation
     hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
-
-    // this is where I update the kmer-skip prob, but I've stopped using it with the expanded alphabet
-    //if (to == shortGapX) {
-    //    hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.addToEmissionExpectationFcn(
-    //            (Hmm *)hmmExpectations, 0, kmerIdx, 0, p);
-    //}
 
     if ((to == match) & (p >= hmmExpectations->threshold)) {
         //st_uglyf("SENTINAL - adding to expectations kmer %s\n", kmer);

@@ -9,6 +9,10 @@ typedef struct _hmmDiscrete {
     Hmm baseHmm;
     double *transitions;
     double *emissions;
+    void (*addToEmissionExpectationFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p);
+    void (*setEmissionExpectationFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p);
+    double (*getEmissionExpFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y);
+    int64_t (*getElementIndexFcn)(void *);
 } HmmDiscrete;
 
 // Construct
@@ -36,7 +40,7 @@ void hmmDiscrete_randomizeTransitions(Hmm *hmm);
 void hmmDiscrete_randomizeEmissions(Hmm *hmm);
 void hmmDiscrete_randomize(Hmm *hmmD);
 void hmmDiscrete_normalize(Hmm *hmmD);
-void hmmDiscrete_normalize2(Hmm *hmm, bool normalizeEmissions);
+void hmmDiscrete_normalizeTransitions(Hmm *hmm);
 // Writers
 void hmmDiscrete_write(Hmm *hmmD, FILE *fileHandle);
 

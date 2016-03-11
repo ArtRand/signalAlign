@@ -62,16 +62,6 @@ struct _hmm {
 
     double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to);
 
-    void (*addToEmissionExpectationFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p);
-
-    void (*setEmissionExpectationFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p);
-
-    double (*getEmissionExpFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y);
-
-    int64_t (*getElementIndexFcn)(void *);
-
-    //void (*loadSymmetric)(StateMachine sM, Hmm hmm);
-    //void (*loadAsymmetric)(struct stateMachine, struct hmm);
 };
 
 struct _stateMachine {
@@ -80,9 +70,9 @@ struct _stateMachine {
     int64_t matchState;
     int64_t parameterSetSize;
 
-    double *EMISSION_MATCH_PROBS; //Match emission probs
-    double *EMISSION_GAP_X_PROBS; //Gap emission probs
-    double *EMISSION_GAP_Y_PROBS; //Gap emission probs
+    double *EMISSION_MATCH_MATRIX; //Match emission probs
+    double *EMISSION_GAP_X_PROBS;  //Gap emission probs
+    double *EMISSION_GAP_Y_MATRIX; //Gap emission probs
 
     double (*startStateProb)(StateMachine *sM, int64_t state);
 
@@ -314,6 +304,7 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
                                                                          double eP, double tP, void *extraArgs));
 
 // indexing functions //
+void stateMachine_index_check(int64_t c);
 //Returns the index for a base, for use with matrices and emissions_discrete_getKmerIndex
 int64_t emissions_discrete_getBaseIndex(void *base);
 
