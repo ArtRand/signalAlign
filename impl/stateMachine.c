@@ -591,6 +591,24 @@ double emissions_signal_strawManGetKmerEventMatchProb(const double *eventModel, 
     return l_probEventMean + l_probEventNoise;
 }
 
+void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shift, double var) {
+    // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev, sd_lambda per kmer
+    // already been adjusted for correlation coeff.
+    for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS) + 1; i += MODEL_PARAMS) {
+        // Level adjustments
+        // level_mean = mean * scale + shift
+        sM->EMISSION_MATCH_MATRIX[i] = sM->EMISSION_MATCH_MATRIX[i] * scale + shift;
+        // level_stdev = stdev * var
+        sM->EMISSION_MATCH_MATRIX[i + 1] = sM->EMISSION_MATCH_MATRIX[i + 1] * var;
+
+        // adjusting extra event also
+        // level_mean = mean * scale + shift
+        sM->EMISSION_GAP_Y_MATRIX[i] = sM->EMISSION_GAP_Y_MATRIX[i] * scale + shift;
+        // level_stdev = stdev * var
+        sM->EMISSION_GAP_Y_MATRIX[i + 1] = sM->EMISSION_GAP_Y_MATRIX[i + 1] * var;
+    }
+}
+
 void emissions_signal_scaleModel(StateMachine *sM,
                                  double scale, double shift, double var,
                                  double scale_sd, double var_sd) {
@@ -603,13 +621,11 @@ void emissions_signal_scaleModel(StateMachine *sM,
         // level_stdev = stdev * var
         sM->EMISSION_MATCH_MATRIX[i + 1] = sM->EMISSION_MATCH_MATRIX[i + 1] * var;
 
-
-        // experimenting with adjusting extra event also
+        // adjusting extra event also
         // level_mean = mean * scale + shift
         sM->EMISSION_GAP_Y_MATRIX[i] = sM->EMISSION_GAP_Y_MATRIX[i] * scale + shift;
         // level_stdev = stdev * var
         sM->EMISSION_GAP_Y_MATRIX[i + 1] = sM->EMISSION_GAP_Y_MATRIX[i + 1] * var;
-
 
         // Fluctuation (noise) adjustments
         // noise_mean *= scale_sd
@@ -617,8 +633,8 @@ void emissions_signal_scaleModel(StateMachine *sM,
         // noise_lambda *= var_sd
         sM->EMISSION_MATCH_MATRIX[i + 4] = sM->EMISSION_MATCH_MATRIX[i + 4] * var_sd;
         // noise_sd = sqrt(adjusted_noise_mean**3 / adjusted_noise_lambda);
-        sM->EMISSION_MATCH_MATRIX[i + 3] = sqrt(pow(sM->EMISSION_MATCH_MATRIX[i + 2], 3.0) / sM->EMISSION_MATCH_MATRIX[i + 4]);
-
+        sM->EMISSION_MATCH_MATRIX[i + 3] = sqrt(pow(sM->EMISSION_MATCH_MATRIX[i + 2], 3.0)
+                                                / sM->EMISSION_MATCH_MATRIX[i + 4]);
 
         // Fluctuation (noise) adjustments
         // noise_mean *= scale_sd
@@ -626,32 +642,8 @@ void emissions_signal_scaleModel(StateMachine *sM,
         // noise_lambda *= var_sd
         sM->EMISSION_GAP_Y_MATRIX[i + 4] = sM->EMISSION_GAP_Y_MATRIX[i + 4] * var_sd;
         // noise_sd = sqrt(adjusted_noise_mean**3 / adjusted_noise_lambda);
-        sM->EMISSION_GAP_Y_MATRIX[i + 3] = sqrt(pow(sM->EMISSION_GAP_Y_MATRIX[i + 2], 3.0) / sM->EMISSION_MATCH_MATRIX[i + 4]);
-
-
-
-    }
-}
-
-void emissions_signal_scaleModelNoiseOnly(StateMachine *sM,
-                                          double scale, double shift, double var,
-                                          double scale_sd, double var_sd) {
-    // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev, sd_lambda per kmer
-    // already been adjusted for correlation coeff.
-    for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS) + 1; i += MODEL_PARAMS) {
-        // Level adjustments
-        // level_mean = mean * scale + shift
-        //sM->EMISSION_MATCH_MATRIX[i] = sM->EMISSION_MATCH_MATRIX[i] * scale + shift;
-        // level_stdev = stdev * var
-        sM->EMISSION_MATCH_MATRIX[i + 1] = sM->EMISSION_MATCH_MATRIX[i + 1] * var;
-
-        // Fluctuation (noise) adjustments
-        // noise_mean *= scale_sd
-        sM->EMISSION_MATCH_MATRIX[i + 2] = sM->EMISSION_MATCH_MATRIX[i + 2] * scale_sd;
-        // noise_lambda *= var_sd
-        sM->EMISSION_MATCH_MATRIX[i + 4] = sM->EMISSION_MATCH_MATRIX[i + 4] * var_sd;
-        // noise_sd = sqrt(adjusted_noise_mean**3 / adjusted_noise_lambda);
-        sM->EMISSION_MATCH_MATRIX[i + 3] = sqrt(pow(sM->EMISSION_MATCH_MATRIX[i + 2], 3.0) / sM->EMISSION_MATCH_MATRIX[i + 4]);
+        sM->EMISSION_GAP_Y_MATRIX[i + 3] = sqrt(pow(sM->EMISSION_GAP_Y_MATRIX[i + 2], 3.0)
+                                                / sM->EMISSION_MATCH_MATRIX[i + 4]);
     }
 }
 
@@ -1617,48 +1609,6 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t paramete
     return (StateMachine *) sM3;
 }
 
-StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
-                                             void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
-                                             double (*xSkipProbFcn)(StateMachine *, void *, bool),
-                                             double (*scaledMatchProbFcn)(const double *, void *, void *),
-                                             double (*matchProbFcn)(const double *, void *, void *),
-                                             void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
-                                                                          int64_t from, int64_t to,
-                                                                          double eP, double tP, void *extraArgs)) {
-    StateMachine3Vanilla *sM3v = st_malloc(sizeof(StateMachine3Vanilla));
-    // check
-    if (type != vanilla) {
-        st_errAbort("Tried to create a vanilla state machine with the wrong type?");
-    }
-    // setup end state prob defaults
-    // defaults from a template nanopore file
-    sM3v->TRANSITION_M_TO_Y_NOT_X = 0.17; //default for template
-    sM3v->TRANSITION_E_TO_E = 0.55f; //default for template
-    sM3v->DEFAULT_END_MATCH_PROB = -0.23552123624314988; // log(step_prob) (0.79015888282447311)
-    sM3v->DEFAULT_END_FROM_X_PROB = -1.6269694202638481; // log(skip_prob) (0.19652425498269727)
-    sM3v->DEFAULT_END_FROM_Y_PROB = -4.3187242127300092; // log(1 - (skip_prob + step_prob)) (0.013316862192829682)
-    // setup the parent class
-    sM3v->model.type = type;
-    sM3v->model.parameterSetSize = parameterSetSize;
-    sM3v->model.stateNumber = 3;
-    sM3v->model.matchState = match;
-    sM3v->model.startStateProb = stateMachine3_startStateProb;
-    sM3v->model.raggedStartStateProb = stateMachine3_raggedStartStateProb;
-    sM3v->model.endStateProb = stateMachine3Vanilla_endStateProb;
-    sM3v->model.raggedEndStateProb = stateMachine3Vanilla_raggedEndStateProb;
-    sM3v->model.cellCalculate = stateMachine3Vanilla_cellCalculate;
-    sM3v->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
-
-    // stateMachine3Vanilla-specific functions
-    sM3v->getKmerSkipProb = xSkipProbFcn;
-    sM3v->getScaledMatchProbFcn = scaledMatchProbFcn;
-    sM3v->getMatchProbFcn = matchProbFcn;
-
-    // set emissions to defaults or zeros
-    setEmissionsDefaults((StateMachine *) sM3v, 60);
-    return (StateMachine *) sM3v;
-}
-
 StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t parameterSetSize,
                                             void (*setEmissionsToDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                             double (*durationProbFcn)(void *event, int64_t n),
@@ -1820,18 +1770,6 @@ StateMachine *getStateMachine4(const char *modelFile) {
                                                 cell_signal_updateExpectations);
     emissions_signal_loadPoreModel(sM4, modelFile, sM4->type);
     return sM4;
-}
-
-StateMachine *getSignalStateMachine3Vanilla(const char *modelFile) {
-    // construct a stateMachine3Vanilla then load the model
-    StateMachine *sM3v = stateMachine3Vanilla_construct(vanilla, NUM_OF_KMERS,
-                                                        emissions_signal_initEmissionsToZero,
-                                                        emissions_signal_getBetaOrAlphaSkipProb,
-                                                        emissions_signal_getEventMatchProbWithTwoDists,
-                                                        emissions_signal_getEventMatchProbWithTwoDists,
-                                                        cell_signal_updateBetaAndAlphaProb);
-    emissions_signal_loadPoreModel(sM3v, modelFile, sM3v->type);
-    return sM3v;
 }
 
 StateMachine *getStateMachineEchelon(const char *modelFile) {

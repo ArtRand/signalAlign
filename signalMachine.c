@@ -204,7 +204,7 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
 }
 
 void loadHmmRoutine(const char *hmmFile, StateMachine *sM, StateMachineType type) {
-    if ((type != vanilla) && (type != threeState) && (type != threeStateHdp)) {
+    if ((type != threeState) && (type != threeStateHdp)) {
         st_errAbort("LoadSignalHmm : unupported stateMachineType");
     }
     hmmContinuous_loadSignalHmm(hmmFile, sM, type);
@@ -247,17 +247,11 @@ stList *performSignalAlignmentP(StateMachine *sM, Sequence *sY, int64_t *eventMa
     return alignedPairs;
 }
 
-stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, Sequence *eventSequence, int64_t *eventMap,
+stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_t *eventMap,
                                int64_t mapOffset,
                                char *target, PairwiseAlignmentParameters *p, stList *unmappedAncors) {
     if ((sM->type != threeState) && (sM->type != threeStateHdp)) {
         st_errAbort("signalAlign - You're trying to do the wrong king of alignment");
-    }
-
-    // load HMM, if given
-    if (hmmFile != NULL) {
-        fprintf(stderr, "loading HMM from file, %s\n", hmmFile);
-        loadHmmRoutine(hmmFile, sM, sM->type);
     }
 
     stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset, target, p,
@@ -339,6 +333,9 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
     if (inputHmm != NULL) {
         fprintf(stderr, "signalAlign - loading HMM from file, %s\n", inputHmm);
         loadHmmRoutine(inputHmm, sM, type);
+        if (type == threeState) {
+            emissions_signal_scaleEmissions(sM, npp.scale, npp.shift, npp.var);
+        }
     }
 
     // correct sequence length
@@ -583,8 +580,12 @@ int main(int argc, char *argv[]) {
     if ((templateExpectationsFile != NULL) && (complementExpectationsFile != NULL)) {
         // Expectation Routine //
         // make empty HMM to collect expectations
-        Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold);
-        Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold);
+        Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold,
+                                                              npRead->templateParams.scale,
+                                                              npRead->templateParams.shift);
+        Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold,
+                                                                npRead->complementParams.scale,
+                                                                npRead->complementParams.shift);
 
         // get expectations for template
         fprintf(stderr, "signalAlign - getting expectations for template\n");
@@ -593,12 +594,14 @@ int main(int argc, char *argv[]) {
                               tEventSequence, npRead->templateEventMap, pA->start2, templateTargetSeq, p,
                               anchorPairs, template);
 
-        // write to file
-        fprintf(stderr, "signalAlign - writing expectations to file: %s\n", templateExpectationsFile);
         if (sMtype == threeStateHdp) {
             fprintf(stderr, "signalAlign - got %lld template HDP assignments\n",
                     hmmContinuous_howManyAssignments(templateExpectations));
         }
+
+        // write to file
+        fprintf(stderr, "signalAlign - writing expectations to file: %s\n", templateExpectationsFile);
+
         hmmContinuous_writeToFile(templateExpectationsFile, templateExpectations, sMtype);
 
         // get expectations for the complement
@@ -608,12 +611,13 @@ int main(int argc, char *argv[]) {
                               npRead->complementParams, cEventSequence, npRead->complementEventMap, pA->start2,
                               complementTargetSeq, p, anchorPairs, complement);
 
-        // write to file
-        fprintf(stderr, "signalAlign - writing expectations to file: %s\n", complementExpectationsFile);
         if (sMtype == threeStateHdp) {
             fprintf(stderr, "signalAlign - got %lld complement HDP assignments\n",
                     hmmContinuous_howManyAssignments(complementExpectations));
         }
+
+        // write to file
+        fprintf(stderr, "signalAlign - writing expectations to file: %s\n", complementExpectationsFile);
         hmmContinuous_writeToFile(complementExpectationsFile, complementExpectations, sMtype);
 
         hmmContinuous_destruct(templateExpectations, sMtype);
@@ -643,11 +647,19 @@ int main(int argc, char *argv[]) {
 
         // make template stateMachine
         sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, template, nHdpT);
-
+        // load HMM, if given
+        if (templateHmmFile != NULL) {
+            fprintf(stderr, "loading HMM from file, %s\n", templateHmmFile);
+            loadHmmRoutine(templateHmmFile, sMt, sMt->type);
+            if (sMt->type == threeState) {
+                emissions_signal_scaleEmissions(sMt, npRead->templateParams.scale,
+                                                npRead->templateParams.shift,
+                                                npRead->templateParams.var);
+            }
+        }
         // get aligned pairs
-        templateAlignedPairs = performSignalAlignment(sMt, templateHmmFile, tEventSequence,
-                                                      npRead->templateEventMap, pA->start2, templateTargetSeq,
-                                                      p, anchorPairs);
+        templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
+                                                      pA->start2, templateTargetSeq, p, anchorPairs);
 
         templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
@@ -671,9 +683,17 @@ int main(int argc, char *argv[]) {
         // Complement alignment
         fprintf(stderr, "signalAlign - starting complement alignment\n");
         sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, complement, nHdpC);
-
+        if (complementHmmFile != NULL) {
+            fprintf(stderr, "loading HMM from file, %s\n", complementHmmFile);
+            loadHmmRoutine(complementHmmFile, sMc, sMc->type);
+            if (sMc->type == threeState) {
+                emissions_signal_scaleEmissions(sMc, npRead->complementParams.scale,
+                                                npRead->complementParams.shift,
+                                                npRead->complementParams.var);
+            }
+        }
         // get aligned pairs
-        complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, cEventSequence,
+        complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
                                                         npRead->complementEventMap, pA->start2,
                                                         complementTargetSeq, p, anchorPairs);
 

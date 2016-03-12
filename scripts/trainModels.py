@@ -114,12 +114,13 @@ def get_expectations(work_queue, done_queue):
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
-def get_model(type, symbol_set_size, threshold):
-    assert (type in ["threeState", "vanilla", "threeStateHdp"]), "Unsupported StateMachine type"
+def get_model(type, symbol_set_size, threshold, table_file=None):
+    assert (type in ["threeState", "threeStateHdp"]), "Unsupported StateMachine type"
     if type == "threeState":
-        return ContinuousPairHmm(model_type=type, symbol_set_size=symbol_set_size)
-    if type == "vanilla":
-        return ConditionalSignalHmm(model_type=type, symbol_set_size=symbol_set_size)
+        assert table_file is not None, "Need to have starting lookup table for {} HMM".format(type)
+        model = ContinuousPairHmm(model_type=type, symbol_set_size=symbol_set_size)
+        model.parse_lookup_table(table_file=table_file)
+        return model
     if type == "threeStateHdp":
         return HdpSignalHmm(model_type=type, threshold=threshold)
 
@@ -211,9 +212,15 @@ def main(argv):
     bwa_ref_index = get_bwa_index(args.ref, working_directory_path)
     print("signalAlign - indexing reference, done", file=sys.stderr)
 
-    # make model objects, these handle normalizing, loading, and writing
-    template_model = get_model(type=args.stateMachineType, symbol_set_size=4096, threshold=args.threshold)
-    complement_model = get_model(type=args.stateMachineType, symbol_set_size=4096, threshold=args.threshold)
+    default_template_table_path = "../../signalAlign/models/testModel_template.model"
+    default_complement_table_path = "../../signalAlign/models/testModel_complement.model"
+    assert os.path.exists(default_template_table_path) and os.path.exists(default_complement_table_path),\
+        "Missing default lookup tables"
+
+    template_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
+                               table_file=default_template_table_path)
+    complement_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
+                                 table_file=default_complement_table_path)
 
     # get the input HDP, if we're using it
     if args.stateMachineType == "threeStateHdp":

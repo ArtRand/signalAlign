@@ -284,15 +284,6 @@ StateMachine *stateMachine4_construct(StateMachineType type, int64_t parameterSe
                                       void (*cellCalcUpdateFcn)(double *, double *, int64_t from, int64_t to,
                                                                 double eP, double tP, void *));
 
-StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
-                                             void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
-                                             double (*xSkipProbFcn)(StateMachine *, void *, bool),
-                                             double (*scaledMatchProbFcn)(const double *, void *, void *),
-                                             double (*matchProbFcn)(const double *, void *, void *),
-                                             void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
-                                                                          int64_t from, int64_t to,
-                                                                          double eP, double tP, void *extraArgs));
-
 StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t parameterSetSize,
                                             void (*setEmissionsToDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                             double (*durationProbFcn)(void *event, int64_t n),
@@ -357,8 +348,7 @@ double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, 
 void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, double var,
                                  double scale_sd, double var_sd);
 
-void emissions_signal_scaleModelNoiseOnly(StateMachine *sM, double scale, double shift, double var, double scale_sd,
-                                          double var_sd);
+void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shift, double var);
 
 double emissions_signal_getDurationProb(void *event, int64_t n);
 
@@ -367,8 +357,6 @@ StateMachine *getStrawManStateMachine3(const char *modelFile);
 StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile);
 
 StateMachine *getStateMachine4(const char *modelFile);
-
-StateMachine *getSignalStateMachine3Vanilla(const char *modelFile);
 
 StateMachine *getStateMachineEchelon(const char *modelFile);
 

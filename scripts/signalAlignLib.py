@@ -13,6 +13,8 @@ from serviceCourse.sequenceTools import reverse_complement
 from serviceCourse.parsers import read_fasta
 from serviceCourse.file_handlers import FolderHandler
 
+# Globals
+NORMAL_DISTRIBUTION_PARAMS = 2
 
 def kmer_iterator(dna, k):
     for i in xrange(len(dna)):
@@ -984,13 +986,25 @@ class ContinuousPairHmm(SignalHmm):
     def __init__(self, model_type, symbol_set_size):
         super(ContinuousPairHmm, self).__init__(model_type=model_type, symbol_set_size=symbol_set_size)
         self.transitions = np.zeros(self.state_number**2)
-        self.kmer_skip_probs = np.zeros(self.symbol_set_size)
+
+        # event model for describing normal distributions for each kmer
+        self.event_model = {"means": np.zeros(self.symbol_set_size),
+                            "SDs": np.zeros(self.symbol_set_size)}
+
+        # bins for expectations
+        self.mean_expectations = np.zeros(self.symbol_set_size)
+        self.sd_expectations = np.zeros(self.symbol_set_size)
+        self.posteriors = np.zeros(self.symbol_set_size)
+        self.observed = np.zeros(self.symbol_set_size, dtype=bool)
+        self.has_model = False
+        self.normalized = False
 
     def add_expectations_file(self, expectations_file):
         fH = open(expectations_file, 'r')
 
         # line 0: smType stateNumber, symbolSetSize
         line = map(float, fH.readline().split())
+        assert len(line) == 4, "cpHMM - Got incorrect header {}".format(''.join(line))
         assert line[0] == 2
         assert line[1] == self.state_number
         assert line[2] == self.symbol_set_size
@@ -1000,7 +1014,7 @@ class ContinuousPairHmm(SignalHmm):
 
         # check if valid file
         if len(line) != (len(self.transitions) + 1):
-            print("PYSENTINAL - problem with file {}".format(expectations_file), file=sys.stdout)
+            print("add_expectations_file: - problem with file {}".format(expectations_file), file=sys.stdout)
             return
 
         self.likelihood += line[-1]
@@ -1008,7 +1022,22 @@ class ContinuousPairHmm(SignalHmm):
 
         # line 2: kmer skip probs
         line = map(float, fH.readline().split())
-        self.kmer_skip_probs = map(lambda x: sum(x), zip(self.kmer_skip_probs, line))
+        assert len(line) == self.symbol_set_size * NORMAL_DISTRIBUTION_PARAMS, "Bad model"
+
+        # line 3 event expectations [E_mean, E_sd]
+        line = map(float, fH.readline().split())
+        assert len(line) == self.symbol_set_size * NORMAL_DISTRIBUTION_PARAMS, "Bad expectations line"
+        self.mean_expectations = [i + j for i, j in izip(self.mean_expectations, line[::2])]
+        self.sd_expectations = [i + j for i, j in izip(self.sd_expectations, line[1::2])]
+
+        # line 4, posteriors
+        line = map(float, fH.readline().split())
+        assert len(line) == self.symbol_set_size, "Bad posteriors line"
+        self.posteriors = map(lambda x: sum(x), zip(self.posteriors, line))
+
+        line = map(bool, fH.readline().split())
+        assert len(line) == self.symbol_set_size, "Bad observation line"
+        self.observed = [any(b) for b in zip(self.observed, line)]
 
         fH.close()
 
@@ -1020,36 +1049,60 @@ class ContinuousPairHmm(SignalHmm):
             for to_state in xrange(self.state_number):
                 self.transitions[i + to_state] = self.transitions[i + to_state] / j
 
-        # normalize kmer skip probs
-        total_skip_prob = sum(self.kmer_skip_probs)
-        for i in xrange(self.symbol_set_size):
-            self.kmer_skip_probs[i] = self.kmer_skip_probs[i] / total_skip_prob
+        # calculate the new expected mean and standard deviation for the kmer normal distributions
+        for k in xrange(self.symbol_set_size):  # TODO implement learning rate
+            if self.observed[k] is True:
+                u_k = self.mean_expectations[k] / self.posteriors[k]
+                o_k = np.sqrt(self.sd_expectations[k] / self.posteriors[k])
+                if u_k > 0:
+                    self.event_model["means"][k] = u_k
+                    self.event_model["SDs"][k] = o_k
+            else:
+                continue
+
+        self.normalized = True
+        self.has_model = True
 
     def write(self, out_file):
-        # Format
-        # type \t stateNumber \t symbolSetSize \n
-        # [transitions, ... \t seperated] likelihood \n
-        # [kmer skip probs... \t sep] \n
+        # Format:
+        # 0 * type \t stateNumber \t symbolSetSize \t hasModel \n
+        # 1 * [transitions... \t] likelihood \n
+        # 2 * [Event Model] \n
+        # 3 * [Event Expectations] \n
+        # 4 * [Event Posteriors] \n
+        # 5 * [Observed] \n
+        assert self.has_model, "Shouldn't be writing down a Hmm that has no Model"
+        assert self.normalized, "Shouldn't be writing down a not normalized HMM"
+
         f = open(out_file, 'w')
 
         # line 0
-        f.write("2\t{stateNumber}\t{symbolSetSize}\n".format(stateNumber=self.state_number,
-                                                             symbolSetSize=self.symbol_set_size))
-
-        # line 1
-        # transitions
+        f.write("2\t{stateNumber}\t{symbolSetSize}\t{hasModel}\n".format(stateNumber=self.state_number,
+                                                                         symbolSetSize=self.symbol_set_size,
+                                                                         hasModel=int(self.has_model)))
+        # line 1 transitions
         for i in xrange(self.state_number * self.state_number):
             f.write("{transition}\t".format(transition=str(self.transitions[i])))
         # likelihood
         f.write("{}\n".format(str(self.likelihood)))
 
-        # line 2
-        # kmer skip probs
-        for kmer in xrange(self.symbol_set_size):
-            f.write("{}\t".format(str(self.kmer_skip_probs[kmer])))
-        # final newline
+        # line 2 Event Model
+        for k in xrange(self.symbol_set_size):
+            f.write("{mean}\t{sd}\t".format(mean=self.event_model["means"][k], sd=self.event_model["SDs"][k]))
         f.write("\n")
+
         f.close()
+
+    def parse_lookup_table(self, table_file):
+        fH = open(table_file, 'r')
+        NB_MODEL_PARAMS = 5
+
+        line = map(float, fH.readline().split())
+        line = line[1:]  # disregard the correlation param
+        assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, "Model {} has incorrect line".format(model_file)
+        self.event_model["means"] = [x for x in line[::NB_MODEL_PARAMS]]
+        self.event_model["SDs"] = [x for x in line[1::NB_MODEL_PARAMS]]
+        self.has_model = True
 
 
 class HdpSignalHmm(SignalHmm):

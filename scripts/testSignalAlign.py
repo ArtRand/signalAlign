@@ -14,8 +14,6 @@ class LibTest(unittest.TestCase):
         command = "./signalAlignLibTests"
         result = call(command, shell=True, bufsize=-1, stdout=sys.stdout, stderr=sys.stderr)
         self.assertTrue(result == 0, "signalAlign Library Tests Fail")
-        #if result != 0:
-        #    raise RuntimeError("signalAlign Library Tests Fail.")
 
 
 class signalAlign_alignment_test(unittest.TestCase):
@@ -63,7 +61,7 @@ def main():
     testSuite = unittest.TestSuite()
     testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(signalAlign_alignment_test('test_zymo_reads'))
-    testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
+    #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
 
     testRunner = unittest.TextTestRunner(verbosity=1)
     testRunner.run(testSuite)

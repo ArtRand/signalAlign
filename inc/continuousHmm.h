@@ -3,36 +3,39 @@
 #define NORMAL_DISTRIBUTION_PARAMS 2
 #include "stateMachine.h"
 
-
-typedef struct _hmmContinuous {
-    Hmm baseHmm;
-    //double *matchModel;
-    //double *extraEventMatchModel;
-} HmmContinuous;
-
 typedef struct _strawManHmm {
-    Hmm baseHmm; // TODO TODO COMMENT HOW THIS WORKS
+    Hmm baseHmm;
+    // threeState transitions matrix (3x3)
     double *transitions;
+    // matrix formatted [x, y] * NUM_OF_KMERS. x = Sigma_k(p_i * obs_i) and y = Sigma_k(p_i * (obs - u_K)**2),
+    // u_k is calculated as x / Sigma_k(p_k) and _k indicates the kmer
     double *eventExpectations;
+    // matrix formatted [E(u), E(o)] * NUM_OF_KMERS, this is the expected parameters for the Normal Distributions
+    // for each kmer
     double *eventModel;
+    // matrix formatted [Sigma(p_k)] * NUM_OF_KMERS, a running sum of the posterior probabilities
     double *posteriors;
+    // this read's scale parameter and shift parameter, these are used to descale the events when adding to
+    // the expectation
+    double scale;
+    double shift;
+    // gets the kmer index for a nucleotide string
     int64_t (*getElementIndexFcn)(void *);
+    // descales the event mean
+    double (*getDescaledEvent)(double scale, double shift, double eventMean);
+    // updates the eventExpectations matrix
     void (*addToEmissionExpectationFcn)(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p);
+    // sets a value in the eventExpectations matrix
     void (*setEmissionExpectationFcn)(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p);
+    // these functions return pointers to their respective matrices
     double *(*getEmissionExpFcn)(Hmm *hmm, int64_t kmerIndex);
     double *(*getPosteriorExpFcn)(Hmm *hmm, int64_t kmerIndex);
     double *(*getEventModelEntry)(Hmm *hmm, int64_t kmerIndex);
+    // a boolian mask for the kmers that have been observed
+    bool *observed;
+    // boolian indicating whether the HMM object has a an event model or not
     bool hasModel;
-    bool hasExpectations;
 } ContinuousPairHmm;
-
-typedef struct _vanillaHmm {
-    HmmContinuous baseContinuousHmm;
-    double *matchModel;
-    double *scaledMatchModel;
-    double *kmerSkipBins;
-    int64_t (*getKmerSkipBin)(double *matchModel, void *cX);
-} VanillaHmm;
 
 typedef struct _hdpHmm {
     Hmm baseHmm;
@@ -46,7 +49,8 @@ typedef struct _hdpHmm {
 } HdpHmm;
 
 Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPseudocount,
-                                 int64_t stateNumber, int64_t symbolSetSize, StateMachineType type);
+                                 int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
+                                 double scale, double shift);
 
 void continuousPairHmm_addToTransitionsExpectation(Hmm *hmm, int64_t from, int64_t to, double p);
 
@@ -62,7 +66,9 @@ double *continuousPairHmm_getEmissionExpectation(Hmm *hmm, int64_t kmerIndex);
 
 double *continuousPairHmm_getEmissionPosterior(Hmm *hmm, int64_t kmerIndex);
 
-void continuousPairHmm_loadIntoStateMachine(StateMachine *sM, Hmm *hmm);
+void continuousPairHmm_loadEmissionsIntoStateMachine(StateMachine *sM, Hmm *hmm);
+
+void continuousPairHmm_loadTransitionsIntoStateMachine(StateMachine *sM, Hmm *hmm);
 
 void continuousPairHmm_normalize(Hmm *hmm);
 
@@ -72,7 +78,7 @@ void continuousPairHmm_destruct(Hmm *hmm);
 
 void continuousPairHmm_dump(Hmm *hmm, FILE *fileHandle);
 
-Hmm *continuousPairHmm_loadFromFile(const char *fileName);
+Hmm *continuousPairHmm_loadFromFile(const char *fileName, double transitionPseudocount, double emissionPseudocount);
 
 void continuousPairHmm_loadModelFromFile(ContinuousPairHmm *hmm, const char *modelFile);
 
@@ -86,7 +92,6 @@ void hdpHmm_loadTransitions(StateMachine *sM, Hmm *hmm);
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
 
 Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *ndhp);
-Hmm *hdpHmm_loadFromFile2(const char *fileName, NanoporeHDP *nHdp);
 
 void hdpHmm_destruct(Hmm *hmm);
 
@@ -95,7 +100,8 @@ void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMac
 
 void hmmContinuous_destruct(Hmm *hmm, StateMachineType type);
 
-Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold);
+Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold,
+                               double scale, double shift);
 
 void hmmContinuous_normalize(Hmm *hmm, StateMachineType type);
 

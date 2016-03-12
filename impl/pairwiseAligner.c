@@ -650,11 +650,13 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     ContinuousPairHmm *hmmExpectations = ((void **) extraArgs)[1];
-    if ((hmmExpectations->hasExpectations == FALSE) || (hmmExpectations->hasModel == FALSE)) {
-        st_errAbort("cell_signal_updateExpectations: Hmm needs to have model and expectations\n");
-    }
+
     int64_t kmerIndex = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the kmer index
     double eventMean = *(double *)((void **) extraArgs)[3];
+    double descaledEventMean = hmmExpectations->getDescaledEvent(hmmExpectations->scale,
+                                                                 hmmExpectations->shift,
+                                                                 eventMean);
+
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
 
@@ -662,8 +664,7 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
     //
     if (to == match) {
-        st_uglyf("SENTINAL - adding to expectations kmer %s, event %f\n", kmer, eventMean);
-        hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, kmerIndex, eventMean, p);
+        hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, kmerIndex, descaledEventMean, p);
     }
 }
 
@@ -688,28 +689,6 @@ void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *
         //st_uglyf("SENTINAL - adding to expectations kmer %s\n", kmer);
         // add to emissions expectations function here
         hmmExpectations->addToAssignments((Hmm *)hmmExpectations, kmer, event);
-    }
-}
-
-void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
-                                        double tP, void *extraArgs) {
-    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
-    double totalProbability = *((double *) ((void **) extraArgs)[0]);
-    VanillaHmm *hmmExpectations = ((void **) extraArgs)[1];
-
-    // you want this to give you the skip bin
-    int64_t x = hmmExpectations->getKmerSkipBin(hmmExpectations->matchModel, (((void **) extraArgs)[2]));
-
-    // Calculate posterior probability of the transition/emission pair
-    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
-    // update beta
-    if (from == match && to == shortGapX) {
-        hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, x, 0, p);
-    }
-    // update alpha
-    if (from == shortGapX && to == shortGapX) {
-        hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations,
-                                                                                 (x + 30), 0, p);
     }
 }
 
