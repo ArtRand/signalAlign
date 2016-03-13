@@ -1094,12 +1094,16 @@ class ContinuousPairHmm(SignalHmm):
         f.close()
 
     def parse_lookup_table(self, table_file):
+        assert os.path.exists(table_file), "cpHMM::parse_lookup_table - Didn't find lookup table"
+
         fH = open(table_file, 'r')
         NB_MODEL_PARAMS = 5
 
         line = map(float, fH.readline().split())
         line = line[1:]  # disregard the correlation param
-        assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, "Model {} has incorrect line".format(model_file)
+        assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, "Model {} has incorrect line length" \
+                                                                    "".format(table_file)
+
         self.event_model["means"] = [x for x in line[::NB_MODEL_PARAMS]]
         self.event_model["SDs"] = [x for x in line[1::NB_MODEL_PARAMS]]
         self.has_model = True

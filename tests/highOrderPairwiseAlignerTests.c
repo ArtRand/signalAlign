@@ -790,7 +790,12 @@ static void test_continuousPairHmm(CuTest *testCase) {
         double E_mean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
         double E_sd = 0;
         CuAssertDblEquals(testCase, E_mean, x, 0.0);
-        //CuAssertDblEquals(testCase, E_sd, y, 0.0); // TODO fails
+        CuAssertDblEquals(testCase, E_sd, y, 0.0);
+    }
+
+    // check posteriors
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        CuAssertDblEquals(testCase, 1, *(cpHmm->getPosteriorExpFcn((Hmm *)cpHmm, i)), 0.0); // todo fails
     }
 
     // add new expectations at 2 * E(mean)
@@ -799,19 +804,26 @@ static void test_continuousPairHmm(CuTest *testCase) {
         cpHmm->addToEmissionExpectationFcn((Hmm *)cpHmm, i, mean, 1);
     }
 
+    // check posteriors
+    for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
+        CuAssertDblEquals(testCase, 2, *(cpHmm->getPosteriorExpFcn((Hmm *)cpHmm, i)), 0.0); // todo fails
+    }
+
     // check that they got added
     for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
         double x = *(cpHmm->getEmissionExpFcn((Hmm *)cpHmm, i));
         double y = *(cpHmm->getEmissionExpFcn((Hmm *)cpHmm, i) + 1);
         double E_mean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i)) * 3;
-        double E_sd = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i)) * *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+        double twoX = 2 * *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+        double onePointFiveX = 1.5 * *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+        double E_sd = (twoX - onePointFiveX) * (twoX - onePointFiveX);
         CuAssertDblEquals(testCase, E_mean, x, 0.0);
-        //CuAssertDblEquals(testCase, E_sd, y, 0.0); // TODO fails
+        CuAssertDblEquals(testCase, E_sd, y, 0.0); // TODO fails
     }
 
     // check posteriors
     for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
-        //CuAssertDblEquals(testCase, 2, *(cpHmm->getPosteriorExpFcn((Hmm *)cpHmm, i)), 0.0); // todo fails
+        CuAssertDblEquals(testCase, 2, *(cpHmm->getPosteriorExpFcn((Hmm *)cpHmm, i)), 0.0); // todo fails
     }
 
     // normalize it
@@ -819,7 +831,7 @@ static void test_continuousPairHmm(CuTest *testCase) {
 
     // check that the posteriors didn't change
     for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
-        //CuAssertDblEquals(testCase, 2, *(cpHmm->getPosteriorExpFcn((Hmm *)cpHmm, i)), 0.0); // todo fails
+        CuAssertDblEquals(testCase, 2, *(cpHmm->getPosteriorExpFcn((Hmm *)cpHmm, i)), 0.0); // todo fails
     }
 
     // Recheck transitions
@@ -835,9 +847,16 @@ static void test_continuousPairHmm(CuTest *testCase) {
     for (int64_t i = 0; i < cpHmm->baseHmm.symbolSetSize; i++) {
         double origMean = sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)];
         double newMean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
+
+        double twoX = 2 * sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)];
+        double onePointFiveX = 1.5 * sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)];
+        double sq = (twoX - onePointFiveX) * (twoX - onePointFiveX);
+        double E_sd = sqrt(sq / 2);
+
         double sd = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i) + 1);
-        //CuAssertDblEquals(testCase, 1.5 * origMean, newMean, 0.01); // todo fails
-        //CuAssertDblEquals(testCase, sqrt((origMean * origMean) / 2), sd, 0.0); // todo fails
+        CuAssertDblEquals(testCase, 1.5 * origMean, newMean, 0.0); // todo fails
+        CuAssertDblEquals(testCase, E_sd, sd, 0.0); // todo fails
+
     }
     continuousPairHmm_destruct((Hmm *)cpHmm);
 }

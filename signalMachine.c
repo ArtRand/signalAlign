@@ -65,7 +65,6 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         double eventMean = events[(y * NB_EVENT_PARAMS)];
         double eventNoise = events[(y * NB_EVENT_PARAMS) + 1];
         double eventDuration = events[(y * NB_EVENT_PARAMS) + 2];
-        //double descaledMean = (eventMean - shift) / scale;
         double descaledMean = type == threeStateHdp ? eventMean : (eventMean - shift) / scale;
 
         // make the kmer string at the target index,

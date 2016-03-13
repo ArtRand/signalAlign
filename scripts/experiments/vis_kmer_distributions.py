@@ -9,7 +9,39 @@ import string
 import numpy as np
 from scipy.stats.kde import gaussian_kde
 from scipy.stats import norm
+from itertools import product
 
+
+def nucleotideToIndex(base):
+    if base == 'A':
+        return 0
+    if base == 'C':
+        return 1
+    if base == 'E':
+        return 2
+    if base == 'G':
+        return 3
+    if base == 'O':
+        return 4
+    if base == 'T':
+        return 5
+    if base == 'N':
+        return 6
+
+def getKmerIndex(kmer):
+    """This is the algorithm for finding the rank (index) of a kmer)
+    """
+    alphabet = "ACEGOT"
+    axisLength = len(alphabet)**len(kmer)
+    l = axisLength/len(alphabet)
+    i = 0
+    index = 0
+    while l > 1:
+        index += l*nucleotideToIndex(kmer[i])
+        i += 1
+        l = l/len(alphabet)
+    index += nucleotideToIndex(kmer[-1])
+    return int(index)
 
 class KmerDistribution(object):
     def __init__(self, data_directory):
@@ -75,4 +107,28 @@ def plot_ont_distribution(kmer, fast5, x_vals):
 
     return norm.pdf(x_vals, template_model[kmer][0], template_model[kmer][1]), \
            norm.pdf(x_vals, complement_model[kmer][0], complement_model[kmer][1])
+
+
+def plot_hmm_distribution(kmer, hmm, x_vals):
+    def get_model_from_hmm(model_file):
+        fH = open(hmm, 'r')
+
+        # line 0, type, stateNumber, etc
+        line = map(float, fH.readline().split())
+        assert len(line) == 4, "Bad header line"
+
+        # line 1, transitions
+        line = map(float, fH.readline().split())
+        assert len(line) == 10, "Bad transitions line"
+
+        # line 2, model
+        line = map(float, fH.readline().split())
+        assert len(line) == 6**6 * 2  # number of kmers * normal distribution parameters
+        return line
+
+    model = get_model_from_hmm(hmm)
+    kmer_index = getKmerIndex(kmer)
+    table_index = kmer_index * 2
+    print model[table_index], model[table_index + 1]
+    return norm.pdf(x_vals, model[table_index], model[table_index + 1])
 

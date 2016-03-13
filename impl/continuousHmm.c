@@ -783,6 +783,7 @@ void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMac
     }
 
     Hmm *hmm = hmmContinuous_loadSignalHmmFromFile(hmmFile, type, 0.0, 0.001); // TODO make sure you want these pseudocounts
+    // TODO add loadIntoExpectations function here
     hmmContinuous_loadIntoStateMachine(sM, hmm, type);
     hmmContinuous_destruct(hmm, type);
 }
