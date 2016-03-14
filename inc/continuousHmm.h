@@ -3,7 +3,9 @@
 #define NORMAL_DISTRIBUTION_PARAMS 2
 #include "stateMachine.h"
 
-typedef struct _strawManHmm {
+typedef struct _strawManHmm ContinuousPairHmm;
+
+struct _strawManHmm {
     Hmm baseHmm;
     // threeState transitions matrix (3x3)
     double *transitions;
@@ -19,10 +21,11 @@ typedef struct _strawManHmm {
     // the expectation
     double scale;
     double shift;
+    double var;
     // gets the kmer index for a nucleotide string
     int64_t (*getElementIndexFcn)(void *);
     // descales the event mean
-    double (*getDescaledEvent)(double scale, double shift, double eventMean);
+    double (*getDescaledEvent)(ContinuousPairHmm *self, double eventMean, double levelMean);
     // updates the eventExpectations matrix
     void (*addToEmissionExpectationFcn)(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p);
     // sets a value in the eventExpectations matrix
@@ -35,7 +38,7 @@ typedef struct _strawManHmm {
     bool *observed;
     // boolian indicating whether the HMM object has a an event model or not
     bool hasModel;
-} ContinuousPairHmm;
+};
 
 typedef struct _hdpHmm {
     Hmm baseHmm;
@@ -50,7 +53,7 @@ typedef struct _hdpHmm {
 
 Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPseudocount,
                                  int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
-                                 double scale, double shift);
+                                 double scale, double shift, double var);
 
 void continuousPairHmm_addToTransitionsExpectation(Hmm *hmm, int64_t from, int64_t to, double p);
 
@@ -96,14 +99,16 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *ndhp);
 void hdpHmm_destruct(Hmm *hmm);
 
 // CORE
-void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMachineType type);
+void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMachineType type, Hmm *expectations);
 
 void hmmContinuous_destruct(Hmm *hmm, StateMachineType type);
 
 Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold,
-                               double scale, double shift);
+                               double scale, double shift, double var);
 
 void hmmContinuous_normalize(Hmm *hmm, StateMachineType type);
+
+void hmmContinuous_loadModelPrior(Hmm *prior, Hmm *expectations);
 
 void hmmContinuous_writeToFile(const char *outFile, Hmm *hmm, StateMachineType type);
 

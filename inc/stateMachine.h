@@ -9,6 +9,7 @@
 #define STATEMACHINE_H_
 
 #include "sonLib.h"
+#include "nanopore.h"
 #include "nanopore_hdp.h"
 
 #define SYMBOL_NUMBER 5
@@ -125,20 +126,27 @@ typedef struct _StateMachine3 StateMachine3;
 struct _StateMachine3 {
     // 3 state state machine, allowing for symmetry in x and y.
     StateMachine model;
-    double TRANSITION_MATCH_CONTINUE; //0.9703833696510062f
-    double TRANSITION_MATCH_FROM_GAP_X; //1.0 - gapExtend - gapSwitch = 0.280026392297485
-    double TRANSITION_MATCH_FROM_GAP_Y; //1.0 - gapExtend - gapSwitch = 0.280026392297485
-    double TRANSITION_GAP_OPEN_X; //0.0129868352330243
-    double TRANSITION_GAP_OPEN_Y; //0.0129868352330243
-    double TRANSITION_GAP_EXTEND_X; //0.7126062401851738f;
-    double TRANSITION_GAP_EXTEND_Y; //0.7126062401851738f;
-    double TRANSITION_GAP_SWITCH_TO_X; //0.0073673675173412815f;
-    double TRANSITION_GAP_SWITCH_TO_Y; //0.0073673675173412815f;
+    // transitions for HMM
+    double TRANSITION_MATCH_CONTINUE;
+    double TRANSITION_MATCH_FROM_GAP_X;
+    double TRANSITION_MATCH_FROM_GAP_Y;
+    double TRANSITION_GAP_OPEN_X;
+    double TRANSITION_GAP_OPEN_Y;
+    double TRANSITION_GAP_EXTEND_X;
+    double TRANSITION_GAP_EXTEND_Y;
+    double TRANSITION_GAP_SWITCH_TO_X;
+    double TRANSITION_GAP_SWITCH_TO_Y;
+
+    // scale, shift, and var variables for MinION alignments
+    double scale;
+    double shift;
+    double var;
 
     double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
-
-    double (*getYGapProbFcn)(const double *emissionYGapProbs, void *x, void *y);
-    double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
+    //double (*getYGapProbFcn)(const double *emissionYGapProbs, void *x, void *y);
+    //double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
+    double (*getYGapProbFcn)(StateMachine3 *sM, void *x, void *y, bool match);
+    double (*getMatchProbFcn)(StateMachine3 *sM, void *x, void *y, bool match);
 };
 
 typedef struct _StateMachine3_HDP StateMachine3_HDP;
@@ -211,8 +219,8 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
                                       void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                       double (*gapXProbFcn)(const double *, void *),
-                                      double (*gapYProbFcn)(const double *, void *, void *),
-                                      double (*matchProbFcn)(const double *, void *, void *),
+                                      double (*gapYProbFcn)(StateMachine3 *, void *, void *, bool ),
+                                      double (*matchProbFcn)(StateMachine3 *, void *, void *, bool ),
                                       void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
                                                                    int64_t from, int64_t to,
                                                                    double eP, double tP, void *extraArgs));
@@ -253,6 +261,9 @@ void emissions_discrete_initEmissionsToZero(StateMachine *sM);
 * matrix is nK x 1 and the match matrix is nK x nK
 * In the most simple case, with 4 nucleotides the gap matrix is 4x1 matrix and the match matrix is a 4x4 matrix.
 */
+
+double emissions_signal_descaleEventMean_JordanStyle(double scaledEvent, double levelMean, double scale, double shift, double var);
+
 void emissions_signal_initEmissionsToZero(StateMachine *sM, int64_t nbSkipParams);
 
 double emissions_symbol_getGapProb(const double *emissionGapProbs, void *base);
@@ -282,6 +293,8 @@ void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, d
 void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shift, double var);
 
 double emissions_signal_getDurationProb(void *event, int64_t n);
+
+StateMachine *getSM3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp);
 
 StateMachine *getStrawManStateMachine3(const char *modelFile);
 

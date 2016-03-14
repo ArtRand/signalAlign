@@ -23,10 +23,10 @@ void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
     st_uglyf("end    2: %lld\n", pA->end2);
 }
 
-void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *matchModel, double scale, double shift,
-                         double *events, char *target, bool forward, char *contig, StateMachineType type,
-                         int64_t eventSequenceOffset, int64_t referenceSequenceOffset,
-                         stList *alignedPairs, Strand strand) {
+void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *matchModel,
+                         NanoporeReadAdjustmentParameters npp, double *events, char *target, bool forward,
+                         char *contig, StateMachineType type, int64_t eventSequenceOffset,
+                         int64_t referenceSequenceOffset, stList *alignedPairs, Strand strand) {
     // label for tsv output
     char *strandLabel;
     if (strand == template) {
@@ -65,7 +65,6 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         double eventMean = events[(y * NB_EVENT_PARAMS)];
         double eventNoise = events[(y * NB_EVENT_PARAMS) + 1];
         double eventDuration = events[(y * NB_EVENT_PARAMS) + 2];
-        double descaledMean = type == threeStateHdp ? eventMean : (eventMean - shift) / scale;
 
         // make the kmer string at the target index,
         char *k_i = st_malloc(KMER_LENGTH * sizeof(char));
@@ -77,10 +76,12 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromKmer(k_i);
 
         // get the expected event mean amplitude and noise
-        double E_levelu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS)];
-        double E_noiseu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS + 2)];
-        //double deScaled_E_levelu = (E_levelu - shift) / scale;
-        double deScaled_E_levelu = type == threeStateHdp ? E_levelu : (E_levelu - shift) / scale;
+        double E_mean = matchModel[1 + (targetKmerIndex * MODEL_PARAMS)];
+        double E_noise = matchModel[1 + (targetKmerIndex * MODEL_PARAMS + 2)];
+        double scaled_Emean = E_mean * npp.scale + npp.shift;
+        double scaled_Enoise = E_noise * npp.scale_sd;
+        double descaledEventMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, E_mean,
+                                                                                 npp.scale, npp.shift, npp.var);
 
         // make reference kmer
         char *refKmer;
@@ -92,8 +93,8 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         }
         // write to disk
         fprintf(fH, "%s\t%lld\t%s\t%s\t%s\t%lld\t%f\t%f\t%f\t%s\t%f\t%f\t%f\t%f\t%f\t%s\n",
-                contig, x_adj, refKmer, readFile, strandLabel, y, eventMean, eventNoise, eventDuration, k_i, E_levelu,
-                E_noiseu, p, descaledMean, deScaled_E_levelu, pathKmer);
+                contig, x_adj, refKmer, readFile, strandLabel, y, eventMean, eventNoise, eventDuration, k_i,
+                scaled_Emean, scaled_Enoise, p, descaledEventMean, E_mean, pathKmer);
 
         // cleanup
         free(k_i);
@@ -174,8 +175,9 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
     }
 
     if (type == threeState) {
-        StateMachine *sM = getStrawManStateMachine3(modelFile);
-        emissions_signal_scaleModel(sM, npp.scale, npp.shift, npp.var, npp.scale_sd, npp.var_sd);
+        StateMachine *sM = getSM3_descaled(modelFile, npp);
+        //StateMachine *sM = getStrawManStateMachine3(modelFile);
+        //emissions_signal_scaleModel(sM, npp.scale, npp.shift, npp.var, npp.scale_sd, npp.var_sd);
         return sM;
     }
     if (type == threeStateHdp) {
@@ -202,11 +204,11 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
     destroy_nanopore_hdp(nHdp);
 }
 
-void loadHmmRoutine(const char *hmmFile, StateMachine *sM, StateMachineType type) {
+void loadHmmRoutine(const char *hmmFile, StateMachine *sM, StateMachineType type, Hmm *expectations) {
     if ((type != threeState) && (type != threeStateHdp)) {
         st_errAbort("LoadSignalHmm : unupported stateMachineType");
     }
-    hmmContinuous_loadSignalHmm(hmmFile, sM, type);
+    hmmContinuous_loadSignalHmm(hmmFile, sM, type, expectations);
 }
 
 static double totalScore(stList *alignedPairs) {
@@ -331,10 +333,10 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
     // load HMM
     if (inputHmm != NULL) {
         fprintf(stderr, "signalAlign - loading HMM from file, %s\n", inputHmm);
-        loadHmmRoutine(inputHmm, sM, type);
-        if (type == threeState) {
-            emissions_signal_scaleEmissions(sM, npp.scale, npp.shift, npp.var);
-        }
+        loadHmmRoutine(inputHmm, sM, type, hmmExpectations);
+        //if (type == threeState) {
+        //    emissions_signal_scaleEmissions(sM, npp.scale, npp.shift, npp.var);
+        //}
     }
 
     // correct sequence length
@@ -581,10 +583,12 @@ int main(int argc, char *argv[]) {
         // make empty HMM to collect expectations
         Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold,
                                                               npRead->templateParams.scale,
-                                                              npRead->templateParams.shift);
+                                                              npRead->templateParams.shift,
+                                                              npRead->templateParams.var);
         Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold,
                                                                 npRead->complementParams.scale,
-                                                                npRead->complementParams.shift);
+                                                                npRead->complementParams.shift,
+                                                                npRead->complementParams.var);
 
         // get expectations for template
         fprintf(stderr, "signalAlign - getting expectations for template\n");
@@ -649,7 +653,7 @@ int main(int argc, char *argv[]) {
         // load HMM, if given
         if (templateHmmFile != NULL) {
             fprintf(stderr, "loading HMM from file, %s\n", templateHmmFile);
-            loadHmmRoutine(templateHmmFile, sMt, sMt->type);
+            loadHmmRoutine(templateHmmFile, sMt, sMt->type, NULL);
             if (sMt->type == threeState) {
                 emissions_signal_scaleEmissions(sMt, npRead->templateParams.scale,
                                                 npRead->templateParams.shift,
@@ -672,9 +676,8 @@ int main(int argc, char *argv[]) {
                                           tCoordinateShift, rCoordinateShift_t, templateAlignedPairs, template);
             } else {
                 writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_MATRIX,
-                                    npRead->templateParams.scale, npRead->templateParams.shift,
-                                    npRead->templateEvents, trimmedRefSeq, forward, pA->contig1, sMt->type,
-                                    tCoordinateShift, rCoordinateShift_t,
+                                    npRead->templateParams, npRead->templateEvents, trimmedRefSeq, forward,
+                                    pA->contig1, sMt->type, tCoordinateShift, rCoordinateShift_t,
                                     templateAlignedPairs, template);
             }
         }
@@ -684,7 +687,7 @@ int main(int argc, char *argv[]) {
         sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, complement, nHdpC);
         if (complementHmmFile != NULL) {
             fprintf(stderr, "loading HMM from file, %s\n", complementHmmFile);
-            loadHmmRoutine(complementHmmFile, sMc, sMc->type);
+            loadHmmRoutine(complementHmmFile, sMc, sMc->type, NULL);
             if (sMc->type == threeState) {
                 emissions_signal_scaleEmissions(sMc, npRead->complementParams.scale,
                                                 npRead->complementParams.shift,
@@ -708,8 +711,7 @@ int main(int argc, char *argv[]) {
                                           cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complement);
             } else {
                 writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_MATRIX,
-                                    npRead->complementParams.scale, npRead->complementParams.shift,
-                                    npRead->complementEvents, rc_trimmedRefSeq,
+                                    npRead->complementParams, npRead->complementEvents, rc_trimmedRefSeq,
                                     forward, pA->contig1, sMc->type,cCoordinateShift, rCoordinateShift_c,
                                     complementAlignedPairs, complement);
             }

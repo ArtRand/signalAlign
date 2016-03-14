@@ -650,12 +650,14 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     ContinuousPairHmm *hmmExpectations = ((void **) extraArgs)[1];
+    if (!hmmExpectations->hasModel) {
+        st_errAbort("cell_signal_updateExpectations: HMM needs to have model\n");
+    }
 
     int64_t kmerIndex = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the kmer index
     double eventMean = *(double *)((void **) extraArgs)[3];
-    double descaledEventMean = hmmExpectations->getDescaledEvent(hmmExpectations->scale,
-                                                                 hmmExpectations->shift,
-                                                                 eventMean);
+    double descaledEventMean = hmmExpectations->getDescaledEvent(
+            hmmExpectations, eventMean, *(hmmExpectations->getEventModelEntry((Hmm *)hmmExpectations, kmerIndex)));
 
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);

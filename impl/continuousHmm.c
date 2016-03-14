@@ -66,13 +66,20 @@ static double *continuousPairHmm_getEventModelEntry(Hmm *hmm, int64_t kmerIndex)
     return &(cpHmm->eventModel[kmerIndex * NORMAL_DISTRIBUTION_PARAMS]);
 }
 
-static double continuousPairHmm_descaleEventMean(double scale, double shift, double eventMean) {
-    return (eventMean - shift) / scale;
+static double continuousPairHmm_descaleEventMean_JordanStyle(ContinuousPairHmm *self,
+                                                             double eventMean, double levelMean) {
+    // (x  + var * level_mean - scale * level_mean - shift) / var
+    return (eventMean + self->var * levelMean - self->scale * levelMean - self->shift) / self->var;
+}
+
+static double continuousPairHmm_descaleEventMean(ContinuousPairHmm *self, double eventMean, double levelMean) {
+    (void) levelMean;
+    return (eventMean - self->shift) / self->scale;
 }
 
 Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPseudocount,
                                  int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
-                                 double scale, double shift) {
+                                 double scale, double shift, double var) {
     if (type != threeState && type != threeStateHdp) {
         st_errAbort("ContinuousPair HMM construct: Wrong HMM type for this function got: %i", type);
     }
@@ -97,7 +104,8 @@ Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPs
     // scaling factors
     cpHmm->scale = scale;
     cpHmm->shift = shift;
-    cpHmm->getDescaledEvent = continuousPairHmm_descaleEventMean;
+    cpHmm->var = var;
+    cpHmm->getDescaledEvent = continuousPairHmm_descaleEventMean_JordanStyle;
 
     // emissions
     cpHmm->addToEmissionExpectationFcn = continuousPairHmm_addToEmissionExpectation;
@@ -401,7 +409,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName, double transitionPseud
 
     // make empty cpHMM
     Hmm *hmm = continuousPairHmm_construct(transitionPseudocount, emissionPseudocount,
-                                           stateNumber, symbolSetSize, type, 0.0, 0.0);
+                                           stateNumber, symbolSetSize, type, 0.0, 0.0, 0.0);
 
     // Downcast
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
@@ -777,25 +785,41 @@ void hdpHmm_destruct(Hmm *hmm) {
 }
 
 ///////////////////////////////////////////////// CORE FUNCTIONS //////////////////////////////////////////////////////
-void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMachineType type) {
+void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMachineType type, Hmm *expectations) {
     if ((type != threeStateHdp) && (type != threeState)) {
         st_errAbort("hmmContinuous_loadSignalHmm - ERROR: got unsupported HMM type %i\n", type);
     }
 
     Hmm *hmm = hmmContinuous_loadSignalHmmFromFile(hmmFile, type, 0.0, 0.001); // TODO make sure you want these pseudocounts
-    // TODO add loadIntoExpectations function here
-    hmmContinuous_loadIntoStateMachine(sM, hmm, type);
+    if (expectations != NULL) {
+        hmmContinuous_loadModelPrior(hmm, expectations);
+    }
+    hmmContinuous_loadIntoStateMachine(sM, hmm, type); // todo remove types here, they're in the hmm object
     hmmContinuous_destruct(hmm, type);
 }
 
+void hmmContinuous_loadModelPrior(Hmm *prior, Hmm *expectations) {
+    ContinuousPairHmm *priorHmm = (ContinuousPairHmm *)prior;
+    ContinuousPairHmm *newHmm = (ContinuousPairHmm *)expectations;
+    if (!priorHmm->hasModel) {
+        st_errAbort("hmmContinuous_loadModelPrior: Prior HMM needs to have model");
+    }
+    if (priorHmm->baseHmm.symbolSetSize != newHmm->baseHmm.symbolSetSize) {
+        st_errAbort("hmmContinuous_loadModelPrior: These models aren't the same size\n");
+    }
+    for (int64_t i = 0; i < priorHmm->baseHmm.symbolSetSize * NORMAL_DISTRIBUTION_PARAMS; i++) {
+        newHmm->eventModel[i] = priorHmm->eventModel[i];
+    }
+}
+
 Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold,
-                               double scale, double shift) {
+                               double scale, double shift, double var) {
     if ((type != threeStateHdp) && (type != threeState)) {
         st_errAbort("hmmContinuous_getEmptyHmm - ERROR: got unsupported HMM type %i\n", type);
     }
     if (type == threeState) {
         Hmm *hmm = continuousPairHmm_construct(pseudocount, pseudocount, 3, NUM_OF_KMERS, threeState,
-                                               scale, shift);
+                                               scale, shift, var);
         return hmm;
     }
     if (type == threeStateHdp) {
