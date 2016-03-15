@@ -626,9 +626,9 @@ static void test_strawMan_getDescaledAlignedPairsWithBanding(CuTest *testCase) {
 
 
     // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
     // used to be 1001 before I added prior skip prob
-    //CuAssertTrue(testCase, stList_length(alignedPairs) == 1069);
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 1069);
 
     // check against alignment without banding
 
@@ -639,8 +639,8 @@ static void test_strawMan_getDescaledAlignedPairsWithBanding(CuTest *testCase) {
                                                           0, 0);
 
     checkAlignedPairs(testCase, alignedPairs2, lX, lY);
-    st_uglyf("got %lld alignedPairs without anchors\n", stList_length(alignedPairs2));
-    //CuAssertTrue(testCase, stList_length(alignedPairs2) == 1069);
+    //st_uglyf("got %lld alignedPairs without anchors\n", stList_length(alignedPairs2));
+    CuAssertTrue(testCase, stList_length(alignedPairs2) == 1069);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -1093,7 +1093,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
         // normalize
         continuousPairHmm_normalize((Hmm *)cpHmm);
 
-        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->baseHmm.likelihood, iter);
+        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->baseHmm.likelihood, iter);
         // M step
         continuousPairHmm_loadTransitionsIntoStateMachine(sM, (Hmm *)cpHmm);
         continuousPairHmm_loadEmissionsIntoStateMachine(sM, (Hmm *)cpHmm);

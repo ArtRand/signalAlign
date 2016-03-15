@@ -444,7 +444,6 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName, double transitionPseud
 
     // Event Model
     if (cpHmm->hasModel) {
-        st_uglyf("SENTINAL - LOADING MODEL\n");
         string = stFile_getLineFromFile(fH);
         if (string == NULL) {
             st_errAbort("cpHmm_loadFromFile: Got to end of file when looking for event model\n");
@@ -789,7 +788,6 @@ void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMac
 
     Hmm *hmm = hmmContinuous_loadSignalHmmFromFile(hmmFile, type, 0.0, 0.001); // TODO make sure you want these pseudocounts
     if (expectations != NULL) {
-        st_uglyf("SENTINAL - loading prior model\n");
         hmmContinuous_loadModelPrior(hmm, expectations);
     }
     hmmContinuous_loadIntoStateMachine(sM, hmm, type); // todo remove types here, they're in the hmm object

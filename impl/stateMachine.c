@@ -640,6 +640,28 @@ void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shif
     }
 }
 
+static void emissions_signal_scaleNoise(StateMachine *sM, NanoporeReadAdjustmentParameters npp) {
+    for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS) + 1; i += MODEL_PARAMS) {
+        // Fluctuation (noise) adjustments
+        // noise_mean *= scale_sd
+        sM->EMISSION_MATCH_MATRIX[i + 2] = sM->EMISSION_MATCH_MATRIX[i + 2] * npp.scale_sd;
+        // noise_lambda *= var_sd
+        sM->EMISSION_MATCH_MATRIX[i + 4] = sM->EMISSION_MATCH_MATRIX[i + 4] * npp.var_sd;
+        // noise_sd = sqrt(adjusted_noise_mean**3 / adjusted_noise_lambda);
+        sM->EMISSION_MATCH_MATRIX[i + 3] = sqrt(pow(sM->EMISSION_MATCH_MATRIX[i + 2], 3.0)
+                                                / sM->EMISSION_MATCH_MATRIX[i + 4]);
+
+        // Fluctuation (noise) adjustments
+        // noise_mean *= scale_sd
+        sM->EMISSION_GAP_Y_MATRIX[i + 2] = sM->EMISSION_GAP_Y_MATRIX[i + 2] * npp.scale_sd;
+        // noise_lambda *= var_sd
+        sM->EMISSION_GAP_Y_MATRIX[i + 4] = sM->EMISSION_GAP_Y_MATRIX[i + 4] * npp.var_sd;
+        // noise_sd = sqrt(adjusted_noise_mean**3 / adjusted_noise_lambda);
+        sM->EMISSION_GAP_Y_MATRIX[i + 3] = sqrt(pow(sM->EMISSION_GAP_Y_MATRIX[i + 2], 3.0)
+                                                / sM->EMISSION_MATCH_MATRIX[i + 4]);
+    }
+}
+
 void emissions_signal_scaleModel(StateMachine *sM,
                                  double scale, double shift, double var,
                                  double scale_sd, double var_sd) {
@@ -1545,6 +1567,8 @@ StateMachine *getSM3_descaled(const char *modelFile, NanoporeReadAdjustmentParam
     sM3->var = npp.var;
 
     emissions_signal_loadPoreModel((StateMachine *)sM3, modelFile, sM3->model.type);
+
+    emissions_signal_scaleNoise((StateMachine *)sM3, npp);
 
     return (StateMachine *)sM3;
 }
