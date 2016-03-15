@@ -2589,9 +2589,9 @@ double dir_proc_density(HierarchicalDirichletProcess* hdp, double x, int64_t dp_
     while (!dp->observed) {
         dp = dp->parent;
     }
-    
     double interp =  grid_spline_interp(x, hdp->sampling_grid, dp->posterior_predictive,
                                         dp->spline_slopes, hdp->grid_length);
+
     if (interp > 0.0) {
         return interp;
     }

@@ -14,7 +14,7 @@ from serviceCourse.parsers import read_fasta
 from serviceCourse.file_handlers import FolderHandler
 
 # Globals
-NORMAL_DISTRIBUTION_PARAMS = 2
+NORM_DIST_PARAMS = 2
 
 def kmer_iterator(dna, k):
     for i in xrange(len(dna)):
@@ -1037,13 +1037,13 @@ class ContinuousPairHmm(SignalHmm):
 
         # line 2: event model
         line = map(float, fH.readline().split())
-        assert len(line) == self.symbol_set_size * NORMAL_DISTRIBUTION_PARAMS, "Bad model"
+        assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, "Bad model"
 
         # line 3 event expectations [E_mean, E_sd]
         line = map(float, fH.readline().split())
-        assert len(line) == self.symbol_set_size * NORMAL_DISTRIBUTION_PARAMS, "Bad expectations line"
-        self.mean_expectations = [i + j for i, j in izip(self.mean_expectations, line[::2])]
-        self.sd_expectations = [i + j for i, j in izip(self.sd_expectations, line[1::2])]
+        assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, "Bad expectations line"
+        self.mean_expectations = [i + j for i, j in izip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
+        self.sd_expectations = [i + j for i, j in izip(self.sd_expectations, line[1::NORM_DIST_PARAMS])]
 
         # line 4, posteriors
         line = map(float, fH.readline().split())
@@ -1144,6 +1144,32 @@ class ContinuousPairHmm(SignalHmm):
         self.event_model["means"] = [x for x in line[::NB_MODEL_PARAMS]]
         self.event_model["SDs"] = [x for x in line[1::NB_MODEL_PARAMS]]
         self.has_model = True
+
+    def load_model(self, path_to_model):
+        assert os.path.exists(path_to_model), "cpHmm::load_model - didn't find model here{}?".format(path_to_model)
+
+        fH = open(path_to_model, 'r')
+
+        line = map(float, fH.readline().split())
+        assert len(line) == 4, "cpHmm::load_model - incorrect line length line:{}".format(''.join(line))
+        assert line[0] == 2
+        assert line[1] == self.state_number
+        assert line[2] == self.symbol_set_size
+        assert bool(line[3]) == True
+
+        line = map(float, fH.readline().split())
+        assert len(line) == len(self.transitions) + 1, "cpHmm::load_model incorrect transitions line"
+        self.transitions = line[:-1]
+        self.likelihood = line[-1]
+
+        line = map(float, fH.readline().split())
+        assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, \
+            "cpHmm::load_model incorrect event model line"
+        self.event_model["means"] = line[::NORM_DIST_PARAMS]
+        self.event_model["SDs"] = line[1::NORM_DIST_PARAMS]
+
+        assert not np.any(self.event_model["means"] == 0.0), "cpHmm::load_model, this model has 0 E_means"
+        assert not np.any(self.event_model["SDs"] == 0.0), "cpHmm::load_model, this model has 0 E_means"
 
 
 class HdpSignalHmm(SignalHmm):

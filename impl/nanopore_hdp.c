@@ -389,7 +389,9 @@ double get_nanopore_kmer_density(NanoporeHDP* nhdp, void *kmer, void *x) {
     if (kmer == NULL) {
         return LOG_ZERO;
     } else {
-        return dir_proc_density(nhdp->hdp, *(double *) x, nhdp_kmer_id(nhdp, (char *)kmer));
+        double u = *(double *)x;
+        //return dir_proc_density(nhdp->hdp, *(double *) x, nhdp_kmer_id(nhdp, (char *)kmer));
+        return dir_proc_density(nhdp->hdp, u, nhdp_kmer_id(nhdp, (char *)kmer));
     }
 
 }

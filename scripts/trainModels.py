@@ -42,13 +42,15 @@ def parse_args():
     parser.add_argument('--transitions', action='store_true', default=False, dest='transitions',
                         help='Flag to train transitions, False by default')
     # disabled input HMMs, only start from scratch right now
-    #parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
-    #                    required=False, type=str, default=None,
-    #                    help="input HMM for template events, if you don't want the default")
-    #parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
-    #                    required=False, type=str, default=None,
-    #                    help="input HMM for complement events, if you don't want the default")
-
+    parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
+                        required=False, type=str, default=None,
+                        help="input HMM for template events, if you don't want the default")
+    parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
+                        required=False, type=str, default=None,
+                        help="input HMM for complement events, if you don't want the default")
+    parser.add_argument('--in_complement_hmm_pop1', '-C2', action='store', dest='in_C_Hmm2',
+                        required=False, type=str, default=None,
+                        help="input HMM for complement events, if you don't want the default")
     parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
                         default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False, default=4,
@@ -121,12 +123,15 @@ def get_expectations(work_queue, done_queue):
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
-def get_model(type, symbol_set_size, threshold, table_file=None):
+def get_model(type, symbol_set_size, threshold, table_file=None, premade_model=None):
     assert (type in ["threeState", "threeStateHdp"]), "Unsupported StateMachine type"
     if type == "threeState":
         assert table_file is not None, "Need to have starting lookup table for {} HMM".format(type)
         model = ContinuousPairHmm(model_type=type, symbol_set_size=symbol_set_size)
-        model.parse_lookup_table(table_file=table_file)
+        if premade_model is not None:
+            model.load_model(premade_model)
+        else:
+            model.parse_lookup_table(table_file=table_file)
         return model
     if type == "threeStateHdp":
         return HdpSignalHmm(model_type=type, threshold=threshold)
@@ -229,11 +234,11 @@ def main(argv):
         and os.path.exists(default_complement_pop1_table_path), "Missing default lookup tables"
 
     template_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
-                               table_file=default_template_table_path)
+                               table_file=default_template_table_path, premade_model=args.in_T_Hmm)
     complement_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
-                                 table_file=default_complement_table_path)
+                                 table_file=default_complement_table_path, premade_model=args.in_C_Hmm)
     complement_model_pop1 = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
-                                      table_file=default_complement_pop1_table_path)
+                                      table_file=default_complement_pop1_table_path, premade_model=args.in_C_Hmm2)
 
     # get the input HDP, if we're using it
     if args.stateMachineType == "threeStateHdp":

@@ -530,14 +530,18 @@ double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, vo
     // this is meant to work with getKmer (NOT getKmer2)
     // wrangle e_j data
     double eventMean = *(double *) e_j;
+
     int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
 
     double levelMean = emissions_signal_getModelLevelMean(self->model.EMISSION_MATCH_MATRIX, kmerIndex);
-    eventMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean,
-                                                              self->scale, self->shift, self->var);
-    double density = get_nanopore_kmer_density(self->hdpModel, x_i, &eventMean);
+    double *normedMean = (double *)st_malloc(sizeof(double));
+    *normedMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean,
+                                                                self->scale, self->shift, self->var);
+
+    double density = get_nanopore_kmer_density(self->hdpModel, x_i, normedMean);
+    free(normedMean);
     free(kmer_i);
-    return density;
+    return log(density);
 }
 
 
