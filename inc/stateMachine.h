@@ -163,10 +163,15 @@ struct _StateMachine3_HDP {
     double TRANSITION_GAP_SWITCH_TO_X; //0.0073673675173412815f;
     double TRANSITION_GAP_SWITCH_TO_Y; //0.0073673675173412815f;
 
-    double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
+    //double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
+    //double (*getYGapProbFcn)(StateMachine3_HDP *self, void *x, void *y);
+    // scale, shift, and var variables for MinION alignments
+    double scale;
+    double shift;
+    double var;
+
     NanoporeHDP *hdpModel;
-    double (*getYGapProbFcn)(NanoporeHDP *hdp, void *x, void *y);
-    double (*getMatchProbFcn)(NanoporeHDP *hdp, void *x, void *y);
+    double (*getMatchProbFcn)(StateMachine3_HDP *self, void *x, void *y);
 };
 
 typedef struct _StateMachineEchelon {
@@ -208,9 +213,9 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t paramete
                                          void (*setTransitionsToDefaults)(StateMachine *sM),
                                          void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                          NanoporeHDP *hdpModel,
-                                         double (*gapXProbFcn)(const double *, void *),
-                                         double (*gapYProbFcn)(NanoporeHDP *, void *, void *),
-                                         double (*matchProbFcn)(NanoporeHDP *, void *, void *),
+        //double (*gapXProbFcn)(const double *, void *),
+        //double (*gapYProbFcn)(NanoporeHDP *, void *, void *),
+                                         double (*matchProbFcn)(StateMachine3_HDP *, void *, void *),
                                          void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
                                                                       int64_t from, int64_t to,
                                                                       double eP, double tP, void *extraArgs));
@@ -262,6 +267,8 @@ void emissions_discrete_initEmissionsToZero(StateMachine *sM);
 * In the most simple case, with 4 nucleotides the gap matrix is 4x1 matrix and the match matrix is a 4x4 matrix.
 */
 
+double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, void *e_j);
+
 double emissions_signal_descaleEventMean_JordanStyle(double scaledEvent, double levelMean, double scale, double shift, double var);
 
 void emissions_signal_initEmissionsToZero(StateMachine *sM, int64_t nbSkipParams);
@@ -295,6 +302,8 @@ void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shif
 double emissions_signal_getDurationProb(void *event, int64_t n);
 
 StateMachine *getSM3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp);
+
+StateMachine *getHdpMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp);
 
 StateMachine *getStrawManStateMachine3(const char *modelFile);
 

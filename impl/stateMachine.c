@@ -515,6 +515,32 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
     return c + a;
 }
 
+double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, void *e_j) {
+    if (x_i == NULL) {
+        return LOG_ZERO;
+    }
+
+    // make temp x_i
+    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
+    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_i[x] = *((char *) x_i + x);
+    }
+    kmer_i[KMER_LENGTH] = '\0';
+
+    // this is meant to work with getKmer (NOT getKmer2)
+    // wrangle e_j data
+    double eventMean = *(double *) e_j;
+    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
+
+    double levelMean = emissions_signal_getModelLevelMean(self->model.EMISSION_MATCH_MATRIX, kmerIndex);
+    eventMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean,
+                                                              self->scale, self->shift, self->var);
+    double density = get_nanopore_kmer_density(self->hdpModel, x_i, &eventMean);
+    free(kmer_i);
+    return density;
+}
+
+
 double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3 *sM,
                                                                    void *x_i, void *e_j, bool match) {
     if (x_i == NULL) {
@@ -1200,7 +1226,7 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
                     //st_uglyf("SENTINAL - legal MIDDLE : pathC kmer %s\n", pathC->kmer);
                     double *middleCells = path_getCell(pathM);
                     double *curentCells = path_getCell(pathC);
-                    double eP = sM3->getMatchProbFcn(sM3->hdpModel, pathC->kmer, cY);
+                    double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY);
                     doTransition(middleCells, curentCells, match, match, eP, sM3->TRANSITION_MATCH_CONTINUE, extraArgs);
                     doTransition(middleCells, curentCells, shortGapX, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_X, extraArgs);
                     doTransition(middleCells, curentCells, shortGapY, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_Y, extraArgs);
@@ -1217,7 +1243,7 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
                     //st_uglyf("SENTINAL - legal UPPER : pathC kmer %s\n", pathC->kmer);
                     double *upperCells = path_getCell(pathU);
                     double *currentCells = path_getCell(pathC);
-                    double eP = sM3->getYGapProbFcn(sM3->hdpModel, pathC->kmer, cY);
+                    double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY);
                     doTransition(upperCells, currentCells, match, shortGapY, eP, sM3->TRANSITION_GAP_OPEN_Y, extraArgs);
                     doTransition(upperCells, currentCells, shortGapY, shortGapY, eP, sM3->TRANSITION_GAP_EXTEND_Y, extraArgs);
                     // shortGapX -> shortGapY not allowed, this would be going from a kmer skip to extra event?
@@ -1335,9 +1361,9 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t paramete
                                          void (*setTransitionsToDefaults)(StateMachine *sM),
                                          void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                          NanoporeHDP *hdpModel,
-                                         double (*gapXProbFcn)(const double *, void *),
-                                         double (*gapYProbFcn)(NanoporeHDP *, void *, void *),
-                                         double (*matchProbFcn)(NanoporeHDP *, void *, void *),
+                                         //double (*gapXProbFcn)(const double *, void *),
+                                         //double (*gapYProbFcn)(NanoporeHDP *, void *, void *),
+                                         double (*matchProbFcn)(StateMachine3_HDP *, void *, void *),
                                          void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
                                                                       int64_t from, int64_t to,
                                                                       double eP, double tP, void *extraArgs)) {
@@ -1359,8 +1385,8 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t paramete
     sM3->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
 
     // setup functions
-    sM3->getXGapProbFcn = gapXProbFcn;
-    sM3->getYGapProbFcn = gapYProbFcn;
+    //sM3->getXGapProbFcn = gapXProbFcn;
+    //sM3->getYGapProbFcn = gapYProbFcn;
     sM3->getMatchProbFcn = matchProbFcn;
 
     // setup HDP
@@ -1538,15 +1564,30 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
     return sM3;
 }
 
+StateMachine *getHdpMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp) {
+    StateMachine *sM = stateMachine3Hdp_construct(threeStateHdp, NUM_OF_KMERS,
+                                                      stateMachine3_setTransitionsToNanoporeDefaults,
+                                                      emissions_signal_initEmissionsToZero,
+                                                      hdp,
+                                                      emissions_signal_getHdpKmerDensity,
+                                                      cell_signal_updateTransAndKmerSkipExpectations2);
+    StateMachine3_HDP *sM3Hdp = (StateMachine3_HDP *)sM;
+    sM3Hdp->scale = npp.scale;
+    sM3Hdp->shift = npp.shift;
+    sM3Hdp->var = npp.var;
+
+    emissions_signal_loadPoreModel((StateMachine *)sM3Hdp, modelFile, sM3Hdp->model.type);
+    return (StateMachine *)sM3Hdp;
+}
 
 StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile) {
     StateMachine *sM3Hdp = stateMachine3Hdp_construct(threeStateHdp, NUM_OF_KMERS,
                                                       stateMachine3_setTransitionsToNanoporeDefaults,
                                                       emissions_signal_initEmissionsToZero,
                                                       hdp,
-                                                      emissions_kmer_getGapProb,
-                                                      get_nanopore_kmer_density,
-                                                      get_nanopore_kmer_density,
+                                                      //emissions_kmer_getGapProb,
+                                                      //get_nanopore_kmer_density,
+                                                      emissions_signal_getHdpKmerDensity,
                                                       cell_signal_updateTransAndKmerSkipExpectations2);
     emissions_signal_loadPoreModel(sM3Hdp, modelFile, sM3Hdp->type);
     return sM3Hdp;

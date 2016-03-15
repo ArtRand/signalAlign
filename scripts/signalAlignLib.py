@@ -764,7 +764,7 @@ class ComplementModel(NanoporeModel):
 
 class SignalAlignment(object):
     def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
-                 in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
+                 in_templateHmm, in_complementHmm, in_complementHmm_pop1, in_templateHdp, in_complementHdp,
                  threshold, diagonal_expansion, constraint_trim,
                  target_regions=None, cytosine_substitution=None, sparse_output=False):
         self.in_fast5 = in_fast5  # fast5 file to align
@@ -773,8 +773,6 @@ class SignalAlignment(object):
         self.stateMachineType = stateMachineType  # flag for vanillaAlign
         self.banded = banded
         self.bwa_index = bwa_index  # index of reference sequence
-        #self.in_templateModel = None  # initialize to none
-        #self.in_complementModel = None  # initialize to none
         self.threshold = threshold
         self.diagonal_expansion = diagonal_expansion
         self.constraint_trim = constraint_trim
@@ -785,12 +783,17 @@ class SignalAlignment(object):
         # if we're using an input hmm, make sure it exists
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
+            print(in_templateHmm, file=sys.stderr)
         else:
             self.in_templateHmm = None
         if (in_complementHmm is not None) and os.path.isfile(in_complementHmm):
             self.in_complementHmm = in_complementHmm
         else:
             self.in_complementHmm = None
+        if (in_complementHmm_pop1 is not None) and os.path.isfile(in_complementHmm_pop1):
+            self.in_complementHmm_pop1 = in_complementHmm_pop1
+        else:
+            self.in_complementHmm_pop1 = None
 
         # similarly for HDPs
         if (in_templateHdp is not None) and os.path.isfile(in_templateHdp):
@@ -803,6 +806,8 @@ class SignalAlignment(object):
             self.in_complementHdp = None
 
     def run(self, get_expectations=False):
+        if get_expectations:
+            assert (self.in_templateHmm) is not None and self.in_complementHmm is not None
         # file checks
         if os.path.isfile(self.in_fast5) is False:
             print("signalAlign - problem with file path {file}".format(file=self.in_fast5))
@@ -891,10 +896,15 @@ class SignalAlignment(object):
         # input HMMs
         if self.in_templateHmm is not None:
             template_hmm_flag = "-y {hmm_loc} ".format(hmm_loc=self.in_templateHmm)
+            print("Template HMM flag {}".format(template_model_flag), file=sys.stderr)
         else:
             template_hmm_flag = ""
+            print("Template HMM flag {}".format(template_model_flag), file=sys.stderr)
         if self.in_complementHmm is not None:
-            complement_hmm_flag = "-z {hmm_loc} ".format(hmm_loc=self.in_complementHmm)
+            if def_complement_model is True:
+                complement_hmm_flag = "-z {hmm_loc} ".format(hmm_loc=self.in_complementHmm)
+            else:
+                complement_hmm_flag = "-z {hmm_loc} ".format(hmm_loc=self.in_complementHmm_pop1)
         else:
             complement_hmm_flag = ""
 
@@ -943,7 +953,10 @@ class SignalAlignment(object):
         # commands
         if get_expectations:
             template_expectations_file_path = self.destination + read_name + ".template.expectations"
-            complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
+            if def_complement_model is True:
+                complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
+            else:
+                complement_expectations_file_path = self.destination + read_name + ".complement_pop1.expectations"
 
             command = \
                 "echo {cigar} | {vA} {model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
@@ -986,6 +999,8 @@ class ContinuousPairHmm(SignalHmm):
     def __init__(self, model_type, symbol_set_size):
         super(ContinuousPairHmm, self).__init__(model_type=model_type, symbol_set_size=symbol_set_size)
         self.transitions = np.zeros(self.state_number**2)
+        self.set_default_transitions()
+        self.transitions_expectations = np.zeros(self.state_number**2)
 
         # event model for describing normal distributions for each kmer
         self.event_model = {"means": np.zeros(self.symbol_set_size),
@@ -1018,9 +1033,9 @@ class ContinuousPairHmm(SignalHmm):
             return
 
         self.likelihood += line[-1]
-        self.transitions = map(lambda x: sum(x), zip(self.transitions, line[0:-1]))
+        self.transitions_expectations = map(lambda x: sum(x), zip(self.transitions_expectations, line[0:-1]))
 
-        # line 2: kmer skip probs
+        # line 2: event model
         line = map(float, fH.readline().split())
         assert len(line) == self.symbol_set_size * NORMAL_DISTRIBUTION_PARAMS, "Bad model"
 
@@ -1041,20 +1056,25 @@ class ContinuousPairHmm(SignalHmm):
 
         fH.close()
 
-    def normalize(self):
+    def normalize(self, update_transitions, update_emissions):
         # normalize transitions
         for from_state in xrange(self.state_number):
             i = self.state_number * from_state
-            j = sum(self.transitions[i:i+self.state_number])
+            j = sum(self.transitions_expectations[i:i+self.state_number])
             for to_state in xrange(self.state_number):
-                self.transitions[i + to_state] = self.transitions[i + to_state] / j
+                self.transitions_expectations[i + to_state] = self.transitions_expectations[i + to_state] / j
+
+        # update
+        if update_transitions is True:
+            for i in xrange(self.state_number**2):
+                self.transitions[i] = self.transitions_expectations[i]
 
         # calculate the new expected mean and standard deviation for the kmer normal distributions
         for k in xrange(self.symbol_set_size):  # TODO implement learning rate
             if self.observed[k] is True:
                 u_k = self.mean_expectations[k] / self.posteriors[k]
                 o_k = np.sqrt(self.sd_expectations[k] / self.posteriors[k])
-                if u_k > 0:
+                if u_k > 0 and update_emissions is True:
                     self.event_model["means"][k] = u_k
                     self.event_model["SDs"][k] = o_k
             else:
@@ -1062,6 +1082,23 @@ class ContinuousPairHmm(SignalHmm):
 
         self.normalized = True
         self.has_model = True
+
+    def set_default_transitions(self):
+        MATCH_CONTINUE = np.exp(-0.23552123624314988)     # stride
+        MATCH_FROM_GAP_X = np.exp(-0.21880828092192281)   # 1 - skip'
+        MATCH_FROM_GAP_Y = np.exp(-0.013406326748077823)  # 1 - (skip + stay)
+        GAP_OPEN_X = np.exp(-1.6269694202638481)          # skip
+        GAP_OPEN_Y = np.exp(-4.3187242127300092)          # 1 - (skip + stride)
+        GAP_EXTEND_X = np.exp(-1.6269694202638481)        # skip'
+        GAP_EXTEND_Y = np.exp(-4.3187242127239411)        # stay (1 - (skip + stay))
+        GAP_SWITCH_TO_X = 0.000000001
+        GAP_SWITCH_TO_Y = 0.0
+        self.transitions = [
+            MATCH_CONTINUE, GAP_OPEN_X, GAP_OPEN_Y,
+            MATCH_FROM_GAP_X, GAP_EXTEND_X, GAP_SWITCH_TO_Y,
+            MATCH_FROM_GAP_Y, GAP_SWITCH_TO_X, GAP_EXTEND_Y
+        ]
+        return
 
     def write(self, out_file):
         # Format:

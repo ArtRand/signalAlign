@@ -10,6 +10,7 @@ from subprocess import check_output
 from signalAlignLib import *
 from argparse import ArgumentParser
 from random import shuffle
+from shutil import copyfile
 
 
 def parse_args():
@@ -28,7 +29,7 @@ def parse_args():
                         required=False, type=int)
     parser.add_argument('--train_amount', '-a', action='store', dest='amount', default=15,
                         required=False, type=int,
-                        help="limit the total length of sequence to use in training.")
+                        help="limit the total length of sequence to use in training (batch size).")
     parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
                         required=False, default=None, help="number of diagonals to expand around each anchor")
     parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
@@ -36,12 +37,18 @@ def parse_args():
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
                         default=0.01, help="posterior match probability threshold")
     parser.add_argument('--verbose', action='store_true', default=False, dest='verbose')
-    parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
-                        required=False, type=str, default=None,
-                        help="input HMM for template events, if you don't want the default")
-    parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
-                        required=False, type=str, default=None,
-                        help="input HMM for complement events, if you don't want the default")
+    parser.add_argument('--emissions', action='store_true', default=False, dest='emissions',
+                        help="Flag to train emissions, False by default")
+    parser.add_argument('--transitions', action='store_true', default=False, dest='transitions',
+                        help='Flag to train transitions, False by default')
+    # disabled input HMMs, only start from scratch right now
+    #parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
+    #                    required=False, type=str, default=None,
+    #                    help="input HMM for template events, if you don't want the default")
+    #parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
+    #                    required=False, type=str, default=None,
+    #                    help="input HMM for complement events, if you don't want the default")
+
     parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
                         default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False, default=4,
@@ -125,7 +132,11 @@ def get_model(type, symbol_set_size, threshold, table_file=None):
         return HdpSignalHmm(model_type=type, threshold=threshold)
 
 
-def add_and_norm_expectations(path, files, model, hmm_file):
+def add_and_norm_expectations(path, files, model, hmm_file, update_transitions=False, update_emissions=False):
+    if update_emissions is False and update_transitions is False:
+        print("[trainModels] NOTICE: Training transitions by default\n", file=sys.stderr)
+        update_transitions = True
+
     model.likelihood = 0
     files_added_successfully = 0
     files_with_problems = 0
@@ -139,7 +150,7 @@ def add_and_norm_expectations(path, files, model, hmm_file):
                   file=sys.stderr)
             os.remove(path + f)
             files_with_problems += 1
-    model.normalize()
+    model.normalize(update_transitions=update_transitions, update_emissions=update_emissions)
     model.write(hmm_file)
     model.running_likelihoods.append(model.likelihood)
     if type(model) is HdpSignalHmm:
@@ -179,16 +190,14 @@ def main(argv):
     start_message = """\n
     # Starting Baum-Welch training.
     # Directories with training files: {files_dir}
-    # Training on {amount} bases.
+    # Each batch has {amount} bases, performing {iter} iterations.
     # Using reference sequence: {ref}
-    # Input template/complement models: {inTHmm}/{inCHmm}
     # Writing trained models to: {outLoc}
     # Performing {iterations} iterations.
     # Using model: {model}
     # Using HDPs: {thdp} / {chdp}
     \n
-    """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref,
-               inTHmm=args.in_T_Hmm, inCHmm=args.in_C_Hmm, outLoc=args.out,
+    """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref, outLoc=args.out, iter=args.iter,
                iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP)
 
     assert (args.files_dir is not None), "Need to specify which files to train on"
@@ -214,13 +223,17 @@ def main(argv):
 
     default_template_table_path = "../../signalAlign/models/testModel_template.model"
     default_complement_table_path = "../../signalAlign/models/testModel_complement.model"
-    assert os.path.exists(default_template_table_path) and os.path.exists(default_complement_table_path),\
-        "Missing default lookup tables"
+    default_complement_pop1_table_path = "../../signalAlign/models/testModel_complement_pop1.model"
+
+    assert os.path.exists(default_template_table_path) and os.path.exists(default_complement_table_path) \
+        and os.path.exists(default_complement_pop1_table_path), "Missing default lookup tables"
 
     template_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
                                table_file=default_template_table_path)
     complement_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
                                  table_file=default_complement_table_path)
+    complement_model_pop1 = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
+                                      table_file=default_complement_pop1_table_path)
 
     # get the input HDP, if we're using it
     if args.stateMachineType == "threeStateHdp":
@@ -232,19 +245,25 @@ def main(argv):
     # make some paths to files to hold the HMMs
     template_hmm = working_folder.add_file_path("template_trained.hmm")
     complement_hmm = working_folder.add_file_path("complement_trained.hmm")
+    complement_hmm_pop1 = working_folder.add_file_path("complement_trained_pop1.hmm")
+
+    trained_models = [template_hmm, complement_hmm, complement_hmm_pop1]
+
+    default_template_hmm = "../../signalAlign/models/default_template.hmm"
+    default_complement_hmm = "../../signalAlign/models/default_complement.hmm"
+    default_complement_hmm_pop1 = "../../signalAlign/models/default_complement_pop1.hmm"
+
+    default_models = [default_template_hmm, default_complement_hmm, default_complement_hmm_pop1]
+
+    for default_model, trained_model in zip(default_models, trained_models):
+        assert os.path.exists(default_model), "Didn't find default model {}".format(default_model)
+        copyfile(default_model, trained_model)
+        assert os.path.exists(trained_model), "Problem copying default model to {}".format(trained_model)
 
     print("Starting {iterations} iterations.\n\n\t    Running likelihoods\ni\tTempalte\tComplement".format(
         iterations=args.iter), file=sys.stdout)
 
     for i in xrange(args.iter):
-        # if we're starting there are no HMMs
-        if i == 0:
-            in_template_hmm = None
-            in_complement_hmm = None
-        else:
-            in_template_hmm = template_hmm
-            in_complement_hmm = complement_hmm
-
         # if we're using 'mutated' or non-canonical reference sequences, they come in a list. if we're not then
         # we make a list of the 'normal' reference sequence
         if args.cytosine_sub is None:
@@ -271,8 +290,9 @@ def main(argv):
                 "stateMachineType": args.stateMachineType,
                 "banded": args.banded,
                 "bwa_index": bwa_ref_index,
-                "in_templateHmm": in_template_hmm,
-                "in_complementHmm": in_complement_hmm,
+                "in_templateHmm": template_hmm,
+                "in_complementHmm": complement_hmm,
+                "in_complementHmm_pop1": complement_hmm_pop1,
                 "in_templateHdp": args.templateHDP,
                 "in_complementHdp": args.complementHDP,
                 "threshold": args.threshold,
@@ -301,19 +321,34 @@ def main(argv):
         complement_expectations_files = [x for x in os.listdir(working_directory_path)
                                          if x.endswith(".complement.expectations")]
 
+        complement_pop1_expectations_files = [x for x in os.listdir(working_directory_path)
+                                              if x.endswith(".complement_pop1.expectations")]
+
         if len(template_expectations_files) > 0:
             add_and_norm_expectations(path=working_directory_path,
                                       files=template_expectations_files,
                                       model=template_model,
-                                      hmm_file=template_hmm)
+                                      hmm_file=template_hmm,
+                                      update_emissions=args.emissions,
+                                      update_transitions=args.transitions)
 
         if len(complement_expectations_files) > 0:
             add_and_norm_expectations(path=working_directory_path,
                                       files=complement_expectations_files,
                                       model=complement_model,
-                                      hmm_file=complement_hmm)
+                                      hmm_file=complement_hmm,
+                                      update_emissions=args.emissions,
+                                      update_transitions=args.transitions)
 
-        # Build HDP from last round of assignments
+        if len(complement_pop1_expectations_files) > 0:
+            add_and_norm_expectations(path=working_directory_path,
+                                      files=complement_pop1_expectations_files,
+                                      model=complement_model_pop1,
+                                      hmm_file=complement_hmm_pop1,
+                                      update_emissions=args.emissions,
+                                      update_transitions=args.transitions)
+
+        # Build HDP from last round of assignments  ## TODO needs to be updated for extra complement models
         if args.stateMachineType == "threeStateHdp":
             assert isinstance(template_model, HdpSignalHmm) and isinstance(complement_model, HdpSignalHmm)
 

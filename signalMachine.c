@@ -181,7 +181,8 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
         return sM;
     }
     if (type == threeStateHdp) {
-        StateMachine *sM = getHdpStateMachine3(nHdp, modelFile);
+        StateMachine *sM = getHdpMachine(nHdp, modelFile, npp);
+        //StateMachine *sM = getHdpStateMachine3(nHdp, modelFile);
         return sM;
     }
     else {
@@ -331,13 +332,14 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
     StateMachine *sM = buildStateMachine(model, npp, type, strand, nHdp);
 
     // load HMM
-    if (inputHmm != NULL) {
-        fprintf(stderr, "signalAlign - loading HMM from file, %s\n", inputHmm);
-        loadHmmRoutine(inputHmm, sM, type, hmmExpectations);
+    if (inputHmm == NULL) {
+        st_errAbort("[signalMachine] ERROR: need to have input HMMs\n");
         //if (type == threeState) {
         //    emissions_signal_scaleEmissions(sM, npp.scale, npp.shift, npp.var);
         //}
     }
+    fprintf(stderr, "signalAlign - loading HMM from file, %s\n", inputHmm);
+    loadHmmRoutine(inputHmm, sM, type, hmmExpectations);
 
     // correct sequence length
     int64_t lX = sequence_correctSeqLength(strlen(trainingTarget), event);
@@ -520,10 +522,10 @@ int main(int argc, char *argv[]) {
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
 
     // descale events if using hdp
-    if (sMtype == threeStateHdp) {
-        fprintf(stderr, "signalAlign - descaling Nanopore Events\n");
-        nanopore_descaleNanoporeRead(npRead);
-    }
+    //if (sMtype == threeStateHdp) {
+    //    fprintf(stderr, "signalAlign - descaling Nanopore Events\n");
+    //    nanopore_descaleNanoporeRead(npRead);
+    //}
 
     // make some params
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -641,7 +643,7 @@ int main(int argc, char *argv[]) {
         return 0;
     } else {
         // Alignment Procedure //
-        StateMachine *sMt, *sMc;
+        StateMachine *sMt;
         stList *templateAlignedPairs, *complementAlignedPairs;
         double templatePosteriorScore, complementPosteriorScore;
 
@@ -654,11 +656,6 @@ int main(int argc, char *argv[]) {
         if (templateHmmFile != NULL) {
             fprintf(stderr, "loading HMM from file, %s\n", templateHmmFile);
             loadHmmRoutine(templateHmmFile, sMt, sMt->type, NULL);
-            if (sMt->type == threeState) {
-                emissions_signal_scaleEmissions(sMt, npRead->templateParams.scale,
-                                                npRead->templateParams.shift,
-                                                npRead->templateParams.var);
-            }
         }
         // get aligned pairs
         templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
@@ -684,15 +681,10 @@ int main(int argc, char *argv[]) {
 
         // Complement alignment
         fprintf(stderr, "signalAlign - starting complement alignment\n");
-        sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, complement, nHdpC);
+        StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, complement, nHdpC);
         if (complementHmmFile != NULL) {
             fprintf(stderr, "loading HMM from file, %s\n", complementHmmFile);
             loadHmmRoutine(complementHmmFile, sMc, sMc->type, NULL);
-            if (sMc->type == threeState) {
-                emissions_signal_scaleEmissions(sMc, npRead->complementParams.scale,
-                                                npRead->complementParams.shift,
-                                                npRead->complementParams.var);
-            }
         }
         // get aligned pairs
         complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,

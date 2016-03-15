@@ -666,7 +666,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     int64_t lY = npRead->nbTemplateEvents;
     char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
-    StateMachine *sMt = getHdpStateMachine3(nHdp, modelFile);
+    StateMachine *sMt = getHdpMachine(nHdp, modelFile, npRead->templateParams);
     // parameters for pairwise alignment using defaults
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
     p->threshold = 0.1;
@@ -689,16 +689,10 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        0, 0);
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
-    //for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
-    //    stIntTuple *pair = stList_get(alignedPairs, i);
-    //    int64_t x = stIntTuple_length(pair);
-    //    char *pairKmer = (char *)stIntTuple_get(pair, 3);
-    //    st_uglyf("kmer %s\n", pairKmer);
-    //}
 
     // for ch1_file1 template there should be this many aligned pairs with banding
     //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 2886);
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2876);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -725,7 +719,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     int64_t lY = npRead->nbTemplateEvents;
     char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
-    StateMachine *sMt = getHdpStateMachine3(nHdp, modelFile);
+    StateMachine *sMt = getHdpMachine(nHdp, modelFile, npRead->templateParams);
 
     // parameters for pairwise alignment using defaults
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -762,7 +756,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     // for ch1_file1 template there should be this many aligned pairs with banding
     //st_uglyf("got %lld alignedPairs on the normal sequence\n", stList_length(alignedPairs));
     //st_uglyf("got %lld alignedPairs on the methyl sequence\n", stList_length(alignedPairs2));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 2886);
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2876);
     //CuAssertTrue(testCase, stList_length(alignedPairs2) == 2887);
 
     // clean
@@ -786,6 +780,33 @@ static void test_cpHmmEmissionsAgainstStateMachine(CuTest *testCase, StateMachin
         CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)], E_mean, 0.0);
         CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS + 1)], E_noise, 0.0);
     }
+}
+
+static void test_makeAndCheckModels(CuTest *testCase) {
+    // make a blank HMM
+    Hmm *hmm = continuousPairHmm_construct(0.0, 0.0, 3, NUM_OF_KMERS, threeState, 0.0, 0.0, 0.0);
+    ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
+
+    // this is the lookup table with default values
+    const char *templateLookupTableFile = "../../signalAlign/models/testModel_template.model";
+    if (!stFile_exists(templateLookupTableFile)) {
+        st_errAbort("Didn't find model file %s\n", templateLookupTableFile);
+    }
+
+    // load the table into the HMM emissions
+    continuousPairHmm_loadModelFromFile(cpHmm, templateLookupTableFile);
+    if (!cpHmm->hasModel) {
+        st_errAbort("Problem loading match model\n");
+    }
+
+    // make a stateMachine based on the same table
+    StateMachine *sM = getStrawManStateMachine3(templateLookupTableFile);
+
+    // check that the emissions are correct
+    test_cpHmmEmissionsAgainstStateMachine(testCase, sM, cpHmm);
+    CuAssertTrue(testCase, sM->stateNumber == cpHmm->baseHmm.stateNumber);
+
+    // this is bogus
 }
 
 static void test_continuousPairHmm(CuTest *testCase) {
@@ -1212,7 +1233,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
 CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    /*
+
     SUITE_ADD_TEST(suite, test_findPotentialMethylation);
     SUITE_ADD_TEST(suite, test_pathLegalTransitions);
     SUITE_ADD_TEST(suite, test_methylPermutations);
@@ -1229,7 +1250,7 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
-    */
+
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     //SUITE_ADD_TEST(suite, test_hdpHmm_em);

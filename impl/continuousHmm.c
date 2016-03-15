@@ -282,25 +282,21 @@ void continuousPairHmm_randomize(Hmm *hmm) {
 void continuousPairHmm_loadTransitionsIntoStateMachine(StateMachine *sM, Hmm *hmm) {
     StateMachine3 *sM3 = (StateMachine3 *)sM;
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
-    // load transitions
+    // load transitions  // TODO comment this up with the logic
     // from match
-
-    sM3->TRANSITION_MATCH_CONTINUE = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, match, match));
-    sM3->TRANSITION_GAP_OPEN_X = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, match, shortGapX));
+    sM3->TRANSITION_MATCH_CONTINUE = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, match, match)); // stride
+    sM3->TRANSITION_GAP_OPEN_X = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, match, shortGapX)); // skip
     sM3->TRANSITION_GAP_OPEN_Y = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, match, shortGapY));
 
     // from shortGapX (kmer skip)
     sM3->TRANSITION_MATCH_FROM_GAP_X = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapX, match));
-    //sM3->TRANSITION_GAP_EXTEND_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapX));
-    sM3->TRANSITION_GAP_EXTEND_X = log(1 - cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapX, match));
+    sM3->TRANSITION_GAP_EXTEND_X = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapX, shortGapX));
     sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
 
     // from shortGapY (extra event)
     sM3->TRANSITION_MATCH_FROM_GAP_Y = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapY, match));
     sM3->TRANSITION_GAP_EXTEND_Y = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapY, shortGapY));
     sM3->TRANSITION_GAP_SWITCH_TO_X = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapY, shortGapX));
-
-    //sM3->TRANSITION_GAP_SWITCH_TO_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapY));
     //sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
 }
 
@@ -448,6 +444,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName, double transitionPseud
 
     // Event Model
     if (cpHmm->hasModel) {
+        st_uglyf("SENTINAL - LOADING MODEL\n");
         string = stFile_getLineFromFile(fH);
         if (string == NULL) {
             st_errAbort("cpHmm_loadFromFile: Got to end of file when looking for event model\n");
@@ -792,6 +789,7 @@ void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMac
 
     Hmm *hmm = hmmContinuous_loadSignalHmmFromFile(hmmFile, type, 0.0, 0.001); // TODO make sure you want these pseudocounts
     if (expectations != NULL) {
+        st_uglyf("SENTINAL - loading prior model\n");
         hmmContinuous_loadModelPrior(hmm, expectations);
     }
     hmmContinuous_loadIntoStateMachine(sM, hmm, type); // todo remove types here, they're in the hmm object
@@ -810,6 +808,7 @@ void hmmContinuous_loadModelPrior(Hmm *prior, Hmm *expectations) {
     for (int64_t i = 0; i < priorHmm->baseHmm.symbolSetSize * NORMAL_DISTRIBUTION_PARAMS; i++) {
         newHmm->eventModel[i] = priorHmm->eventModel[i];
     }
+    newHmm->hasModel = TRUE;
 }
 
 Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold,
