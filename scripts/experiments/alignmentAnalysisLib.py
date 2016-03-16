@@ -8,9 +8,12 @@ from random import shuffle
 
 
 def randomly_select_alignments(path_to_alignments):
+    files = os.listdir(path_to_alignments)
+    files = [f for f in files if f.endswith(".tsv")]
+    files = [path_to_alignments + f for f in files]
     alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
-    shuffle(alignments)
-    return alignments
+    shuffle(files)
+    return files
 
 
 class Kmer_histogram(object):
