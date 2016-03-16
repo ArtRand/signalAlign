@@ -2,7 +2,10 @@
 
 import os
 import sys
+sys.path.append("../")
 from alignmentAnalysisLib import Kmer_histogram
+from serviceCourse.parsers import read_fasta
+from signalAlignLib import kmer_iterator
 from itertools import product
 from argparse import ArgumentParser
 from multiprocessing import Process, current_process, Manager
@@ -17,13 +20,27 @@ def parse_args():
                         help="alignment files, add file extension")
     parser.add_argument('--number_of_assignments', '-n', action='store', type=int, default=10000,
                         dest='max_assignments',
-                        help='total number of assignments to collect FOR EACH GROUP')
+                        help='total number of points to collect')
+    parser.add_argument('--ref', action='store', type=str, dest='ref', required=True,
+                        help="Reference fasta file")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--threshold', '-t', action='store', type=float, default=0.25, dest='threshold')
     parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out')
 
     return parser.parse_args()
+
+
+def get_sequence(path_to_fasta):
+    seqs = []
+    for header, comment, sequence in read_fasta(path_to_fasta):
+        seqs.append(sequence)
+
+    assert len(seqs) > 0, "ERROR parsing sequence {}".format(len(seqs))
+    if len(seqs) > 1:
+        print "Taking first sequence of {}".format(len(seqs))
+
+    return seqs[0]
 
 
 def check_for_destination_directory(working_directory_path, new_directory):
@@ -57,14 +74,10 @@ def main(args):
 
     print start_message
 
-    kmers_of_interest = []
+    kmers_of_interest = set()
 
-    for kmer in product("ACTG", repeat=6):
-        kmer = ''.join(kmer)
-        if "C" in kmer:
-            kmers_of_interest.append(kmer)
-        else:
-            continue
+    for kmer in kmer_iterator(get_sequence(args.ref), 6):
+        kmers_of_interest.add(kmer)
 
     workers = args.nb_jobs
     work_queue = Manager().Queue()
