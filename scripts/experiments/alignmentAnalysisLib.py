@@ -13,7 +13,8 @@ def randomly_select_alignments(path_to_alignments):
     files = [path_to_alignments + f for f in files]
     files = [f for f in files if os.path.isfile(f)]
     alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
-    #shuffle(files)
+    shuffle(files)
+    files = files[:1000]
     return files
 
 
