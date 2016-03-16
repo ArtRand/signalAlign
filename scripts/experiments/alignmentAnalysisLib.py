@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import sys
 import glob
 import os
 import pandas as pd
@@ -14,7 +15,7 @@ def randomly_select_alignments(path_to_alignments):
     files = [f for f in files if os.path.isfile(f)]
     alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
     shuffle(files)
-    print "[notice] sampling from {} files".format(len(files))
+    print >> sys.stderr, "[notice] sampling from {} files".format(len(files))
     return files
 
 
