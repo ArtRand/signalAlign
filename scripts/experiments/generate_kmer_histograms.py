@@ -100,9 +100,9 @@ def main(args):
                 "max_assignments": args.max_assignments,
                 "out_dir": destination,
             }
-            k = Kmer_histogram(**hist_args)
-            k.run()
-            #work_queue.put(hist_args)
+            #k = Kmer_histogram(**hist_args)
+            #k.run()
+            work_queue.put(hist_args)
 
     for w in xrange(workers):
         p = Process(target=histogram_runner, args=(work_queue, done_queue))
