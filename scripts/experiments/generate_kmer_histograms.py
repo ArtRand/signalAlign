@@ -3,10 +3,9 @@
 import os
 import sys
 sys.path.append("../")
-from alignmentAnalysisLib import Kmer_histogram
+from alignmentAnalysisLib import KmerHistogram
 from serviceCourse.parsers import read_fasta
 from signalAlignLib import kmer_iterator
-from itertools import product
 from argparse import ArgumentParser
 from multiprocessing import Process, current_process, Manager
 
@@ -57,7 +56,7 @@ def check_for_destination_directory(working_directory_path, new_directory):
 def histogram_runner(work_queue, done_queue):
     try:
         for f in iter(work_queue.get, 'STOP'):
-            k = Kmer_histogram(**f)
+            k = KmerHistogram(**f)
             k.run()
     except Exception, e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))

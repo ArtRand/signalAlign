@@ -55,14 +55,18 @@ def parse_args():
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", required=False,
                         help="StateMachine options: threeState, threeStateHdp, vanilla")
-    parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None)
-    parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None)
+    parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None,
+                        help="path to template HDP model to use")
+    parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
+                        help="path to complement HDP model to use")
     parser.add_argument('--cytosine_substitution', '-cs', action='append', default=None,
                         dest='cytosine_sub', required=False, type=str,
                         help="mutate cytosines to this letter in the reference")
     # gibbs
     parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
-    parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
+    parser.add_argument('--thinning', '-th', action='store', type=int, default=200, dest='thinning')
+    parser.add_argument('--min_assignments', action='store', type=int, default=30000, dest='min_assignments',
+                        help="Do not initiate Gibbs sampling unless this many assignments have been accumulated")
 
     args = parser.parse_args()
     return args
@@ -245,6 +249,13 @@ def main(argv):
             "Need to provide serialized HDP files for this stateMachineType"
         assert (os.path.isfile(args.templateHDP)) and (os.path.isfile(args.complementHDP)),\
             "Could not find the HDP files"
+        template_hdp = working_folder.add_file_path("{}".format(args.templateHDP.split("/")[-1]))
+        complement_hdp = working_folder.add_file_path("{}".format(args.complementHDP.split("/")[-1]))
+        copyfile(args.templateHDP, template_hdp)
+        copyfile(args.complementHDP, complement_hdp)
+    else:
+        template_hdp = None
+        complement_hdp = None
 
     # make some paths to files to hold the HMMs
     template_hmm = working_folder.add_file_path("template_trained.hmm")
@@ -294,8 +305,8 @@ def main(argv):
                 "bwa_index": bwa_ref_index,
                 "in_templateHmm": template_hmm,
                 "in_complementHmm": complement_hmm,
-                "in_templateHdp": args.templateHDP,
-                "in_complementHdp": args.complementHDP,
+                "in_templateHdp": template_hdp,
+                "in_complementHdp": complement_hdp,
                 "threshold": args.threshold,
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
@@ -341,13 +352,18 @@ def main(argv):
         # Build HDP from last round of assignments
         if args.stateMachineType == "threeStateHdp" and args.emissions is True:
             assert isinstance(template_model, HdpSignalHmm) and isinstance(complement_model, HdpSignalHmm)
+            if min(template_model.assignments_record[-1],
+                   complement_model.assignments_record[-1]) < args.min_assignments:
+                print("[trainModels] not enough assignments at iteration {}, continuing...".format(i),
+                      file=sys.stderr)
+                pass
+            else:
+                total_assignments = max(template_model.assignments_record[-1], complement_model.assignments_record[-1])
 
-            total_assignments = max(template_model.assignments_record[-1], complement_model.assignments_record[-1])
-
-            build_hdp(template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
-                      template_assignments=template_hmm, complement_assignments=complement_hmm,
-                      samples=args.gibbs_samples, thinning=args.thinning, burn_in=30 * total_assignments,
-                      verbose=args.verbose)
+                build_hdp(template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
+                          template_assignments=template_hmm, complement_assignments=complement_hmm,
+                          samples=args.gibbs_samples, thinning=args.thinning, burn_in=30 * total_assignments,
+                          verbose=args.verbose)
 
         # log the running likelihood
         if len(template_model.running_likelihoods) > 0 and len(complement_model.running_likelihoods) > 0:
