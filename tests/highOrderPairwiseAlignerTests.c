@@ -950,10 +950,7 @@ static void test_continuousPairHmm(CuTest *testCase) {
 
 static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     // make the hmm object
-    Hmm *hmm = hdpHmm_constructEmpty(0.0, 3, threeStateHdp, 0.02,
-                                     continuousPairHmm_addToTransitionsExpectation,
-                                     continuousPairHmm_setTransitionExpectation,
-                                     continuousPairHmm_getTransitionExpectation);
+    Hmm *hmm = hdpHmm_constructEmpty(0.0, 3, threeStateHdp, 0.02);
     HdpHmm *hdpHmm = (HdpHmm *) hmm;
 
     // Add some transition expectations
@@ -1017,7 +1014,7 @@ static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
 void updateStateMachineHDP(const char *expectationsFile, StateMachine *sM) {
     StateMachine3_HDP *sM3Hdp = (StateMachine3_HDP *)sM;
     Hmm *transitionsExpectations = hdpHmm_loadFromFile(expectationsFile, sM3Hdp->hdpModel);
-    hdpHmm_loadTransitions((StateMachine *) sM3Hdp, transitionsExpectations);
+    continuousPairHmm_loadTransitionsIntoStateMachine((StateMachine *) sM3Hdp, transitionsExpectations);
     hdpHmm_destruct(transitionsExpectations);
 }
 
@@ -1144,10 +1141,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
     double pLikelihood = -INFINITY;
 
-    Hmm *hdpHmm = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold,
-                                        continuousPairHmm_addToTransitionsExpectation,
-                                        continuousPairHmm_setTransitionExpectation,
-                                        continuousPairHmm_getTransitionExpectation);
+    Hmm *hdpHmm = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold);
 
     //continuousPairHmm_randomize(hdpHmm);
     hmmDiscrete_randomizeTransitions(hdpHmm);
@@ -1171,10 +1165,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
     hdpHmm_destruct(hdpHmm);
 
     for (int64_t iter = 0; iter < 10; iter++) {
-        Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold,
-                                                     continuousPairHmm_addToTransitionsExpectation,
-                                                     continuousPairHmm_setTransitionExpectation,
-                                                     continuousPairHmm_getTransitionExpectation);
+        Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold);
         // E step
         // get anchors using lastz
         stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
@@ -1244,13 +1235,13 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_getKmer4);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_strawMan_getDescaledAlignedPairsWithBanding);
 
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
 
-    SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
+    //SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);

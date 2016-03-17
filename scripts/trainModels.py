@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
                         required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
-                        default=0.01, help="posterior match probability threshold")
+                        default=0.5, help="posterior match probability threshold")
     parser.add_argument('--verbose', action='store_true', default=False, dest='verbose')
     parser.add_argument('--emissions', action='store_true', default=False, dest='emissions',
                         help="Flag to train emissions, False by default")
@@ -46,9 +46,6 @@ def parse_args():
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
-                        required=False, type=str, default=None,
-                        help="input HMM for complement events, if you don't want the default")
-    parser.add_argument('--in_complement_hmm_pop1', '-C2', action='store', dest='in_C_Hmm2',
                         required=False, type=str, default=None,
                         help="input HMM for complement events, if you don't want the default")
     parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
@@ -134,7 +131,10 @@ def get_model(type, symbol_set_size, threshold, table_file=None, premade_model=N
             model.parse_lookup_table(table_file=table_file)
         return model
     if type == "threeStateHdp":
-        return HdpSignalHmm(model_type=type, threshold=threshold)
+        model = HdpSignalHmm(model_type=type, threshold=threshold)
+        if premade_model is not None:
+            model.load_model(premade_model)
+        return model
 
 
 def add_and_norm_expectations(path, files, model, hmm_file, update_transitions=False, update_emissions=False):
@@ -226,39 +226,36 @@ def main(argv):
     bwa_ref_index = get_bwa_index(args.ref, working_directory_path)
     print("signalAlign - indexing reference, done", file=sys.stderr)
 
+    # the default lookup tables are the starting conditions for the model if we're starting from scratch
     default_template_table_path = "../../signalAlign/models/testModel_template.model"
     default_complement_table_path = "../../signalAlign/models/testModel_complement.model"
-    default_complement_pop1_table_path = "../../signalAlign/models/testModel_complement_pop1.model"
+    assert os.path.exists(default_template_table_path) and os.path.exists(default_complement_table_path), \
+        "Missing default lookup tables"
 
-    assert os.path.exists(default_template_table_path) and os.path.exists(default_complement_table_path) \
-        and os.path.exists(default_complement_pop1_table_path), "Missing default lookup tables"
-
+    # make the model objects, for the threeState model, we're going to parse the lookup table or the premade
+    # model, for the HDP model, we just load the transitions
     template_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
                                table_file=default_template_table_path, premade_model=args.in_T_Hmm)
     complement_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
                                  table_file=default_complement_table_path, premade_model=args.in_C_Hmm)
-    complement_model_pop1 = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
-                                      table_file=default_complement_pop1_table_path, premade_model=args.in_C_Hmm2)
 
     # get the input HDP, if we're using it
     if args.stateMachineType == "threeStateHdp":
-        assert (args.templateHDP is not None) and (args.complementHDP is not None), "Need to provide serialized HDP " \
-                                                                                    "files for this stateMachineType"
-        assert (os.path.isfile(args.templateHDP)) and (os.path.isfile(args.complementHDP)), "Could not find the HDP" \
-                                                                                            "files"
+        assert (args.templateHDP is not None) and (args.complementHDP is not None), \
+            "Need to provide serialized HDP files for this stateMachineType"
+        assert (os.path.isfile(args.templateHDP)) and (os.path.isfile(args.complementHDP)),\
+            "Could not find the HDP files"
 
     # make some paths to files to hold the HMMs
     template_hmm = working_folder.add_file_path("template_trained.hmm")
     complement_hmm = working_folder.add_file_path("complement_trained.hmm")
-    complement_hmm_pop1 = working_folder.add_file_path("complement_trained_pop1.hmm")
 
-    trained_models = [template_hmm, complement_hmm, complement_hmm_pop1]
+    trained_models = [template_hmm, complement_hmm]
 
     default_template_hmm = "../../signalAlign/models/default_template.hmm"
     default_complement_hmm = "../../signalAlign/models/default_complement.hmm"
-    default_complement_hmm_pop1 = "../../signalAlign/models/default_complement_pop1.hmm"
 
-    default_models = [default_template_hmm, default_complement_hmm, default_complement_hmm_pop1]
+    default_models = [default_template_hmm, default_complement_hmm]
 
     for default_model, trained_model in zip(default_models, trained_models):
         assert os.path.exists(default_model), "Didn't find default model {}".format(default_model)
@@ -297,7 +294,6 @@ def main(argv):
                 "bwa_index": bwa_ref_index,
                 "in_templateHmm": template_hmm,
                 "in_complementHmm": complement_hmm,
-                "in_complementHmm_pop1": complement_hmm_pop1,
                 "in_templateHdp": args.templateHDP,
                 "in_complementHdp": args.complementHDP,
                 "threshold": args.threshold,
@@ -326,9 +322,6 @@ def main(argv):
         complement_expectations_files = [x for x in os.listdir(working_directory_path)
                                          if x.endswith(".complement.expectations")]
 
-        complement_pop1_expectations_files = [x for x in os.listdir(working_directory_path)
-                                              if x.endswith(".complement_pop1.expectations")]
-
         if len(template_expectations_files) > 0:
             add_and_norm_expectations(path=working_directory_path,
                                       files=template_expectations_files,
@@ -345,16 +338,8 @@ def main(argv):
                                       update_emissions=args.emissions,
                                       update_transitions=args.transitions)
 
-        if len(complement_pop1_expectations_files) > 0:
-            add_and_norm_expectations(path=working_directory_path,
-                                      files=complement_pop1_expectations_files,
-                                      model=complement_model_pop1,
-                                      hmm_file=complement_hmm_pop1,
-                                      update_emissions=args.emissions,
-                                      update_transitions=args.transitions)
-
-        # Build HDP from last round of assignments  ## TODO needs to be updated for extra complement models
-        if args.stateMachineType == "threeStateHdp":
+        # Build HDP from last round of assignments
+        if args.stateMachineType == "threeStateHdp" and args.emissions is True:
             assert isinstance(template_model, HdpSignalHmm) and isinstance(complement_model, HdpSignalHmm)
 
             total_assignments = max(template_model.assignments_record[-1], complement_model.assignments_record[-1])

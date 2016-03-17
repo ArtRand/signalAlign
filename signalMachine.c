@@ -334,10 +334,8 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
     // load HMM
     if (inputHmm == NULL) {
         st_errAbort("[signalMachine] ERROR: need to have input HMMs\n");
-        //if (type == threeState) {
-        //    emissions_signal_scaleEmissions(sM, npp.scale, npp.shift, npp.var);
-        //}
     }
+
     fprintf(stderr, "signalAlign - loading HMM from file, %s\n", inputHmm);
     loadHmmRoutine(inputHmm, sM, type, hmmExpectations);
 

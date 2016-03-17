@@ -764,7 +764,7 @@ class ComplementModel(NanoporeModel):
 
 class SignalAlignment(object):
     def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
-                 in_templateHmm, in_complementHmm, in_complementHmm_pop1, in_templateHdp, in_complementHdp,
+                 in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
                  threshold, diagonal_expansion, constraint_trim,
                  target_regions=None, cytosine_substitution=None, sparse_output=False):
         self.in_fast5 = in_fast5  # fast5 file to align
@@ -790,10 +790,6 @@ class SignalAlignment(object):
             self.in_complementHmm = in_complementHmm
         else:
             self.in_complementHmm = None
-        if (in_complementHmm_pop1 is not None) and os.path.isfile(in_complementHmm_pop1):
-            self.in_complementHmm_pop1 = in_complementHmm_pop1
-        else:
-            self.in_complementHmm_pop1 = None
 
         # similarly for HDPs
         if (in_templateHdp is not None) and os.path.isfile(in_templateHdp):
@@ -807,7 +803,7 @@ class SignalAlignment(object):
 
     def run(self, get_expectations=False):
         if get_expectations:
-            assert (self.in_templateHmm) is not None and self.in_complementHmm is not None
+            assert self.in_templateHmm is not None and self.in_complementHmm is not None
         # file checks
         if os.path.isfile(self.in_fast5) is False:
             print("signalAlign - problem with file path {file}".format(file=self.in_fast5))
@@ -873,7 +869,7 @@ class SignalAlignment(object):
         # Alignment/Expectations routine
 
         # containers and defaults
-        path_to_vanillaAlign = "./signalMachine"  # todo could require this in path
+        path_to_vanillaAlign = "./signalMachine"
 
         # flags
 
@@ -882,29 +878,18 @@ class SignalAlignment(object):
             "Didn't find default template look-up table"
         template_model_flag = "-T {t_model} ".format(t_model="../../signalAlign/models/testModel_template.model")
 
-        if def_complement_model is True:
-            assert (os.path.exists("../../signalAlign/models/testModel_complement.model")), \
-                "Didn't find default complement look-up table"
-            complement_model_flag = "-C {c_model} " \
-                                    "".format(c_model="../../signalAlign/models/testModel_complement.model")
-        else:
-            assert (os.path.exists("../../signalAlign/models/testModel_complement_pop1.model")), \
-                "Didn't find pop1 complement look-up table"
-            complement_model_flag = "-C {c_model} " \
-                                    "".format(c_model="../../signalAlign/models/testModel_complement_pop1.model")
+        assert (os.path.exists("../../signalAlign/models/testModel_complement.model")), \
+            "Didn't find default complement look-up table"
+        complement_model_flag = "-C {c_model} " \
+                                "".format(c_model="../../signalAlign/models/testModel_complement.model")
 
         # input HMMs
         if self.in_templateHmm is not None:
             template_hmm_flag = "-y {hmm_loc} ".format(hmm_loc=self.in_templateHmm)
-            print("Template HMM flag {}".format(template_model_flag), file=sys.stderr)
         else:
             template_hmm_flag = ""
-            print("Template HMM flag {}".format(template_model_flag), file=sys.stderr)
         if self.in_complementHmm is not None:
-            if def_complement_model is True:
-                complement_hmm_flag = "-z {hmm_loc} ".format(hmm_loc=self.in_complementHmm)
-            else:
-                complement_hmm_flag = "-z {hmm_loc} ".format(hmm_loc=self.in_complementHmm_pop1)
+            complement_hmm_flag = "-z {hmm_loc} ".format(hmm_loc=self.in_complementHmm)
         else:
             complement_hmm_flag = ""
 
@@ -953,10 +938,7 @@ class SignalAlignment(object):
         # commands
         if get_expectations:
             template_expectations_file_path = self.destination + read_name + ".template.expectations"
-            if def_complement_model is True:
-                complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
-            else:
-                complement_expectations_file_path = self.destination + read_name + ".complement_pop1.expectations"
+            complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
 
             command = \
                 "echo {cigar} | {vA} {model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
@@ -989,18 +971,43 @@ class SignalHmm(object):
     def __init__(self, model_type, symbol_set_size):
         self.match_model_params = 5
         self.model_type = model_type  # ID of model type
-        self.state_number = {"threeState": 3, "vanilla": 3, "threeStateHdp": 3}[model_type]
-        self.symbol_set_size = symbol_set_size  # eg. number of kmers, 4096 for 6mers
+        self.state_number = {"threeState": 3, "threeStateHdp": 3}[model_type]
+        self.symbol_set_size = symbol_set_size
+        self.transitions = np.zeros(self.state_number**2)
+        self.transitions_expectations = np.zeros(self.state_number**2)
         self.likelihood = 0.0
         self.running_likelihoods = []
+
+    def normalize_transitions_expectations(self):
+        # normalize transitions
+        for from_state in xrange(self.state_number):
+            i = self.state_number * from_state
+            j = sum(self.transitions_expectations[i:i+self.state_number])
+            for to_state in xrange(self.state_number):
+                self.transitions_expectations[i + to_state] = self.transitions_expectations[i + to_state] / j
+
+    def set_default_transitions(self):
+        MATCH_CONTINUE = np.exp(-0.23552123624314988)     # stride
+        MATCH_FROM_GAP_X = np.exp(-0.21880828092192281)   # 1 - skip'
+        MATCH_FROM_GAP_Y = np.exp(-0.013406326748077823)  # 1 - (skip + stay)
+        GAP_OPEN_X = np.exp(-1.6269694202638481)          # skip
+        GAP_OPEN_Y = np.exp(-4.3187242127300092)          # 1 - (skip + stride)
+        GAP_EXTEND_X = np.exp(-1.6269694202638481)        # skip'
+        GAP_EXTEND_Y = np.exp(-4.3187242127239411)        # stay (1 - (skip + stay))
+        GAP_SWITCH_TO_X = 0.000000001
+        GAP_SWITCH_TO_Y = 0.0
+        self.transitions = [
+            MATCH_CONTINUE, GAP_OPEN_X, GAP_OPEN_Y,
+            MATCH_FROM_GAP_X, GAP_EXTEND_X, GAP_SWITCH_TO_Y,
+            MATCH_FROM_GAP_Y, GAP_SWITCH_TO_X, GAP_EXTEND_Y
+        ]
+        return
 
 
 class ContinuousPairHmm(SignalHmm):
     def __init__(self, model_type, symbol_set_size):
         super(ContinuousPairHmm, self).__init__(model_type=model_type, symbol_set_size=symbol_set_size)
-        self.transitions = np.zeros(self.state_number**2)
         self.set_default_transitions()
-        self.transitions_expectations = np.zeros(self.state_number**2)
 
         # event model for describing normal distributions for each kmer
         self.event_model = {"means": np.zeros(self.symbol_set_size),
@@ -1057,12 +1064,8 @@ class ContinuousPairHmm(SignalHmm):
         fH.close()
 
     def normalize(self, update_transitions, update_emissions):
-        # normalize transitions
-        for from_state in xrange(self.state_number):
-            i = self.state_number * from_state
-            j = sum(self.transitions_expectations[i:i+self.state_number])
-            for to_state in xrange(self.state_number):
-                self.transitions_expectations[i + to_state] = self.transitions_expectations[i + to_state] / j
+        # normalize transitions expectations
+        self.normalize_transitions_expectations()
 
         # update
         if update_transitions is True:
@@ -1082,23 +1085,6 @@ class ContinuousPairHmm(SignalHmm):
 
         self.normalized = True
         self.has_model = True
-
-    def set_default_transitions(self):
-        MATCH_CONTINUE = np.exp(-0.23552123624314988)     # stride
-        MATCH_FROM_GAP_X = np.exp(-0.21880828092192281)   # 1 - skip'
-        MATCH_FROM_GAP_Y = np.exp(-0.013406326748077823)  # 1 - (skip + stay)
-        GAP_OPEN_X = np.exp(-1.6269694202638481)          # skip
-        GAP_OPEN_Y = np.exp(-4.3187242127300092)          # 1 - (skip + stride)
-        GAP_EXTEND_X = np.exp(-1.6269694202638481)        # skip'
-        GAP_EXTEND_Y = np.exp(-4.3187242127239411)        # stay (1 - (skip + stay))
-        GAP_SWITCH_TO_X = 0.000000001
-        GAP_SWITCH_TO_Y = 0.0
-        self.transitions = [
-            MATCH_CONTINUE, GAP_OPEN_X, GAP_OPEN_Y,
-            MATCH_FROM_GAP_X, GAP_EXTEND_X, GAP_SWITCH_TO_Y,
-            MATCH_FROM_GAP_Y, GAP_SWITCH_TO_X, GAP_EXTEND_Y
-        ]
-        return
 
     def write(self, out_file):
         # Format:
@@ -1175,7 +1161,7 @@ class ContinuousPairHmm(SignalHmm):
 class HdpSignalHmm(SignalHmm):
     def __init__(self, model_type, threshold):
         super(HdpSignalHmm, self).__init__(model_type=model_type, symbol_set_size=None)
-        self.transitions = np.zeros(self.state_number ** 2)
+        self.set_default_transitions()
         self.number_of_assignments = 0
         self.threshold = threshold
         self.kmer_assignments = []
@@ -1187,6 +1173,7 @@ class HdpSignalHmm(SignalHmm):
 
         # line 0: smType stateNumber, symbolSetSize
         line = map(float, fH.readline().split())
+        assert len(line) == 4, "add_expectations_file - ERROR: header line {} is incorrect".format(''.join(line))
         assert line[0] == 7, "add_expectations_file - ERROR: got incorrect modelType"
         assert line[1] == self.state_number, "add_expectations_file - ERROR: got incorrect stateNumber"
         assert line[2] == self.threshold, "add_expectations_file - ERROR: got incorrect threshold"
@@ -1201,11 +1188,7 @@ class HdpSignalHmm(SignalHmm):
             return
 
         self.likelihood += line[-1]
-        self.transitions = map(lambda x: sum(x), zip(self.transitions, line[0:-1]))
-
-        # line 2: kmer skip probs REMOVED
-        #line = map(float, fH.readline().split())
-        #self.kmer_skip_probs = map(lambda x: sum(x), zip(self.kmer_skip_probs, line))
+        self.transitions_expectations = map(lambda x: sum(x), zip(self.transitions_expectations, line[0:-1]))
 
         # line 3: event assignments
         line = map(float, fH.readline().split())
@@ -1242,14 +1225,6 @@ class HdpSignalHmm(SignalHmm):
         # likelihood
         f.write("{}\n".format(str(self.likelihood)))
 
-        # todo clean up
-        # line 2
-        # kmer skip probs
-        #for kmer in xrange(self.symbol_set_size):
-        #    f.write("{}\t".format(str(self.kmer_skip_probs[kmer])))
-        # final newline
-        #f.write("\n")
-
         # line 3 event assignments
         for event in self.event_assignments:
             f.write("{}\t".format(str(event)))
@@ -1261,87 +1236,32 @@ class HdpSignalHmm(SignalHmm):
         f.write("\n")
         f.close()
 
-    def normalize(self):
-        # normalize transitions
-        for from_state in xrange(self.state_number):
-            i = self.state_number * from_state
-            j = sum(self.transitions[i:i+self.state_number])
-            for to_state in xrange(self.state_number):
-                self.transitions[i + to_state] = self.transitions[i + to_state] / j
-
     def reset_assignments(self):
         self.assignments_record.append(self.number_of_assignments)
         self.event_assignments = []
         self.kmer_assignments = []
         self.number_of_assignments = 0
 
+    def normalize(self, update_transitions, update_emissions=None):
+        self.normalize_transitions_expectations()
 
-class ConditionalSignalHmm(SignalHmm):
-    def __init__(self, model_type, symbol_set_size):
-        super(ConditionalSignalHmm, self).__init__(model_type=model_type, symbol_set_size=symbol_set_size)
-        self.kmer_skip_bins = np.zeros(60)
-        self.match_model = np.zeros(1 + (symbol_set_size * self.match_model_params))
-        self.scaled_match_model = np.zeros(1 + (symbol_set_size * self.match_model_params))
+        if update_transitions is True:
+            for i in xrange(self.state_number**2):
+                self.transitions[i] = self.transitions_expectations[i]
 
-    def add_expectations_file(self, expectations_file):
-        fH = open(expectations_file, 'r')
+    def load_model(self, path_to_model):
+        assert os.path.exists(path_to_model), "cpHmm::load_model - didn't find model here{}?".format(path_to_model)
 
-        # line 0: smType \t stateNumber \t symbol_set_size
+        fH = open(path_to_model, 'r')
+
         line = map(float, fH.readline().split())
-        assert line[0] == 4
+        assert len(line) == 4, "cpHmm::load_model - incorrect line length line:{}".format(''.join(line))
+        assert line[0] == 7
         assert line[1] == self.state_number
-        assert line[2] == self.symbol_set_size
+        assert line[2] == self.threshold
 
-        # line 1: kmer skip bins (alpha and beta) \t likelihood
         line = map(float, fH.readline().split())
-
-        # check if valid file
-        if len(line) != (len(self.kmer_skip_bins) + 1):
-            print("PYSENTINAL - problem with file {}".format(expectations_file), file=sys.stdout)
-            return
-
-        #print("incorperating", line[0:-1], (np.nan in line[0:-1]))
+        assert len(line) == len(self.transitions) + 1, "cpHmm::load_model incorrect transitions line"
+        self.transitions = line[:-1]
         self.likelihood = line[-1]
-        self.kmer_skip_bins = map(lambda x: sum(x), zip(self.kmer_skip_bins, line[0:-1]))
-
-        # ignore match models for now
-
-    def normalize(self):
-        # get totals for alpha and beta probs
-        beta_total = sum(self.kmer_skip_bins[:30])
-        alpha_total = sum(self.kmer_skip_bins[30:])
-
-        # normalize
-        for i in xrange(30):
-            self.kmer_skip_bins[i] = self.kmer_skip_bins[i] / beta_total
-            self.kmer_skip_bins[i + 30] = self.kmer_skip_bins[i + 30] / alpha_total
-
-    def write(self, out_file):
-        # Format:
-        # line 0: type \t stateNumber \t symbolSetSize \n
-        # line 1: skip bins (alpha and beta) \t likelihood \n
-        # line 2: [correlation coeff] \t [match model .. \t]  \n
-        # line 3: [correlation coeff] [extra event matchModel]
-        f = open(out_file, 'w')
-
-        # line 0
-        f.write("4\t{stateNumber}\t{symbolSetSize}\n".format(stateNumber=self.state_number,
-                                                            symbolSetSize=self.symbol_set_size))
-        # line 1
-        # kmer skip bins
-        for i in xrange(60):
-            f.write("{kmerSkipBinProb}\t".format(kmerSkipBinProb=str(self.kmer_skip_bins[i])))
-        # likelihood
-        f.write("{}\n".format(str(self.likelihood)))
-
-        # line 2 and 3, we're not using the match models now so just write down some placeholders
-        for i in xrange(1 + (self.symbol_set_size * self.match_model_params)):
-            f.write("{}\t".format(str(self.match_model[i])))
-        f.write("\n")
-        for i in xrange(1 + (self.symbol_set_size * self.match_model_params)):
-            f.write("{}\t".format(str(self.scaled_match_model[i])))
-        f.write("\n")
-
-        f.close()
-
-
+        # todo make check transitions function

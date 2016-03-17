@@ -26,9 +26,6 @@ def parse_args():
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for complement events, if you don't want the default")
-    parser.add_argument('--in_complement_hmm_2', '-C2', action='store', dest='in_C_Hmm2',
-                        required=False, type=str, default=None,
-                        help="input HMM for complement events, if you don't want the default")
     parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None)
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None)
 
@@ -134,7 +131,6 @@ def main(args):
             "bwa_index": bwa_ref_index,
             "in_templateHmm": args.in_T_Hmm,
             "in_complementHmm": args.in_C_Hmm,
-            "in_complementHmm_pop1": args.in_C_Hmm2,
             "in_templateHdp": args.templateHDP,
             "in_complementHdp": args.complementHDP,
             "banded": args.banded,

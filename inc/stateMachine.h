@@ -53,9 +53,7 @@ struct _hmm {
     int64_t symbolSetSize;
     int64_t matrixSize;
 
-    // 10/27 moved into HmmDiscrete subClass
-    //double *transitions;
-    //double *emissions;
+    double *transitions;
 
     void (*addToTransitionExpectationFcn)(Hmm *hmm, int64_t from, int64_t to, double p);
 

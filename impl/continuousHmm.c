@@ -43,7 +43,8 @@ static inline void hmmContinuous_loadIntoStateMachine(StateMachine *sM, Hmm *hmm
         continuousPairHmm_loadEmissionsIntoStateMachine(sM, hmm);
     }
     if (type == threeStateHdp) {
-        hdpHmm_loadTransitions(sM, hmm);
+        continuousPairHmm_loadTransitionsIntoStateMachine(sM, hmm);
+        //hdpHmm_loadTransitions(sM, hmm);
     }
 }
 
@@ -91,12 +92,12 @@ Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPs
     cpHmm->baseHmm.likelihood = 0.0;
 
     // transitions
-    cpHmm->baseHmm.addToTransitionExpectationFcn = continuousPairHmm_addToTransitionsExpectation;
-    cpHmm->baseHmm.setTransitionFcn = continuousPairHmm_setTransitionExpectation;
-    cpHmm->baseHmm.getTransitionsExpFcn = continuousPairHmm_getTransitionExpectation;
-    cpHmm->transitions = st_malloc(stateNumber * stateNumber * sizeof(double));
+    cpHmm->baseHmm.addToTransitionExpectationFcn = hmm_addToTransitionsExpectation;
+    cpHmm->baseHmm.setTransitionFcn = hmm_setTransitionExpectation;
+    cpHmm->baseHmm.getTransitionsExpFcn = hmm_getTransitionExpectation;
+    cpHmm->baseHmm.transitions = st_malloc(stateNumber * stateNumber * sizeof(double));
     for (int64_t i = 0; i < (stateNumber * stateNumber); i++) {
-        cpHmm->transitions[i] = transitionPseudocount;
+        cpHmm->baseHmm.transitions[i] = transitionPseudocount;
     }
 
     cpHmm->getElementIndexFcn = emissions_discrete_getKmerIndexFromKmer;
@@ -135,19 +136,16 @@ Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPs
 }
 // TODO remove all this needless casting
 // transitions
-void continuousPairHmm_addToTransitionsExpectation(Hmm *hmm, int64_t from, int64_t to, double p) {
-    ContinuousPairHmm *cpHmm = (ContinuousPairHmm *) hmm;
-    cpHmm->transitions[from * cpHmm->baseHmm.stateNumber + to] += p;
+void hmm_addToTransitionsExpectation(Hmm *hmm, int64_t from, int64_t to, double p) {
+    hmm->transitions[from * hmm->stateNumber + to] += p;
 }
 
-void continuousPairHmm_setTransitionExpectation(Hmm *hmm, int64_t from, int64_t to, double p) {
-    ContinuousPairHmm *cpHmm = (ContinuousPairHmm *) hmm;
-    cpHmm->transitions[from * cpHmm->baseHmm.stateNumber + to] = p;
+void hmm_setTransitionExpectation(Hmm *hmm, int64_t from, int64_t to, double p) {
+    hmm->transitions[from * hmm->stateNumber + to] = p;
 }
 
-double continuousPairHmm_getTransitionExpectation(Hmm *hmm, int64_t from, int64_t to) {
-    ContinuousPairHmm *cpHmm = (ContinuousPairHmm *) hmm;
-    return cpHmm->transitions[from * cpHmm->baseHmm.stateNumber + to];
+double hmm_getTransitionExpectation(Hmm *hmm, int64_t from, int64_t to) {
+    return hmm->transitions[from * hmm->stateNumber + to];
 }
 // TODO double check that this is right
 void continuousPairHmm_addToEmissionExpectation(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p) {
@@ -188,7 +186,7 @@ double *continuousPairHmm_getEmissionPosterior(Hmm *hmm, int64_t kmerIndex) {
 
 void continuousPairHmm_destruct(Hmm *hmm) {
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *) hmm;
-    free(cpHmm->transitions);
+    free(cpHmm->baseHmm.transitions);
     free(cpHmm->eventExpectations);
     free(cpHmm->eventModel);
     free(cpHmm->posteriors);
@@ -281,22 +279,21 @@ void continuousPairHmm_randomize(Hmm *hmm) {
 
 void continuousPairHmm_loadTransitionsIntoStateMachine(StateMachine *sM, Hmm *hmm) {
     StateMachine3 *sM3 = (StateMachine3 *)sM;
-    ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
     // load transitions  // TODO comment this up with the logic
     // from match
-    sM3->TRANSITION_MATCH_CONTINUE = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, match, match)); // stride
-    sM3->TRANSITION_GAP_OPEN_X = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, match, shortGapX)); // skip
-    sM3->TRANSITION_GAP_OPEN_Y = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, match, shortGapY));
+    sM3->TRANSITION_MATCH_CONTINUE = log(hmm->getTransitionsExpFcn(hmm, match, match)); // stride
+    sM3->TRANSITION_GAP_OPEN_X = log(hmm->getTransitionsExpFcn(hmm, match, shortGapX)); // skip
+    sM3->TRANSITION_GAP_OPEN_Y = log(hmm->getTransitionsExpFcn(hmm, match, shortGapY));
 
     // from shortGapX (kmer skip)
-    sM3->TRANSITION_MATCH_FROM_GAP_X = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapX, match));
-    sM3->TRANSITION_GAP_EXTEND_X = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapX, shortGapX));
+    sM3->TRANSITION_MATCH_FROM_GAP_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, match));
+    sM3->TRANSITION_GAP_EXTEND_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapX));
     sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
 
     // from shortGapY (extra event)
-    sM3->TRANSITION_MATCH_FROM_GAP_Y = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapY, match));
-    sM3->TRANSITION_GAP_EXTEND_Y = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapY, shortGapY));
-    sM3->TRANSITION_GAP_SWITCH_TO_X = log(cpHmm->baseHmm.getTransitionsExpFcn((Hmm *)cpHmm, shortGapY, shortGapX));
+    sM3->TRANSITION_MATCH_FROM_GAP_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, match));
+    sM3->TRANSITION_GAP_EXTEND_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapY));
+    sM3->TRANSITION_GAP_SWITCH_TO_X = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapX));
     //sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
 }
 
@@ -334,11 +331,11 @@ void continuousPairHmm_dump(Hmm *hmm, FILE *fileHandle) {
 
     int64_t nb_transitions = (cpHmm->baseHmm.stateNumber * cpHmm->baseHmm.stateNumber);
 
-    bool check = hmmContinuous_checkTransitions(cpHmm->transitions, nb_transitions);
+    bool check = hmmContinuous_checkTransitions(cpHmm->baseHmm.transitions, nb_transitions);
     if (check) {
         // write out transitions
         for (int64_t i = 0; i < nb_transitions; i++) {
-            fprintf(fileHandle, "%f\t", cpHmm->transitions[i]); // transitions 1:(0-9)
+            fprintf(fileHandle, "%f\t", cpHmm->baseHmm.transitions[i]); // transitions 1:(0-9)
         }
 
         // write the likelihood
@@ -428,7 +425,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName, double transitionPseud
     }
     // load them
     for (int64_t i = 0; i < nb_transitions; i++) {
-        j = sscanf(stList_get(tokens, i), "%lf", &(cpHmm->transitions[i]));
+        j = sscanf(stList_get(tokens, i), "%lf", &(cpHmm->baseHmm.transitions[i]));
         if (j != 1) {
             st_errAbort("Failed to parse transition prob (float) from string: %s\n", string);
         }
@@ -510,11 +507,10 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName, double transitionPseud
 }
 
 /////////////////////////////////////////////////// HDP HMM  //////////////////////////////////////////////////////////
-static void hdpHmm_addToAssignment(Hmm *self, void *kmer, void *event) {
-    HdpHmm *hdpHmm = (HdpHmm *)self;
-    stList_append(hdpHmm->kmerAssignments, kmer);
-    stList_append(hdpHmm->eventAssignments, event);
-    hdpHmm->numberOfAssignments += 1;
+static void hdpHmm_addToAssignment(HdpHmm *self, void *kmer, void *event) {
+    stList_append(self->kmerAssignments, kmer);
+    stList_append(self->eventAssignments, event);
+    self->numberOfAssignments += 1;
 }
 
 static bool hdpHmm_checkAssignments(HdpHmm *hdpHmm) {
@@ -523,12 +519,8 @@ static bool hdpHmm_checkAssignments(HdpHmm *hdpHmm) {
     return nb_eventAssignmebts == nb_kmerAssignmebts ? TRUE : FALSE;
 }
 
-Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, StateMachineType type, double threshold,
-                           void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
-                           void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
-                           double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to)) {
+Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, StateMachineType type, double threshold) {
     HdpHmm *hmm = st_malloc(sizeof(HdpHmm));
-
     // setup base Hmm
     hmm->baseHmm.type = type;
     hmm->baseHmm.stateNumber = stateNumber;
@@ -537,14 +529,14 @@ Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, StateMachine
     hmm->baseHmm.likelihood = 0.0;
 
     // transitions
-    hmm->baseHmm.addToTransitionExpectationFcn = addToTransitionExpFcn; // add
-    hmm->baseHmm.setTransitionFcn = setTransitionFcn;                   // set
-    hmm->baseHmm.getTransitionsExpFcn = getTransitionsExpFcn;           // get
+    hmm->baseHmm.addToTransitionExpectationFcn = hmm_addToTransitionsExpectation; // add
+    hmm->baseHmm.setTransitionFcn = hmm_setTransitionExpectation;                   // set
+    hmm->baseHmm.getTransitionsExpFcn = hmm_getTransitionExpectation;           // get
 
     // transitions
-    hmm->transitions = st_malloc(stateNumber * stateNumber * sizeof(double));
+    hmm->baseHmm.transitions = st_malloc(stateNumber * stateNumber * sizeof(double));
     for (int64_t i = 0; i < (stateNumber * stateNumber); i++) {
-        hmm->transitions[i] = pseudocount;
+        hmm->baseHmm.transitions[i] = pseudocount;
     }
 
     // HDP specific stuff
@@ -556,25 +548,6 @@ Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, StateMachine
     hmm->nhdp = NULL;  // initialized to NULL
 
     return (Hmm *)hmm;
-}
-
-void hdpHmm_loadTransitions(StateMachine *sM, Hmm *hmm) {
-    StateMachine3_HDP *sM3 = (StateMachine3_HDP *)sM;
-    // load transitions
-    // from match
-    sM3->TRANSITION_MATCH_CONTINUE = log(hmm->getTransitionsExpFcn(hmm, match, match));
-    sM3->TRANSITION_GAP_OPEN_X = log(hmm->getTransitionsExpFcn(hmm, match, shortGapX));
-    sM3->TRANSITION_GAP_OPEN_Y = log(hmm->getTransitionsExpFcn(hmm, match, shortGapY));
-
-    // from shortGapX (kmer skip)
-    sM3->TRANSITION_MATCH_FROM_GAP_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, match));  // tied
-    sM3->TRANSITION_GAP_EXTEND_X = log(1 - hmm->getTransitionsExpFcn(hmm, shortGapX, match));  // tied
-    sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;  // cannot go skip->extra event
-
-    // from shortGapY (extra event)
-    sM3->TRANSITION_MATCH_FROM_GAP_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, match));
-    sM3->TRANSITION_GAP_EXTEND_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapY));
-    sM3->TRANSITION_GAP_SWITCH_TO_X = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapX));
 }
 
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
@@ -596,13 +569,13 @@ void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     // write the transitions to disk
     int64_t nb_transitions = (hdpHmm->baseHmm.stateNumber * hdpHmm->baseHmm.stateNumber);
 
-    bool transitionCheck = hmmContinuous_checkTransitions(hdpHmm->transitions, nb_transitions);
+    bool transitionCheck = hmmContinuous_checkTransitions(hdpHmm->baseHmm.transitions, nb_transitions);
     bool assignmentCheck = hdpHmm_checkAssignments(hdpHmm);
     if (transitionCheck && assignmentCheck) {
         // write out transitions
         for (int64_t i = 0; i < nb_transitions; i++) {
             // transitions 1:(0-9)
-            fprintf(fileHandle, "%f\t", hdpHmm->transitions[i]);
+            fprintf(fileHandle, "%f\t", hdpHmm->baseHmm.transitions[i]);
         }
 
         // likelihood 1:10, newLine
@@ -668,10 +641,7 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
     }
 
     // make empty hdpHmm object
-    Hmm *hmm = hdpHmm_constructEmpty(0.0, stateNumber, type, threshold,
-                                     continuousPairHmm_addToTransitionsExpectation,
-                                     continuousPairHmm_setTransitionExpectation,
-                                     continuousPairHmm_getTransitionExpectation);
+    Hmm *hmm = hdpHmm_constructEmpty(0.0, stateNumber, type, threshold);
 
     HdpHmm *hdpHmm = (HdpHmm *)hmm;  // downcast
     hdpHmm->numberOfAssignments = numberOfAssignments;
@@ -696,7 +666,7 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
 
     // load them
     for (int64_t i = 0; i < nb_transitions; i++) {
-        j = sscanf(stList_get(tokens, i), "%lf", &(hdpHmm->transitions[i]));
+        j = sscanf(stList_get(tokens, i), "%lf", &(hdpHmm->baseHmm.transitions[i]));
         if (j != 1) {
             st_errAbort("Failed to parse transition prob (float) from string: %s\n", string);
         }
@@ -776,7 +746,9 @@ void hdpHmm_destruct(Hmm *hmm) {
     HdpHmm *hdpHmm = (HdpHmm *)hmm;
     free(hdpHmm->kmerAssignments);
     free(hdpHmm->eventAssignments);
-    free(hdpHmm->transitions);
+    free(hdpHmm->baseHmm.transitions);
+    // todo check if we need destructers here
+    //stList_destruct(hdpHmm->kmerAssignments);
     free(hdpHmm);
 }
 
@@ -820,10 +792,7 @@ Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double
         return hmm;
     }
     if (type == threeStateHdp) {
-        Hmm *hmm = hdpHmm_constructEmpty(pseudocount, 3, threeStateHdp, threshold,
-                                         continuousPairHmm_addToTransitionsExpectation,
-                                         continuousPairHmm_setTransitionExpectation,
-                                         continuousPairHmm_getTransitionExpectation);
+        Hmm *hmm = hdpHmm_constructEmpty(pseudocount, 3, threeStateHdp, threshold);
         return hmm;
     }
     return 0;

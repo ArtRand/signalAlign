@@ -8,7 +8,6 @@ typedef struct _strawManHmm ContinuousPairHmm;
 struct _strawManHmm {
     Hmm baseHmm;
     // threeState transitions matrix (3x3)
-    double *transitions;
     // matrix formatted [x, y] * NUM_OF_KMERS. x = Sigma_k(p_i * obs_i) and y = Sigma_k(p_i * (obs - u_K)**2),
     // u_k is calculated as x / Sigma_k(p_k) and _k indicates the kmer
     double *eventExpectations;
@@ -40,26 +39,26 @@ struct _strawManHmm {
     bool hasModel;
 };
 
-typedef struct _hdpHmm {
+typedef struct _hdpHmm HdpHmm;
+struct _hdpHmm {
     Hmm baseHmm;
-    double *transitions;
     double threshold;
-    void (*addToAssignments)(Hmm *, void *, void *);
+    void (*addToAssignments)(HdpHmm *, void *, void *);
     stList *eventAssignments;
     stList *kmerAssignments;
     int64_t numberOfAssignments;
     NanoporeHDP *nhdp;
-} HdpHmm;
+};
 
 Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPseudocount,
                                  int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
                                  double scale, double shift, double var);
 
-void continuousPairHmm_addToTransitionsExpectation(Hmm *hmm, int64_t from, int64_t to, double p);
+void hmm_addToTransitionsExpectation(Hmm *hmm, int64_t from, int64_t to, double p);
 
-void continuousPairHmm_setTransitionExpectation(Hmm *hmm, int64_t from, int64_t to, double p);
+void hmm_setTransitionExpectation(Hmm *hmm, int64_t from, int64_t to, double p);
 
-double continuousPairHmm_getTransitionExpectation(Hmm *hmm, int64_t from, int64_t to);
+double hmm_getTransitionExpectation(Hmm *hmm, int64_t from, int64_t to);
 
 void continuousPairHmm_addToEmissionExpectation(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p);
 
@@ -85,12 +84,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName, double transitionPseud
 
 void continuousPairHmm_loadModelFromFile(ContinuousPairHmm *hmm, const char *modelFile);
 
-Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, StateMachineType type, double threshold,
-                           void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
-                           void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
-                           double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to));
-
-void hdpHmm_loadTransitions(StateMachine *sM, Hmm *hmm);
+Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, StateMachineType type, double threshold);
 
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
 
