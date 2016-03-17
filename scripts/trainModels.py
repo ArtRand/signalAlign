@@ -360,7 +360,7 @@ def main(argv):
             else:
                 total_assignments = max(template_model.assignments_record[-1], complement_model.assignments_record[-1])
 
-                build_hdp(template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
+                build_hdp(template_hdp_path=template_hdp, complement_hdp_path=complement_hdp,
                           template_assignments=template_hmm, complement_assignments=complement_hmm,
                           samples=args.gibbs_samples, thinning=args.thinning, burn_in=30 * total_assignments,
                           verbose=args.verbose)
