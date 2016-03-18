@@ -7,9 +7,9 @@ sys.path.append("../")
 from signalAlignLib import TemplateModel, ComplementModel
 import string
 import numpy as np
-from scipy.stats.kde import gaussian_kde
+#from sklearn.neighbors import KernelDensity
+from scipy.stats import gaussian_kde
 from scipy.stats import norm
-from itertools import product
 
 
 def nucleotideToIndex(base):
@@ -28,6 +28,7 @@ def nucleotideToIndex(base):
     if base == 'N':
         return 6
 
+
 def getKmerIndex(kmer):
     """This is the algorithm for finding the rank (index) of a kmer)
     """
@@ -42,6 +43,7 @@ def getKmerIndex(kmer):
         l = l/len(alphabet)
     index += nucleotideToIndex(kmer[-1])
     return int(index)
+
 
 class KmerDistribution(object):
     def __init__(self, data_directory):
@@ -68,11 +70,9 @@ class KmerHistogram(KmerDistribution):
     def parse_xvals(self, x_vals_file):
         self.x_vals = np.loadtxt(x_vals_file, dtype=np.float64)
 
-    def make_kde(self, x_vals=None):
-        kernel = gaussian_kde(self.histogram)
-        ind = self.x_vals if self.x_vals is not None else x_vals
-        assert ind is not None, "Need to provide x-values"
-        self.kde_pdf = kernel.evaluate(ind)
+    def make_kde(self):
+        kde = KernelDensity(kernel='gaussian', bandwidth=0.75).fit([self.histogram][:100])
+        return kde
 
 
 class KmerHdpDistribution(KmerDistribution):

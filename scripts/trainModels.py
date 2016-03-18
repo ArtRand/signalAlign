@@ -64,7 +64,7 @@ def parse_args():
                         help="mutate cytosines to this letter in the reference")
     # gibbs
     parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
-    parser.add_argument('--thinning', '-th', action='store', type=int, default=200, dest='thinning')
+    parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
     parser.add_argument('--min_assignments', action='store', type=int, default=30000, dest='min_assignments',
                         help="Do not initiate Gibbs sampling unless this many assignments have been accumulated")
 
@@ -276,7 +276,9 @@ def main(argv):
     print("Starting {iterations} iterations.\n\n\t    Running likelihoods\ni\tTempalte\tComplement".format(
         iterations=args.iter), file=sys.stdout)
 
-    for i in xrange(args.iter):
+    # start iterating
+    i = 0
+    while i < args.iter:
         # if we're using 'mutated' or non-canonical reference sequences, they come in a list. if we're not then
         # we make a list of the 'normal' reference sequence
         if args.cytosine_sub is None:
@@ -356,6 +358,7 @@ def main(argv):
                    complement_model.assignments_record[-1]) < args.min_assignments:
                 print("[trainModels] not enough assignments at iteration {}, continuing...".format(i),
                       file=sys.stderr)
+                i -= 1
                 pass
             else:
                 total_assignments = max(template_model.assignments_record[-1], complement_model.assignments_record[-1])
@@ -370,6 +373,7 @@ def main(argv):
             print("{i}| {t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
                                                                c_likelihood=complement_model.running_likelihoods[-1],
                                                                i=i))
+        i += 1
 
     # if we're using HDP, trim the final Hmm (remove assignments)
 
