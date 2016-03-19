@@ -50,9 +50,9 @@ class KmerDistribution(object):
         self.data_directory = data_directory
 
 
-class KmerHistogram(KmerDistribution):
+class KmerAlignmentHistogram(KmerDistribution):
     def __init__(self, data_directory, kmer):
-        super(KmerHistogram, self).__init__(data_directory=data_directory)
+        super(KmerAlignmentHistogram, self).__init__(data_directory=data_directory)
         self.kmer = kmer
         self.data_file = data_directory + "{}_hist.txt".format(self.kmer)
 
@@ -66,6 +66,7 @@ class KmerHistogram(KmerDistribution):
 
     def parse_histogram(self):
         self.histogram = np.loadtxt(self.data_file, dtype=np.float64)
+        self.histogram = [x for x in self.histogram if 0 < x < 100]
 
     def parse_xvals(self, x_vals_file):
         self.x_vals = np.loadtxt(x_vals_file, dtype=np.float64)
