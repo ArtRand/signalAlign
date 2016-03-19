@@ -719,7 +719,7 @@ class NanoporeModel(object):
         # go through the model and build a lookup table
         model_dict = {}
         for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
-            model_dict[kmer] = (level_mean, level_stdev, sd_mean, sd_stdev)
+            model_dict[kmer] = [level_mean, level_stdev, sd_mean, sd_stdev]
         return model_dict
 
     def close(self):

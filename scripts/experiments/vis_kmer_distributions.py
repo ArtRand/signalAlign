@@ -7,7 +7,7 @@ sys.path.append("../")
 from signalAlignLib import TemplateModel, ComplementModel
 import string
 import numpy as np
-#from sklearn.neighbors import KernelDensity
+from sklearn.neighbors import KernelDensity
 from scipy.stats import gaussian_kde
 from scipy.stats import norm
 

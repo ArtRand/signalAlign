@@ -161,8 +161,10 @@ class CallMethylation(object):
             "template": self.template_calls.count(self.label),
             "complement": self.complement_calls.count(self.label)
         }
-        template_acc = self.template_calls.count(self.label) / len(self.template_calls)
-        complement_acc = self.complement_calls.count(self.label) / len(self.complement_calls)
+        template_acc = self.template_calls.count(self.label) / \
+                       len(self.template_calls) if len(self.template_calls) > 0 else 0
+        complement_acc = self.complement_calls.count(self.label) / \
+                         len(self.complement_calls) if len(self.complement_calls) > 0 else 0
         file_name = self.alignment_file.split("/")[-1]
         print("{file}\t{t}\t{c}".format(t=template_acc, c=complement_acc, file=file_name), file=sys.stderr)
         return correct_calls
