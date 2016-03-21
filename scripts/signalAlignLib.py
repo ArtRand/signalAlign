@@ -1026,17 +1026,19 @@ class ContinuousPairHmm(SignalHmm):
 
         # line 0: smType stateNumber, symbolSetSize
         line = map(float, fH.readline().split())
-        assert len(line) == 4, "cpHMM - Got incorrect header {}".format(''.join(line))
-        assert line[0] == 2
-        assert line[1] == self.state_number
-        assert line[2] == self.symbol_set_size
+        if len(line) != 4:
+            print("cpHMM: check_file - bad file (param line): {}".format(expectations_file), file=sys.stderr)
+            return
+        if line[0] != 2 or line[1] != self.state_number or line[2] != self.symbol_set_size:
+            print("cpHMM: check_file - bad file (Hmm params): {}".format(expectations_file), file=sys.stderr)
+            return
 
         # line 1: transitions, likelihood
         line = map(float, fH.readline().split())
 
-        # check if valid file
+        # check if valid
         if len(line) != (len(self.transitions) + 1):
-            print("add_expectations_file: - problem with file {}".format(expectations_file), file=sys.stdout)
+            print("cpHMM: check_file - bad file (transitions expectations): {}".format(expectations_file), file=sys.stderr)
             return
 
         self.likelihood += line[-1]
@@ -1044,21 +1046,32 @@ class ContinuousPairHmm(SignalHmm):
 
         # line 2: event model
         line = map(float, fH.readline().split())
-        assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, "Bad model"
+        if len(line) != self.symbol_set_size * NORM_DIST_PARAMS:
+            print("cpHMM: check_file - bad file (event model): {}".format(expectations_file), file=sys.stderr)
+            return
 
         # line 3 event expectations [E_mean, E_sd]
         line = map(float, fH.readline().split())
-        assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, "Bad expectations line"
+        if len(line) != self.symbol_set_size * NORM_DIST_PARAMS:
+            print("cpHMM: check_file - bad file (event expectations): {}".format(expectations_file), file=sys.stderr)
+            return
+
         self.mean_expectations = [i + j for i, j in izip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
         self.sd_expectations = [i + j for i, j in izip(self.sd_expectations, line[1::NORM_DIST_PARAMS])]
 
         # line 4, posteriors
         line = map(float, fH.readline().split())
-        assert len(line) == self.symbol_set_size, "Bad posteriors line"
+        if len(line) != self.symbol_set_size:
+            print("cpHMM: check_file - bad file (posteriors): {}".format(expectations_file), file=sys.stderr)
+            return
+
         self.posteriors = map(lambda x: sum(x), zip(self.posteriors, line))
 
         line = map(bool, fH.readline().split())
-        assert len(line) == self.symbol_set_size, "Bad observation line"
+        if len(line) != self.symbol_set_size:
+            print("cpHMM: check_file - bad file (observations): {}".format(expectations_file), file=sys.stderr)
+            return
+
         self.observed = [any(b) for b in zip(self.observed, line)]
 
         fH.close()

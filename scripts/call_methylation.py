@@ -10,38 +10,37 @@ from serviceCourse.parsers import read_fasta
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
+
 def parse_args():
     parser = ArgumentParser(description=__doc__)
 
     # query files
-    parser.add_argument('--C_alignments', '-C', action='store',
-                        dest='C_alns', required=False, type=str, default=None,
-                        help="C files")
-    parser.add_argument('--mC_alignments', '-mC', action='store',
-                        dest='mC_alns', required=False, type=str, default=None,
-                        help="mC files")
-    parser.add_argument('--hmC_alignments', '-hmC', action='store',
-                        dest='hmC_alns', required=False, type=str, default=None,
-                        help="hmC files")
+    parser.add_argument('--input', '-i', action='store',
+                        dest='in_files', required=False, type=str, default=None,
+                        help="files, with file-suffix")
     parser.add_argument('--ref', '-r', required=True, action='store', type=str, dest='ref',
                         help="path to fasta reference file")
     parser.add_argument('-n', required=False, action='store', type=int, dest='n', default=100,
                         help='Max number of alignments from each category to look at')
-    #parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out_file')
+    parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
+                        default=4, type=int, help="number of jobs to run concurrently")
+    parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out')
 
     return parser.parse_args()
 
 
 def randomly_select_alignments(path_to_alignments, max):
-    if path_to_alignments is None:
-        return None
+    alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
+    if len(alignments) == 0:
+        print("[error] Didn't find any alignment files here {}".format(path_to_alignments))
+        sys.exit(1)
+
+    shuffle(alignments)
+
+    if len(alignments) < max:
+        return alignments
     else:
-        alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
-        shuffle(alignments)
-        if len(alignments) < max:
-            return alignments
-        else:
-            return alignments[:max]
+        return alignments[:max]
 
 
 def get_forward_mask(list_of_alignments):
@@ -68,54 +67,60 @@ def get_reference_sequence(path_to_fasta):
     return seqs[0]
 
 
-def get_alignments_labels_and_mask(path_to_alignments, label, max):
-    if path_to_alignments is None:
-        return [], [], []
-    else:
-        alignments = randomly_select_alignments(path_to_alignments, max)
-        labels = [label] * len(alignments)
-        mask = get_forward_mask(alignments)
-        return alignments, labels, mask
+def get_alignments_labels_and_mask(path_to_alignments, max):
+    alignments = randomly_select_alignments(path_to_alignments, max)
+    mask = get_forward_mask(alignments)
+    return alignments, mask
+
+
+def run_methyl_caller(work_queue, done_queue):
+    try:
+        for f in iter(work_queue.get, 'STOP'):
+            c = CallMethylation(**f)
+            c.write()
+    except Exception, e:
+        done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
 def main(args):
     args = parse_args()
     reference_sequence = get_reference_sequence(args.ref)
 
-    C_alns, C_labels, C_mask = get_alignments_labels_and_mask(args.C_alns, "C", args.n)
-    mC_alns, mC_labels, mC_mask = get_alignments_labels_and_mask(args.mC_alns, "E", args.n)
-    hmC_alns, hmC_labels, hmC_mask = get_alignments_labels_and_mask(args.hmC_alns, "O", args.n)
+    alns, forward_mask = get_alignments_labels_and_mask(args.in_files, args.n)
 
-    all_alignments = C_alns + mC_alns + hmC_alns
-    all_labels = C_labels + mC_labels + hmC_labels
-    all_masks = C_mask + mC_mask + hmC_mask
+    out_file = args.out
 
-    correct_template_calls = 0
-    correct_complement_calls = 0
-    total_template_calls = 0
-    total_complement_calls = 0
+    workers = args.nb_jobs
+    work_queue = Manager().Queue()
+    done_queue = Manager().Queue()
+    jobs = []
 
-    for aln, label, forward_bool in zip(all_alignments, all_labels, all_masks):
+    for aln, forward_bool in zip(alns, forward_mask):
         call_methyl_args = {
             "sequence": reference_sequence,
             "alignment_file": aln,
             "forward": forward_bool,
-            "test": True,
-            "label": label
+            "out_file": out_file,
         }
-        c = CallMethylation(**call_methyl_args)
-        correct_calls = c.test()
-        correct_template_calls += correct_calls["template"]
-        correct_complement_calls += correct_calls["complement"]
-        total_template_calls += len(c.template_calls)
-        total_complement_calls += len(c.complement_calls)
+        work_queue.put(call_methyl_args)
+        #c = CallMethylation(**call_methyl_args)
+        #correct_calls = c.test()
+        #c.write(out_file=out_file)
+        #correct_template_calls += correct_calls["template"]
+        #correct_complement_calls += correct_calls["complement"]
+        #total_template_calls += len(c.template_calls)
+        #total_complement_calls += len(c.complement_calls)
 
-    template_accuracy = correct_template_calls / total_template_calls * 100
-    complement_accuracy = correct_complement_calls / total_complement_calls * 100
-    print("Template accuracy {t} Complement accuracy {c} {nt} template cytosines tested "
-          "{nc} complement cytosines tested".format(t=template_accuracy, c=complement_accuracy,
-                                                    nt=total_template_calls, nc=total_complement_calls),
-          file=sys.stdout)
+    for w in xrange(workers):
+        p = Process(target=run_methyl_caller, args=(work_queue, done_queue))
+        p.start()
+        jobs.append(p)
+        work_queue.put('STOP')
+
+    for p in jobs:
+        p.join()
+
+    done_queue.put('STOP')
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

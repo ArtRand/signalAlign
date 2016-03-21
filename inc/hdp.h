@@ -28,6 +28,9 @@ void finalize_hdp_structure(HierarchicalDirichletProcess* hdp);
 
 // data management
 
+double dir_proc_expected_val(HierarchicalDirichletProcess* hdp, int64_t dp_id);
+double dir_proc_variance(HierarchicalDirichletProcess* hdp, int64_t dp_id);
+
 void pass_data_to_hdp(HierarchicalDirichletProcess* hdp, double* data, int64_t* dp_id, int64_t length);
 
 void reset_hdp_data(HierarchicalDirichletProcess* hdp);

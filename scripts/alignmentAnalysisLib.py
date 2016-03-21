@@ -81,14 +81,16 @@ class KmerHistogram(object):
 
 
 class CallMethylation(object):
-    def __init__(self, sequence, alignment_file, forward, label=None, test=False):
+    def __init__(self, sequence, alignment_file, forward, label=None, out_file=None):
         self.sequence = sequence
         self.forward = forward
         self.alignment_file = alignment_file
         self.data = None
+        self.probs = []
         self.template_calls = []
         self.complement_calls = []
         self.parse_alignment()
+        self.out_file = out_file
         if label is not None:
             self.label = label
 
@@ -119,7 +121,7 @@ class CallMethylation(object):
         template_sites = self.find_occurences("C") if self.forward is True else self.find_occurences("G")
         complement_sites = self.find_occurences("G") if self.forward is True else self.find_occurences("C")
 
-        def get_calls(sites, call_bin, strand, regular_offset):
+        def get_calls(sites, strand, regular_offset):
             for site in sites:
                 # get the positions that an event can be aligned to and still report of this site
                 positions = self.get_range(site)
@@ -132,7 +134,7 @@ class CallMethylation(object):
                 if select.empty:
                     continue
 
-                probs = {
+                site_probs = {
                     "C": 0,
                     "E": 0,
                     "O": 0,
@@ -141,22 +143,28 @@ class CallMethylation(object):
                 for r in select.itertuples():
                     offset = site - r[1] if regular_offset is True else 5 - (site - r[1])
                     call = r[5][offset]
-                    probs[call] += r[4]
+                    site_probs[call] += r[4]
 
-                total_prob = sum(probs.values())
+                total_prob = sum(site_probs.values())
 
-                for call in probs:
-                    probs[call] /= total_prob
+                for call in site_probs:
+                    site_probs[call] /= total_prob
 
-                call_bin.append(max(probs, key=probs.get))
+                self.probs.append((strand, site, site_probs))
 
         template_offset = True if self.forward is True else False
         complement_offset = False if self.forward is True else True
-        get_calls(template_sites, self.template_calls, 't', template_offset)
-        get_calls(complement_sites, self.complement_calls, 'c', complement_offset)
+        get_calls(template_sites, 't', template_offset)
+        get_calls(complement_sites, 'c', complement_offset)
 
     def test(self):
         self.call_methyls()
+        for strand, site, prob in self.probs:
+            if strand == 't':
+                self.template_calls.append(max(prob, key=prob.get))
+            else:
+                self.complement_calls.append(max(prob, key=prob.get))
+
         correct_calls = {
             "template": self.template_calls.count(self.label),
             "complement": self.complement_calls.count(self.label)
@@ -168,3 +176,15 @@ class CallMethylation(object):
         file_name = self.alignment_file.split("/")[-1]
         print("{file}\t{t}\t{c}".format(t=template_acc, c=complement_acc, file=file_name), file=sys.stderr)
         return correct_calls
+
+    def write(self, out_file=None):
+        self.call_methyls()
+        fH = open(out_file, 'a') if self.out_file is None else open(self.out_file, 'a')
+
+        file_name = self.alignment_file.split("/")[-1]
+
+        for strand, site, prob in self.probs:
+            line = "{site}\t{strand}\t{c}\t{mc}\t{hmc}\t{read}\n"
+            fH.write(line.format(site=site, strand=strand,
+                                 c=prob["C"], mc=prob["E"], hmc=prob["O"],
+                                 read=file_name))

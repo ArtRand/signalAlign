@@ -2763,6 +2763,38 @@ DistributionMetricMemo* new_shannon_jensen_distance_memo(HierarchicalDirichletPr
     return new_distr_metric_memo(hdp, &dir_proc_shannon_jensen_distance);
 }
 
+double dir_proc_expected_val(HierarchicalDirichletProcess* hdp, int64_t dp_id) {
+    double* grid = hdp->sampling_grid;
+    int64_t grid_length = hdp->grid_length;
+    double* distr = hdp->dps[dp_id]->posterior_predictive;
+
+    double expected_val = 0.0;
+    double dx;
+    for (int64_t i = 1; i < grid_length; i++) {
+        dx = grid[i] - grid[i - 1];
+        expected_val += grid[i] * distr[i] * dx;
+    }
+    return expected_val;
+}
+
+double dir_proc_variance(HierarchicalDirichletProcess* hdp, int64_t dp_id) {
+    double* grid = hdp->sampling_grid;
+    int64_t grid_length = hdp->grid_length;
+    double* distr = hdp->dps[dp_id]->posterior_predictive;
+
+    double expected_val = dir_proc_expected_val(hdp, dp_id);
+    double variance = 0.0;
+    double dev;
+    double dx;
+    for (int64_t i = 1; i < grid_length; i++) {
+        dx = grid[i] - grid[i-1];
+        dev = grid[i] - expected_val;
+        variance += dev * dev * distr[i] * dx;;
+    }
+    return variance;
+}
+
+
 double compare_hdp_distrs(HierarchicalDirichletProcess* hdp_1, int64_t dp_id_1, // this HDP is the master for grid samples
                           HierarchicalDirichletProcess* hdp_2, int64_t dp_id_2,
                           double (*dist_func)(double*, double*, double*, int64_t)) {

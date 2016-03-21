@@ -691,8 +691,8 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
 
     // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    //CuAssertTrue(testCase, stList_length(alignedPairs) == 2876);
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 1107);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -968,7 +968,7 @@ static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     double fakeMeans[3] = { 65.0, 64.0, 63.0 };
 
     for (int64_t a = 0; a < 3; a++) {
-        hdpHmm->addToAssignments((Hmm *)hdpHmm, sequence + (a * KMER_LENGTH), fakeMeans + a);
+        hdpHmm->addToAssignments(hdpHmm, sequence + (a * KMER_LENGTH), fakeMeans + a);
     }
 
     CuAssertTrue(testCase, hdpHmm->numberOfAssignments == 3);
@@ -1150,13 +1150,17 @@ static void test_hdpHmm_em(CuTest *testCase) {
     char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
     char *alignmentFile = stString_print("../../signalAlign/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
-    NanoporeHDP *nHdp = flat_hdp_model("ACEGOT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
-                                       5.0, 0.5, // base_gamma, leaf_gamma
-                                       0.0, 100.0, 100, modelFile);
-    update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
+    NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
+    execute_nhdp_gibbs_sampling(nHdp, 500, 10000, 100, TRUE);
+    //finalize_nhdp_distributions(nHdp);
+    //NanoporeHDP *nHdp = flat_hdp_model("ACEGOT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+    //                                   5.0, 0.5, // base_gamma, leaf_gamma
+    //                                   0.0, 100.0, 100, modelFile);
+    //update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
 
     // make statemachine
-    StateMachine *sMt = getHdpStateMachine3(nHdp, modelFile);
+    //StateMachine *sMt = getHdpStateMachine3(nHdp, modelFile);
+    StateMachine *sMt = getHdpMachine(nHdp, modelFile, npRead->templateParams);
 
     // load (random) transitions into stateMachine
     continuousPairHmm_loadEmissionsIntoStateMachine(sMt, hdpHmm);
@@ -1165,6 +1169,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
     hdpHmm_destruct(hdpHmm);
 
     for (int64_t iter = 0; iter < 10; iter++) {
+        st_uglyf("at start of iteration %lld\n", iter);
         Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold);
         // E step
         // get anchors using lastz
@@ -1179,8 +1184,6 @@ static void test_hdpHmm_em(CuTest *testCase) {
                                                sequence_sliceNucleotideSequence2, kmer);
         Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
                                                     sequence_sliceEventSequence2, event);
-        execute_nhdp_gibbs_sampling(nHdp, 1000, 10000, 100, FALSE);
-        finalize_nhdp_distributions(nHdp);
 
         getExpectationsUsingAnchors(sMt, hmmExpectations, refSeq, templateSeq, filteredRemappedAnchors,
                                     p, diagonalCalculation_Expectations, 0, 0);
@@ -1188,7 +1191,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
         // norm
         //continuousPairHmm_normalize(hmmExpectations);
         hmmDiscrete_normalizeTransitions(hmmExpectations);
-
+        st_uglyf("normalized transitions\n");
         st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
 
         // M step
@@ -1245,6 +1248,7 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
+
     //SUITE_ADD_TEST(suite, test_hdpHmm_em);
 
     return suite;

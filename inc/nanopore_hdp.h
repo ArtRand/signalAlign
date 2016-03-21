@@ -78,6 +78,9 @@ double compare_nhdp_distrs_shannon_jensen_distance(NanoporeHDP* nhdp_1, char* km
 double compare_nhdp_distrs_hellinger_distance(NanoporeHDP* nhdp_1, char* kmer_1,
                                               NanoporeHDP* nhdp_2, char* kmer_2);
 
+double kmer_distr_expected_val(NanoporeHDP* nhdp, char* kmer);
+
+double kmer_distr_variance(NanoporeHDP* nhdp, char* kmer);
 
 // single level HDP
 NanoporeHDP* flat_hdp_model(const char* alphabet, int64_t alphabet_size, int64_t kmer_length, double base_gamma,
@@ -124,6 +127,17 @@ NanoporeHDP* middle_2_nts_hdp_model_2(const char* alphabet, int64_t alphabet_siz
                                       double middle_gamma_beta, double leaf_gamma_alpha, double leaf_gamma_beta,
                                       double sampling_grid_start, double sampling_grid_stop,
                                       int64_t sampling_grid_length, const char* model_filepath);
+
+// second level of HDP based on multiset of nucleotide groups, groups must be indexed consecutively starting at 0
+NanoporeHDP* group_multiset_hdp_model(const char* alphabet, int64_t* char_groups, int64_t alphabet_size, int64_t kmer_length,
+                                      double base_gamma, double middle_gamma, double leaf_gamma,
+                                      double sampling_grid_start, double sampling_grid_stop, int64_t sampling_grid_length,
+                                      const char* model_filepath);
+NanoporeHDP* group_multiset_hdp_model_2(const char* alphabet, int64_t* char_groups, int64_t alphabet_size, int64_t kmer_length,
+                                        double base_gamma_alpha, double base_gamma_beta, double middle_gamma_alpha,
+                                        double middle_gamma_beta, double leaf_gamma_alpha, double leaf_gamma_beta,
+                                        double sampling_grid_start, double sampling_grid_stop, int64_t sampling_grid_length,
+                                        const char* model_filepath);
 
 
 void serialize_nhdp(NanoporeHDP* nhdp, const char* filepath);
