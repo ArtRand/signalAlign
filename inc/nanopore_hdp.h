@@ -26,6 +26,12 @@ typedef enum _nanoporeHdpType {
     singleLevelPrior = 1,
     multisetFixed = 2,
     multisetPrior = 3,
+    compFixed = 4,
+    compPrior = 5,
+    middleNtsFixed = 6,
+    middleNtsPrior = 7,
+    groupMultisetFixed = 8,
+    groupMultisetPrior = 9,
 } NanoporeHdpType;
 
 typedef struct _nanoporeDistributionMetricMemo {
@@ -147,7 +153,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
                                                const char *templateModelFile, const char* complementModelFile,
                                                const char *alignments,
                                                const char *templateHDP, const char *complementHDP,
-                                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbsose,
+                                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose,
                                                double baseGamma, double middleGamma, double leafGamma,
                                                double baseGammaAlpha, double baseGammaBeta,
                                                double middleGammaAlpha, double middleGammaBeta,

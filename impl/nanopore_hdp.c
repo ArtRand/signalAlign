@@ -765,6 +765,38 @@ void confirm_valid_groupings(int64_t* char_groups, int64_t alphabet_size) {
     }
 }
 
+int64_t* alphabet_sort_groups(const char* alphabet, int64_t* char_groups, int64_t alphabet_size) {
+    char* aux_alphabet = (char*) malloc(sizeof(char) * alphabet_size);
+    int64_t* sorted_char_groups = (int64_t*) malloc(sizeof(int64_t) * alphabet_size);
+
+    for (int64_t i = 0; i < alphabet_size; i++) {
+        aux_alphabet[i] = alphabet[i];
+        sorted_char_groups[i] = char_groups[i];
+    }
+
+    int64_t temp_group;
+    char temp_char;
+    int64_t min_idx;
+    for (int64_t i = 0; i < alphabet_size; i++) {
+        min_idx = i;
+        for (int64_t j = i + 1; j < alphabet_size; j++) {
+            if (aux_alphabet[j] < aux_alphabet[min_idx]) {
+                min_idx = j;
+            }
+        }
+        temp_char = aux_alphabet[i];
+        aux_alphabet[i] = aux_alphabet[min_idx];
+        aux_alphabet[min_idx] = temp_char;
+
+        temp_group = sorted_char_groups[i];
+        sorted_char_groups[i] = sorted_char_groups[min_idx];
+        sorted_char_groups[min_idx] = temp_group;
+    }
+
+    free(aux_alphabet);
+    return sorted_char_groups;
+}
+
 // assumes char_groups are 0-based and consecutively numbered
 NanoporeHDP* group_multiset_hdp_model(const char* alphabet, int64_t* char_groups, int64_t alphabet_size, int64_t kmer_length,
                                       double base_gamma, double middle_gamma, double leaf_gamma,
@@ -784,7 +816,9 @@ NanoporeHDP* group_multiset_hdp_model(const char* alphabet, int64_t* char_groups
                                                    sampling_grid_stop, sampling_grid_length,
                                                    model_filepath);
 
-    group_multiset_hdp_model_internal(hdp, char_groups, alphabet_size, kmer_length);
+    int64_t* sorted_char_groups = alphabet_sort_groups(alphabet, char_groups, alphabet_size);
+    group_multiset_hdp_model_internal(hdp, sorted_char_groups, alphabet_size, kmer_length);
+    free(sorted_char_groups);
 
     finalize_hdp_structure(hdp);
 
@@ -802,28 +836,30 @@ NanoporeHDP* group_multiset_hdp_model_2(const char* alphabet, int64_t* char_grou
 
     confirm_valid_groupings(char_groups, alphabet_size);
 
-    double* gamma_alpha = (double*) malloc(sizeof(double) * 3);
+    double *gamma_alpha = (double *) malloc(sizeof(double) * 3);
     gamma_alpha[0] = base_gamma_alpha;
     gamma_alpha[1] = middle_gamma_alpha;
     gamma_alpha[2] = leaf_gamma_alpha;
 
 
-    double* gamma_beta = (double*) malloc(sizeof(double) * 3);
+    double *gamma_beta = (double *) malloc(sizeof(double) * 3);
     gamma_beta[0] = base_gamma_beta;
     gamma_beta[1] = middle_gamma_beta;
     gamma_beta[2] = leaf_gamma_beta;
 
     int64_t num_dps = group_multiset_hdp_num_dps(alphabet_size, char_groups, kmer_length);
 
-    HierarchicalDirichletProcess* hdp = minION_hdp_2(num_dps, 3, gamma_alpha, gamma_beta, sampling_grid_start,
+    HierarchicalDirichletProcess *hdp = minION_hdp_2(num_dps, 3, gamma_alpha, gamma_beta, sampling_grid_start,
                                                      sampling_grid_stop, sampling_grid_length,
                                                      model_filepath);
 
-    group_multiset_hdp_model_internal(hdp, char_groups, alphabet_size, kmer_length);
+    int64_t *sorted_char_groups = alphabet_sort_groups(alphabet, char_groups, alphabet_size);
+    group_multiset_hdp_model_internal(hdp, sorted_char_groups, alphabet_size, kmer_length);
+    free(sorted_char_groups);
 
     finalize_hdp_structure(hdp);
 
-    NanoporeHDP* nhdp = package_nanopore_hdp(hdp, alphabet, alphabet_size, kmer_length);
+    NanoporeHDP *nhdp = package_nanopore_hdp(hdp, alphabet, alphabet_size, kmer_length);
 
     return nhdp;
 }
@@ -1046,6 +1082,25 @@ NanoporeHDP* deserialize_nhdp(const char* filepath) {
     return nhdp;
 }
 
+static void nanoporeHdp_checkTwoLevelPriorHyperParameters(double baseGammaAlpha, double baseGammaBeta,
+                                                          double middleGammaAlpha, double middleGammaBeta,
+                                                          double leafGammaAlpha, double leafGammaBeta) {
+    if ((baseGammaAlpha == NULL_HYPERPARAMETER) || (baseGammaBeta == NULL_HYPERPARAMETER) ||
+        (middleGammaAlpha == NULL_HYPERPARAMETER) || (middleGammaBeta == NULL_HYPERPARAMETER) ||
+        (leafGammaAlpha == NULL_HYPERPARAMETER) || (leafGammaBeta == NULL_HYPERPARAMETER)) {
+        st_errAbort("loadNanoporeHdpFromScratch: You need to provide a alphas and betas for the base, middle, "
+                            "and the leaf distributions for the prior for this NanoporeHdp");
+    }
+}
+
+static void nanoporeHdp_checkTwoLevelFixedParameters(double baseGamma, double middleGamma, double leafGamma) {
+    if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER) ||
+        (middleGamma == NULL_HYPERPARAMETER)) {
+        st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma, middle gamma, and leaf gamma "
+                            "for this NanoporeHdpType\n");
+    }
+}
+
 static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile,
                                                double baseGamma, double middleGamma, double leafGamma,
                                                double baseGammaAlpha, double baseGammaBeta,
@@ -1079,11 +1134,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         return nHdp;
     }
     if (nHdpType == multisetFixed) {
-        if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER) ||
-                (middleGamma == NULL_HYPERPARAMETER)) {
-            st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma, middle gamma, and leaf gamma "
-                                "for this NanoporeHdpType\n");
-        }
+        nanoporeHdp_checkTwoLevelFixedParameters(baseGamma, middleGamma, leafGamma);
 
         NanoporeHDP *nHdp = multiset_hdp_model(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                                baseGamma, middleGamma, leafGamma,
@@ -1092,12 +1143,9 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         return nHdp;
     }
     if (nHdpType == multisetPrior) {
-        if ((baseGammaAlpha == NULL_HYPERPARAMETER) || (baseGammaBeta == NULL_HYPERPARAMETER) ||
-            (middleGammaAlpha == NULL_HYPERPARAMETER) || (middleGammaBeta == NULL_HYPERPARAMETER) ||
-            (leafGammaAlpha == NULL_HYPERPARAMETER) || (leafGammaBeta == NULL_HYPERPARAMETER)) {
-            st_errAbort("loadNanoporeHdpFromScratch: You need to provide a alphas and betas for the base, middle, "
-                                "and the leaf distributions for the prior for this NanoporeHdp");
-        }
+        nanoporeHdp_checkTwoLevelPriorHyperParameters(baseGammaAlpha, baseGammaBeta,
+                                                      middleGammaAlpha, middleGammaBeta,
+                                                      leafGammaAlpha, leafGammaBeta);
 
         NanoporeHDP *nHdp = multiset_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                                  baseGammaAlpha, baseGammaBeta,
@@ -1106,8 +1154,80 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
                                                  samplingGridStart, samplingGridEnd, samplingGridLength,
                                                  modelFile);
         return nHdp;
+    }
+    if (nHdpType == compFixed) {
+        nanoporeHdp_checkTwoLevelFixedParameters(baseGamma, middleGamma, leafGamma);
 
-    } else {
+        NanoporeHDP *nHdp = purine_composition_hdp_model(PURINES, 2, PYRIMIDINES, 4, KMER_LENGTH,
+                                                         baseGamma, middleGamma, leafGamma,
+                                                         samplingGridStart, samplingGridEnd,
+                                                         samplingGridLength, modelFile);
+        return nHdp;
+    }
+    if (nHdpType == compPrior) {
+        nanoporeHdp_checkTwoLevelPriorHyperParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
+                                                      middleGammaBeta, leafGammaAlpha, leafGammaBeta);
+
+        NanoporeHDP *nHdp = purine_composition_hdp_model_2(PURINES, 2, PYRIMIDINES, 4, KMER_LENGTH,
+                                                           baseGammaAlpha, baseGammaBeta,
+                                                           middleGammaAlpha, middleGammaBeta,
+                                                           leafGammaAlpha, leafGammaBeta,
+                                                           samplingGridStart, samplingGridEnd,
+                                                           samplingGridLength, modelFile);
+        return nHdp;
+
+    }
+    if (nHdpType == middleNtsFixed) {
+        nanoporeHdp_checkTwoLevelFixedParameters(baseGamma, middleGamma, leafGamma);
+
+        NanoporeHDP *nHdp = middle_2_nts_hdp_model(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+                                                   baseGamma, middleGamma, leafGamma,
+                                                   samplingGridStart, samplingGridEnd, samplingGridLength,
+                                                   modelFile);
+        return nHdp;
+
+    }
+    if (nHdpType == middleNtsPrior) {
+        nanoporeHdp_checkTwoLevelPriorHyperParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
+                                                      middleGammaBeta, leafGammaAlpha, leafGammaBeta);
+
+        NanoporeHDP *nHdp = middle_2_nts_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+                                                     baseGammaAlpha, baseGammaBeta,
+                                                     middleGammaAlpha, middleGammaBeta,
+                                                     leafGammaAlpha, leafGammaBeta,
+                                                     samplingGridStart, samplingGridEnd, samplingGridLength,
+                                                     modelFile);
+        return nHdp;
+    }
+    if (nHdpType == groupMultisetFixed) {
+        nanoporeHdp_checkTwoLevelFixedParameters(baseGamma, middleGamma, leafGamma);
+        // ACEGOT
+        // {0, 1, 1, 2, 1, 3}
+        int64_t groups[6] = {0, 1, 1, 2, 1, 3};
+
+        NanoporeHDP *nHdp = group_multiset_hdp_model(SIX_LETTER_ALPHA, groups, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+                                                     baseGamma, middleGamma, leafGamma,
+                                                     samplingGridStart, samplingGridEnd, samplingGridLength,
+                                                     modelFile);
+        return nHdp;
+    }
+    if (nHdpType == groupMultisetPrior) {
+        nanoporeHdp_checkTwoLevelPriorHyperParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
+                                                      middleGammaBeta, leafGammaAlpha, leafGammaBeta);
+        // ACEGOT
+        // {0, 1, 1, 2, 1, 3}
+        int64_t groups[6] = {0, 1, 1, 2, 1, 3};
+
+        NanoporeHDP *nHdp = group_multiset_hdp_model_2(SIX_LETTER_ALPHA, groups,
+                                                       SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+                                                       baseGammaAlpha, baseGammaBeta,
+                                                       middleGammaAlpha, middleGammaBeta,
+                                                       leafGammaAlpha, leafGammaBeta,
+                                                       samplingGridStart, samplingGridEnd, samplingGridLength,
+                                                       modelFile);
+        return nHdp;
+    }
+    else {
         fprintf(stderr, "loadNanoporeHdpFromScratch: - error making HDP from scratch\n");
         exit(EXIT_FAILURE);
     }
@@ -1117,7 +1237,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
                                                const char *templateModelFile, const char* complementModelFile,
                                                const char *alignments,
                                                const char *templateHDP, const char *complementHDP,
-                                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbsose,
+                                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose,
                                                double baseGamma, double middleGamma, double leafGamma,
                                                double baseGammaAlpha, double baseGammaBeta,
                                                double middleGammaAlpha, double middleGammaBeta,
@@ -1140,7 +1260,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
         fprintf(stderr, "Running Gibbs for template doing %lld samples, %lld burn in, %lld thinning.\n",
                 nbSamples, burnIn, thinning);
 
-        execute_nhdp_gibbs_sampling(nHdpT, nbSamples, burnIn, thinning, verbsose);
+        execute_nhdp_gibbs_sampling(nHdpT, nbSamples, burnIn, thinning, verbose);
         finalize_nhdp_distributions(nHdpT);
 
         fprintf(stderr, "Serializing template to %s...\n", templateHDP);
@@ -1160,7 +1280,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
 
         fprintf(stderr, "Running Gibbs for complement doing %lld samples, %lld burn in, %lld thinning.\n",
                 nbSamples, burnIn, thinning);
-        execute_nhdp_gibbs_sampling(nHdpC, nbSamples, burnIn, thinning, verbsose);
+        execute_nhdp_gibbs_sampling(nHdpC, nbSamples, burnIn, thinning, verbose);
         finalize_nhdp_distributions(nHdpC);
 
         fprintf(stderr, "Serializing complement to %s...\n", complementHDP);
