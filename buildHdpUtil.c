@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
 
     // option for building from alignment
     if (alignmentsFile != NULL) {
-        if (!((hdpType >= 0) && (hdpType <= 8))) {
+        if (!((hdpType >= 0) && (hdpType <= 10))) {
             st_errAbort("Invalid HDP type");
         }
         NanoporeHdpType type = (NanoporeHdpType) hdpType;
