@@ -71,9 +71,11 @@ class KmerAlignmentHistogram(KmerDistribution):
     def parse_xvals(self, x_vals_file):
         self.x_vals = np.loadtxt(x_vals_file, dtype=np.float64)
 
-    def make_kde(self):
-        kde = KernelDensity(kernel='gaussian', bandwidth=0.75).fit([self.histogram][:100])
-        return kde
+    def make_kde(self, x_vals):
+        kernel = gaussian_kde(self.histogram)
+        KDE_PDF = kernel.evaluate(x_vals)
+        #kde = KernelDensity(kernel='gaussian', bandwidth=0.75).fit([self.histogram][:100])
+        return KDE_PDF
 
 
 class KmerHdpDistribution(KmerDistribution):

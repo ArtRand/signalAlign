@@ -1082,9 +1082,9 @@ NanoporeHDP* deserialize_nhdp(const char* filepath) {
     return nhdp;
 }
 
-static void nanoporeHdp_checkTwoLevelPriorHyperParameters(double baseGammaAlpha, double baseGammaBeta,
-                                                          double middleGammaAlpha, double middleGammaBeta,
-                                                          double leafGammaAlpha, double leafGammaBeta) {
+static void nanoporeHdp_checkThreeLevelPriorParameters(double baseGammaAlpha, double baseGammaBeta,
+                                                       double middleGammaAlpha, double middleGammaBeta,
+                                                       double leafGammaAlpha, double leafGammaBeta) {
     if ((baseGammaAlpha == NULL_HYPERPARAMETER) || (baseGammaBeta == NULL_HYPERPARAMETER) ||
         (middleGammaAlpha == NULL_HYPERPARAMETER) || (middleGammaBeta == NULL_HYPERPARAMETER) ||
         (leafGammaAlpha == NULL_HYPERPARAMETER) || (leafGammaBeta == NULL_HYPERPARAMETER)) {
@@ -1093,13 +1093,23 @@ static void nanoporeHdp_checkTwoLevelPriorHyperParameters(double baseGammaAlpha,
     }
 }
 
-static void nanoporeHdp_checkTwoLevelFixedParameters(double baseGamma, double middleGamma, double leafGamma) {
+static void nanoporeHdp_checkThreeLevelFixedParameters(double baseGamma, double middleGamma, double leafGamma) {
     if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER) ||
         (middleGamma == NULL_HYPERPARAMETER)) {
         st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma, middle gamma, and leaf gamma "
                             "for this NanoporeHdpType\n");
     }
 }
+
+static void nanoporeHdp_checkTwoLevelPriorParameters(double baseGammaAlpha, double baseGammaBeta,
+                                                     double leafGammaAlpha, double leafGammaBeta) {
+    if ((baseGammaAlpha == NULL_HYPERPARAMETER) || (baseGammaBeta == NULL_HYPERPARAMETER) ||
+        (leafGammaAlpha == NULL_HYPERPARAMETER) || (leafGammaBeta == NULL_HYPERPARAMETER)) {
+        st_errAbort("loadNanoporeHdpFromScratch: You need to provide a alphas and betas for the base and the leaf"
+                            "distributions for the prior for this NanoporeHdp");
+    }
+}
+
 
 static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile,
                                                double baseGamma, double middleGamma, double leafGamma,
@@ -1121,11 +1131,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         return nHdp;
     }
     if (nHdpType == singleLevelPrior) {
-        if ((baseGammaAlpha == NULL_HYPERPARAMETER) || (baseGammaBeta == NULL_HYPERPARAMETER) ||
-                (leafGammaAlpha == NULL_HYPERPARAMETER) || (leafGammaBeta == NULL_HYPERPARAMETER)) {
-            st_errAbort("loadNanoporeHdpFromScratch: You need to provide a alphas and betas for the base and the leaf"
-                                "distributions for the prior for this NanoporeHdp");
-        }
+        nanoporeHdp_checkTwoLevelPriorParameters(baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta);
 
         NanoporeHDP *nHdp = flat_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                              baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta,
@@ -1133,8 +1139,16 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
                                              modelFile);
         return nHdp;
     }
+    if (nHdpType == singleLevelPrior2) {
+        nanoporeHdp_checkTwoLevelPriorParameters(baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta);
+        NanoporeHDP *nHdp = flat_hdp_model_2(FIVE_LETTER_ALPHA, SYMBOL_NUMBER, KMER_LENGTH,
+                                             baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta,
+                                             samplingGridStart, samplingGridEnd, samplingGridLength,
+                                             modelFile);
+        return nHdp;
+    }
     if (nHdpType == multisetFixed) {
-        nanoporeHdp_checkTwoLevelFixedParameters(baseGamma, middleGamma, leafGamma);
+        nanoporeHdp_checkThreeLevelFixedParameters(baseGamma, middleGamma, leafGamma);
 
         NanoporeHDP *nHdp = multiset_hdp_model(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                                baseGamma, middleGamma, leafGamma,
@@ -1143,9 +1157,9 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         return nHdp;
     }
     if (nHdpType == multisetPrior) {
-        nanoporeHdp_checkTwoLevelPriorHyperParameters(baseGammaAlpha, baseGammaBeta,
-                                                      middleGammaAlpha, middleGammaBeta,
-                                                      leafGammaAlpha, leafGammaBeta);
+        nanoporeHdp_checkThreeLevelPriorParameters(baseGammaAlpha, baseGammaBeta,
+                                                   middleGammaAlpha, middleGammaBeta,
+                                                   leafGammaAlpha, leafGammaBeta);
 
         NanoporeHDP *nHdp = multiset_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                                  baseGammaAlpha, baseGammaBeta,
@@ -1155,8 +1169,21 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
                                                  modelFile);
         return nHdp;
     }
+    if (nHdpType == multisetPrior2) {
+        nanoporeHdp_checkThreeLevelPriorParameters(baseGammaAlpha, baseGammaBeta,
+                                                   middleGammaAlpha, middleGammaBeta,
+                                                   leafGammaAlpha, leafGammaBeta);
+
+        NanoporeHDP *nHdp = multiset_hdp_model_2(FIVE_LETTER_ALPHA, SYMBOL_NUMBER, KMER_LENGTH,
+                                                 baseGammaAlpha, baseGammaBeta,
+                                                 middleGammaAlpha, middleGammaBeta,
+                                                 leafGammaAlpha, leafGammaBeta,
+                                                 samplingGridStart, samplingGridEnd, samplingGridLength,
+                                                 modelFile);
+        return nHdp;
+    }
     if (nHdpType == compFixed) {
-        nanoporeHdp_checkTwoLevelFixedParameters(baseGamma, middleGamma, leafGamma);
+        nanoporeHdp_checkThreeLevelFixedParameters(baseGamma, middleGamma, leafGamma);
 
         NanoporeHDP *nHdp = purine_composition_hdp_model(PURINES, 2, PYRIMIDINES, 4, KMER_LENGTH,
                                                          baseGamma, middleGamma, leafGamma,
@@ -1165,8 +1192,8 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         return nHdp;
     }
     if (nHdpType == compPrior) {
-        nanoporeHdp_checkTwoLevelPriorHyperParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
-                                                      middleGammaBeta, leafGammaAlpha, leafGammaBeta);
+        nanoporeHdp_checkThreeLevelPriorParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
+                                                   middleGammaBeta, leafGammaAlpha, leafGammaBeta);
 
         NanoporeHDP *nHdp = purine_composition_hdp_model_2(PURINES, 2, PYRIMIDINES, 4, KMER_LENGTH,
                                                            baseGammaAlpha, baseGammaBeta,
@@ -1178,7 +1205,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
 
     }
     if (nHdpType == middleNtsFixed) {
-        nanoporeHdp_checkTwoLevelFixedParameters(baseGamma, middleGamma, leafGamma);
+        nanoporeHdp_checkThreeLevelFixedParameters(baseGamma, middleGamma, leafGamma);
 
         NanoporeHDP *nHdp = middle_2_nts_hdp_model(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                                    baseGamma, middleGamma, leafGamma,
@@ -1188,8 +1215,8 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
 
     }
     if (nHdpType == middleNtsPrior) {
-        nanoporeHdp_checkTwoLevelPriorHyperParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
-                                                      middleGammaBeta, leafGammaAlpha, leafGammaBeta);
+        nanoporeHdp_checkThreeLevelPriorParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
+                                                   middleGammaBeta, leafGammaAlpha, leafGammaBeta);
 
         NanoporeHDP *nHdp = middle_2_nts_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                                      baseGammaAlpha, baseGammaBeta,
@@ -1200,7 +1227,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         return nHdp;
     }
     if (nHdpType == groupMultisetFixed) {
-        nanoporeHdp_checkTwoLevelFixedParameters(baseGamma, middleGamma, leafGamma);
+        nanoporeHdp_checkThreeLevelFixedParameters(baseGamma, middleGamma, leafGamma);
         // ACEGOT
         // {0, 1, 1, 2, 1, 3}
         int64_t groups[6] = {0, 1, 1, 2, 1, 3};
@@ -1212,8 +1239,8 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         return nHdp;
     }
     if (nHdpType == groupMultisetPrior) {
-        nanoporeHdp_checkTwoLevelPriorHyperParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
-                                                      middleGammaBeta, leafGammaAlpha, leafGammaBeta);
+        nanoporeHdp_checkThreeLevelPriorParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
+                                                   middleGammaBeta, leafGammaAlpha, leafGammaBeta);
         // ACEGOT
         // {0, 1, 1, 2, 1, 3}
         int64_t groups[6] = {0, 1, 1, 2, 1, 3};

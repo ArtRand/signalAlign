@@ -123,7 +123,7 @@ class CallMethylation(object):
 
         def get_calls(sites, strand, regular_offset):
             for site in sites:
-                # get the positions that an event can be aligned to and still report of this site
+                # get the positions that an event can be aligned to and still report on this site
                 positions = self.get_range(site)
 
                 # select the rows in the dataFrame that have events aligned to this position

@@ -32,6 +32,8 @@ typedef enum _nanoporeHdpType {
     middleNtsPrior = 7,
     groupMultisetFixed = 8,
     groupMultisetPrior = 9,
+    singleLevelPrior2 = 10,
+    multisetPrior2 = 11,
 } NanoporeHdpType;
 
 typedef struct _nanoporeDistributionMetricMemo {

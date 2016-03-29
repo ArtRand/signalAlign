@@ -95,6 +95,8 @@ def get_hdp_type(requested_type):
             "middleNtsPrior": 7,
             "groupMultisetFixed": 8,
             "groupMultisetPrior": 9,
+            "singleLevelPrior2": 10,
+            "multisetPrior2": 11,
         }
         assert (requested_type in hdp_types.keys()), "Requested HDP type is invalid, got {}".format(requested_type)
         return hdp_types[requested_type]
@@ -135,6 +137,11 @@ HDP_TYPES = [
     ("middleNtsPrior", 7),
     ("groupMultisetFixed", 8),
     ("groupMultisetPrior", 9),
+]
+
+HDP_TYPES_2 = [
+    ("singleLevelPrior2", 10),
+    ("multisetPrior2", 11),
 ]
 
 
@@ -179,7 +186,10 @@ template_lookup_table = "-T " + args.template_lookup if args.template_lookup is 
 complement_lookup_table = "-C " + args.complement_lookup if args.complement_lookup is not None else ""
 verbose_flag = "--verbose " if args.verbose is True else ""
 build_commands = []
-hdp_types = HDP_TYPES[1::2] if args.hdp_type == "Prior" else HDP_TYPES[::2]
+if args.hdp_type == "twoWay":
+    hdp_types = HDP_TYPES_2
+else:
+    hdp_types = HDP_TYPES[1::2] if args.hdp_type == "Prior" else HDP_TYPES[::2]
 for hdp_type, i, in hdp_types:
     template_hdp_location = working_directory + "template." + hdp_type + ".nhdp"
     complement_hdp_location = working_directory + "complement." + hdp_type + ".nhdp"
