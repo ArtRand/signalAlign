@@ -396,7 +396,6 @@ Path *path_construct(char *kmer, int64_t stateNumber) {
     Path *path = st_malloc(sizeof(Path));
     path->kmer = kmer;
     path->stateNumber = stateNumber;
-    //path->cells = st_malloc(sizeof(double) * stateNumber);
     path->cells = st_calloc(stateNumber, sizeof(double));
     return path;
 }

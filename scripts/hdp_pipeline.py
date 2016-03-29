@@ -103,7 +103,8 @@ def get_hdp_type(requested_type):
 
 
 def get_initial_hdp_args(args, hdp_type):
-    if hdp_type % 2 == 0:
+    # if we're making a HDP with fixed concentration parameters
+    if hdp_type in [0, 2, 4, 6, 8]:
         assert None not in [args.base_gamma, args.leaf_gamma], \
             "ERROR: need to specify concentration parameters for type {}".format(hdp_type)
         if hdp_type == 0:
@@ -115,7 +116,7 @@ def get_initial_hdp_args(args, hdp_type):
     else:
         assert None not in [args.base_alpha, args.base_beta, args.leaf_alpha, args.leaf_beta], \
                 "ERROR: missing Gamma prior hyper parameters"
-        if hdp_type == 1:
+        if hdp_type == 1 or hdp_type == 10:
             return "-g {Ba} -r {Bb} -i {La} -u {Lb} ".format(Ba=args.base_alpha, Bb=args.base_beta,
                                                              La=args.leaf_alpha, Lb=args.leaf_beta)
         else:
