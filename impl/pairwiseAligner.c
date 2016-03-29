@@ -512,7 +512,7 @@ HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber) {
         st_errAbort("hdCell_construct: got illegal number of paths: %lld", cell->numberOfPaths);
     }
 
-    cell->paths = (Path **)st_malloc(sizeof(Path *) * cell->numberOfPaths); // todo make this calloc?
+    cell->paths = (Path **)st_malloc(sizeof(Path *) * cell->numberOfPaths);
 
     if (cell->numberOfPaths > 1) {
         stList *methylationPatterns = path_getMehtylPermutations(nbMethylPositions);
@@ -732,7 +732,6 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
     while (xmy <= maxXmy) {
         int64_t x = diagonal_getXCoordinate(xay, xmy);
 
-        //void *k = nucleotideSequence->get(nucleotideSequence->elements, (x - 1));
         void *k = sequence_getKmer4(nucleotideSequence, (x -1));
 
         HDCell *hdCell = hdCell_construct(k, stateNumber);

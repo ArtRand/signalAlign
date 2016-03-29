@@ -183,8 +183,8 @@ pipeline_log.write("[pipeline] NOTICE: Making initial HDP of type {}\n".format(a
 
 initial_hdp_build_out = open(working_directory + "build_initial_hdp.out", 'w')
 initial_hdp_build_err = open(working_directory + "build_initial_hdp.err", 'w')
-template_lookup_table = "-T " + args.template_lookup if args.template_lookup is not None else ""
-complement_lookup_table = "-C " + args.complement_lookup if args.complement_lookup is not None else ""
+template_lookup_table = " -T" + args.template_lookup if args.template_lookup is not None else ""
+complement_lookup_table = " -C" + args.complement_lookup if args.complement_lookup is not None else ""
 verbose_flag = "--verbose " if args.verbose is True else ""
 build_commands = []
 if args.hdp_type == "twoWay":
@@ -208,7 +208,6 @@ for hdp_type, i, in hdp_types:
 
 procs = [Popen(x.split(), stdout=initial_hdp_build_out, stderr=initial_hdp_build_err) for x in build_commands]
 status = [p.wait() for p in procs]
-#check_call(build_initial_hdp_command.split(), stdout=initial_hdp_build_out, stderr=initial_hdp_build_err)
 initial_hdp_build_out.close()
 initial_hdp_build_err.close()
 
