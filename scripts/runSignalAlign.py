@@ -28,7 +28,8 @@ def parse_args():
                         help="input HMM for complement events, if you don't want the default")
     parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None)
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None)
-
+    parser.add_argument('--twoWay', action='store_true', dest='twoWay', default=False,
+                        help="Two way classification")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         required=True, default="threeState", help="decide which model to use, threeState by default")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
@@ -140,6 +141,7 @@ def main(args):
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim,
             "target_regions": target_regions,
+            "twoWay": args.twoWay,
         }
         #alignment = SignalAlignment(**alignment_args)
         #alignment.run()

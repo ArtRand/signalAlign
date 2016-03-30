@@ -234,14 +234,18 @@ stList *performSignalAlignmentP(StateMachine *sM, Sequence *sY, int64_t *eventMa
                                 void (*posteriorProbFcn)(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
                                                          DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
                                                          double totalProbability, PairwiseAlignmentParameters *p,
-                                                         void *extraArgs)) {
+                                                         void *extraArgs),
+                                bool twoWay) {
     int64_t lX = sequence_correctSeqLength(strlen(target), kmer);
 
     // remap anchor pairs
     stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
     // make sequences
-    Sequence *sX = sequence_construct2(lX, target, targetGetFcn, sequence_sliceNucleotideSequence2, kmer);
+    Sequence *sX = sequence_constructReferenceSequence(lX, target, targetGetFcn, sequence_sliceNucleotideSequence2,
+                                                       (twoWay ? TWO_CYTOSINES : THREE_CYTOSINES),
+                                                       (twoWay ? TWO_WAY_CYTOSINE_OPTIONS : NB_CYTOSINE_OPTIONS),
+                                                       kmer);
 
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, sY, filteredRemappedAnchors, p,
@@ -250,15 +254,15 @@ stList *performSignalAlignmentP(StateMachine *sM, Sequence *sY, int64_t *eventMa
 }
 
 stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_t *eventMap,
-                               int64_t mapOffset,
-                               char *target, PairwiseAlignmentParameters *p, stList *unmappedAncors) {
+                               int64_t mapOffset, char *target, PairwiseAlignmentParameters *p,
+                               stList *unmappedAncors, bool twoWay) {
     if ((sM->type != threeState) && (sM->type != threeStateHdp)) {
         st_errAbort("signalAlign - You're trying to do the wrong king of alignment");
     }
 
     stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset, target, p,
                                                    unmappedAncors, sequence_getKmer3,
-                                                   diagonalCalculationPosteriorMatchProbs);
+                                                   diagonalCalculationPosteriorMatchProbs, twoWay);
     return alignedPairs;
 }
 
@@ -327,7 +331,7 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
                            Hmm *hmmExpectations, StateMachineType type,
                            NanoporeReadAdjustmentParameters npp, Sequence *eventSequence,
                            int64_t *eventMap, int64_t mapOffset, char *trainingTarget, PairwiseAlignmentParameters *p,
-                           stList *unmappedAnchors, Strand strand) {
+                           stList *unmappedAnchors, Strand strand, bool twoWay) {
     // load match model, build stateMachine
     StateMachine *sM = buildStateMachine(model, npp, type, strand, nHdp);
 
@@ -345,8 +349,12 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
     // remap the anchors
     stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
-    Sequence *target = sequence_construct2(lX, trainingTarget, sequence_getKmer3,
-                                           sequence_sliceNucleotideSequence2, kmer);
+    Sequence *target = sequence_constructReferenceSequence(lX, trainingTarget,
+                                                           sequence_getKmer3, sequence_sliceNucleotideSequence2,
+                                                           (twoWay ? TWO_CYTOSINES : THREE_CYTOSINES),
+                                                           (twoWay ? TWO_WAY_CYTOSINE_OPTIONS : NB_CYTOSINE_OPTIONS),
+                                                           kmer);
+
     getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
                                 diagonalCalculation_Expectations, 1, 1);
 
@@ -356,7 +364,6 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
 int main(int argc, char *argv[]) {
     StateMachineType sMtype = threeState;
     // HDP stuff
-
     int64_t j = 0;
     int64_t diagExpansion = 50;
     double threshold = 0.01;
@@ -375,12 +382,14 @@ int main(int argc, char *argv[]) {
     char *complementHdp = NULL;
     char *cytosine_substitute = NULL;
     bool sparseOutput = FALSE;
+    bool twoWay = FALSE;
 
     int key;
     while (1) {
         static struct option long_options[] = {
                 {"help",                    no_argument,        0,  'h'},
                 {"sm3Hdp",                  no_argument,        0,  'd'},
+                {"twoWay",                  no_argument,        0,  'o'},
                 {"sparse_output",           no_argument,        0,  's'},
                 {"substitute",              required_argument,  0,  'M'},
                 {"templateModel",           required_argument,  0,  'T'},
@@ -402,7 +411,7 @@ int main(int argc, char *argv[]) {
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "hsdU:p:M:a:T:C:L:q:r:u:y:z:v:w:t:c:x:D:m:",
+        key = getopt_long(argc, argv, "h:osd:p:M:a:T:C:L:q:r:u:y:z:v:w:t:c:x:D:m:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -415,6 +424,9 @@ int main(int argc, char *argv[]) {
                 return 1;
             case 's':
                 sparseOutput = TRUE;
+                break;
+            case 'o':
+                twoWay = TRUE;
                 break;
             case 'd':
                 sMtype = threeStateHdp;
@@ -487,7 +499,7 @@ int main(int argc, char *argv[]) {
     if (sMtype == threeStateHdp) {
         fprintf(stderr, "signalAlign - using three-state HMM-HDP model\n");
     }
-
+    
     NanoporeHDP *nHdpT, *nHdpC;
 
     #pragma omp parallel sections
@@ -518,12 +530,6 @@ int main(int argc, char *argv[]) {
 
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
-
-    // descale events if using hdp
-    //if (sMtype == threeStateHdp) {
-    //    fprintf(stderr, "signalAlign - descaling Nanopore Events\n");
-    //    nanopore_descaleNanoporeRead(npRead);
-    //}
 
     // make some params
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -595,7 +601,7 @@ int main(int argc, char *argv[]) {
         getSignalExpectations(templateModelFile, templateHmmFile, nHdpT,
                               templateExpectations, sMtype, npRead->templateParams,
                               tEventSequence, npRead->templateEventMap, pA->start2, templateTargetSeq, p,
-                              anchorPairs, template);
+                              anchorPairs, template, twoWay);
 
         if (sMtype == threeStateHdp) {
             fprintf(stderr, "signalAlign - got %lld template HDP assignments\n",
@@ -612,7 +618,7 @@ int main(int argc, char *argv[]) {
         getSignalExpectations(complementModelFile, complementHmmFile, nHdpC,
                               complementExpectations, sMtype,
                               npRead->complementParams, cEventSequence, npRead->complementEventMap, pA->start2,
-                              complementTargetSeq, p, anchorPairs, complement);
+                              complementTargetSeq, p, anchorPairs, complement, twoWay);
 
         if (sMtype == threeStateHdp) {
             fprintf(stderr, "signalAlign - got %lld complement HDP assignments\n",
@@ -657,7 +663,7 @@ int main(int argc, char *argv[]) {
         }
         // get aligned pairs
         templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
-                                                      pA->start2, templateTargetSeq, p, anchorPairs);
+                                                      pA->start2, templateTargetSeq, p, anchorPairs, twoWay);
 
         templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
@@ -687,7 +693,7 @@ int main(int argc, char *argv[]) {
         // get aligned pairs
         complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
                                                         npRead->complementEventMap, pA->start2,
-                                                        complementTargetSeq, p, anchorPairs);
+                                                        complementTargetSeq, p, anchorPairs, twoWay);
 
         complementPosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(complementAlignedPairs);
 

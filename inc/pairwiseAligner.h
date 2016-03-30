@@ -26,7 +26,9 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 #define PAIR_ALIGNMENT_PROB_1 10000000
 #define CYTOSINE_METHYL_AMBIG "X"
 #define NB_CYTOSINE_OPTIONS 3
-#define CYTOSINES "CEO"
+#define THREE_CYTOSINES "CEO"
+#define TWO_CYTOSINES "CE"
+#define TWO_WAY_CYTOSINE_OPTIONS 2
 #define KMER_LENGTH 6
 #define NUM_OF_KMERS 46656
 
@@ -43,30 +45,27 @@ struct _sequence {
     int64_t length;
     SequenceType type;
     void *elements;
+    char *cytosines;
+    int64_t nbCytosineOptions;
     void *(*get)(void *elements, int64_t index);
     Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t);
 };
 
-/*
- * Sequence constructor function
- * stringLength should be the length of the sequence in bases ie ATGAC has
- * length 5.  *elements is a pointer to the char array, typically.  The
- * SequenceType is 0-nucleotide, 1-kmer, 2-event
-*/
 Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t), SequenceType type);
 
 Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
                               Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t), SequenceType type);
 
+Sequence *sequence_constructReferenceSequence(int64_t length, void *elements,
+                                              void *(*getFcn)(void *, int64_t),
+                                              Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                                              char *cytosines, int64_t nbCytosines, SequenceType type);
+
 void sequence_padSequence(Sequence *sequence);
 
 //slice a sequence object
-Sequence *sequence_sliceNucleotideSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
-                                           void *(*getFcn)(void *, int64_t));
 Sequence *sequence_sliceNucleotideSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength);
 
-Sequence *sequence_sliceEventSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
-                                      void *(*getFcn)(void *, int64_t));
 Sequence *sequence_sliceEventSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength);
 
 void sequence_sequenceDestroy(Sequence *seq);
@@ -78,9 +77,8 @@ void *sequence_getKmer(void *elements, int64_t index);
 // get the kmer at index and the previous kmer
 void *sequence_getKmer2(void *elements, int64_t index);
 
-// for HDP, different 'NULL'
 void *sequence_getKmer3(void *elements, int64_t index);
-
+// for HDP, different 'NULL'
 void *sequence_getKmer4(Sequence *sequence, int64_t index);
 
 void *sequence_getEvent(void *elements, int64_t index);
@@ -216,7 +214,7 @@ bool path_checkLegal(Path *path1, Path *path2);
 
 stList *path_findPotentialMethylation(char *kmer);
 
-stList *path_getMehtylPermutations(int64_t methylPositions);
+stList *path_getMehtylPermutations(int64_t methylPositions, int64_t nbCytosines, char *cytosines);
 
 double *path_getCell(Path *path);
 
@@ -233,7 +231,7 @@ typedef struct _hdcell {
     bool init;
 } HDCell;
 
-HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber);
+HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbCytosines, char *cytosines);
 
 double hdCell_totalProbability(HDCell *cell1, HDCell *cell2);
 
@@ -316,11 +314,6 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                                             DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
                                             double totalProbability, PairwiseAlignmentParameters *p,
                                             void *extraArgs);
-
-void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
-                                                 DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
-                                                 double totalProbability, PairwiseAlignmentParameters *p,
-                                                 void *extraArgs);
 
 void diagonalCalculationExpectations(StateMachine *sM, int64_t xay,
                                      DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,

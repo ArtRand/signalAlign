@@ -765,7 +765,7 @@ class ComplementModel(NanoporeModel):
 class SignalAlignment(object):
     def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
                  in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
-                 threshold, diagonal_expansion, constraint_trim,
+                 threshold, diagonal_expansion, constraint_trim, twoWay,
                  target_regions=None, cytosine_substitution=None, sparse_output=False):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.reference = reference  # reference sequence
@@ -779,6 +779,7 @@ class SignalAlignment(object):
         self.target_regions = target_regions
         self.cytosine_substitution = cytosine_substitution
         self.sparse_output = sparse_output
+        self.twoWayClassification = twoWay
 
         # if we're using an input hmm, make sure it exists
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -837,7 +838,7 @@ class SignalAlignment(object):
             stateMachineType_flag = ""
         elif self.stateMachineType == "threeStateHdp":
             model_label = ".sm3Hdp"
-            stateMachineType_flag = "-d "
+            stateMachineType_flag = "--sm3Hdp "
             assert (self.in_templateHdp is not None) and (self.in_complementHdp is not None), "Need to provide HDPs"
         else:
             model_label = ".sm"
@@ -931,9 +932,15 @@ class SignalAlignment(object):
 
         # sparse output
         if self.sparse_output is True:
-            sparse_flag = "-s "
+            sparse_flag = "--sparse_output "
         else:
             sparse_flag = ""
+
+        # twoWay classification vs threeWay
+        if self.twoWayClassification is True:
+            twoWay_flag = "--twoWay "
+        else:
+            twoWay_flag = ""
 
         # commands
         if get_expectations:
@@ -952,13 +959,13 @@ class SignalAlignment(object):
                         trim=trim_flag, cytosine=cytosine_flag)
         else:
             command = \
-                "echo {cigar} | {vA} {sparse}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
+                "echo {cigar} | {vA} {twoWay}{sparse}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
                 "{expansion}{trim} -u {posteriors} {hdp}-L {readLabel} {cytosine}"\
                 .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, sparse=sparse_flag,
                         ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
                         t_model=template_model_flag, c_model=complement_model_flag, c_hmm=complement_hmm_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag, cytosine=cytosine_flag, hdp=hdp_flags)
+                        trim=trim_flag, cytosine=cytosine_flag, hdp=hdp_flags, twoWay=twoWay_flag)
 
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)

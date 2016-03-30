@@ -21,12 +21,16 @@ Sequence *makeTestKmerSequence() {
     char *s = "ATGXAXA"; // has 2 6mers
     int64_t lX = sequence_correctSeqLength(strlen(s), kmer);
     Sequence *seq = sequence_construct(lX, s, sequence_getKmer3, kmer);
+    seq->cytosines = "CEO";
+    seq->nbCytosineOptions = 3;
     return seq;
 }
 
 Sequence *makeKmerSequence(char *nucleotides) {
     int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer);
-    Sequence *seq = sequence_construct(lX, nucleotides, sequence_getKmer3, kmer);
+    Sequence *seq = sequence_constructReferenceSequence(lX, nucleotides,
+                                                        sequence_getKmer3, sequence_sliceNucleotideSequence2,
+                                                        "CEO", 3, kmer);
     return seq;
 }
 
@@ -75,9 +79,9 @@ static void test_getKmer4(CuTest *testCase) {
 }
 
 static void test_methylPermutations(CuTest *testCase) {
-    CuAssertTrue(testCase, path_getMehtylPermutations(0) == NULL);
+    CuAssertTrue(testCase, path_getMehtylPermutations(0, 3, "CEO") == NULL);
     for (int64_t i = 1; i < 6; i++) {
-        stList *patterns = path_getMehtylPermutations(i);
+        stList *patterns = path_getMehtylPermutations(i, 3, "CEO");
         int64_t correctLength = intPow(3, i);
         CuAssertTrue(testCase, stList_length(patterns) == correctLength);
         stList_destruct(patterns);
@@ -97,7 +101,9 @@ static void test_substitutedKmers(CuTest *testCase) {
 
 static void test_hdCellConstruct(CuTest *testCase) {
     char *ambigKmer = "ATGXAXAAAAAA";
-    HDCell *cell = hdCell_construct(ambigKmer, 3);
+    int64_t nbCytosines = 3;
+    char *cytosines = "CEO";
+    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines);
     Path *path2 = hdCell_getPath(cell, 8);
     Path *path = hdCell_getPath(cell, 0);
     CuAssertTrue(testCase, hdCell_getPath(cell, 9) == NULL);
@@ -109,7 +115,9 @@ static void test_hdCellConstruct(CuTest *testCase) {
 
 static void test_hdCellConstructWorstCase(CuTest *testCase) {
     char *ambigKmer = "XXXXXX";
-    HDCell *cell = hdCell_construct(ambigKmer, 3);
+    int64_t nbCytosines = 3;
+    char *cytosines = "CEO";
+    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines);
     Path *path = hdCell_getPath(cell, 0);
     Path *path2 = hdCell_getPath(cell, 728);
     CuAssertIntEquals(testCase, 729, (int )cell->numberOfPaths);
@@ -225,7 +233,8 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     int64_t lY = 7;
 
     // make Sequence objects
-    Sequence *SsX = sequence_construct(lX, sX, sequence_getKmer3, kmer);
+    //Sequence *SsX = sequence_construct(lX, sX, sequence_getKmer3, kmer);
+    Sequence *SsX = makeKmerSequence(sX);
     Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
 
     // make stateMachine, forward and reverse DP matrices and banding stuff
@@ -547,8 +556,10 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
 
     // make Sequences for reference and template events
-    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
-                                           sequence_sliceNucleotideSequence2, kmer);
+    Sequence *refSeq = sequence_constructReferenceSequence(lX, ZymoReferenceSeq,
+                                                           sequence_getKmer3, sequence_sliceNucleotideSequence2,
+                                                           "CEO", 3, kmer);
+
     Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
                                                 sequence_sliceEventSequence2, event);
 
@@ -582,7 +593,7 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
     sequence_sequenceDestroy(refSeq);
     sequence_sequenceDestroy(templateSeq);
     stList_destruct(alignedPairs);
-    stList_destruct(alignedPairs2);
+    //stList_destruct(alignedPairs2);
     stateMachine_destruct(sMt);
 }
 
@@ -613,8 +624,9 @@ static void test_strawMan_getDescaledAlignedPairsWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
 
     // make Sequences for reference and template events
-    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
-                                           sequence_sliceNucleotideSequence2, kmer);
+    Sequence *refSeq = sequence_constructReferenceSequence(lX, ZymoReferenceSeq,
+                                                           sequence_getKmer3, sequence_sliceNucleotideSequence2,
+                                                           THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
     Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
                                                 sequence_sliceEventSequence2, event);
 
@@ -679,8 +691,9 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
 
     // make Sequences for reference and template events
-    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
-                                           sequence_sliceNucleotideSequence2, kmer);
+    Sequence *refSeq = sequence_constructReferenceSequence(lX, ZymoReferenceSeq,
+                                                           sequence_getKmer3, sequence_sliceNucleotideSequence2,
+                                                           THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
     Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
                                                 sequence_sliceEventSequence2, event);
 
@@ -1078,8 +1091,11 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
         stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
 
         // make Sequences for reference and template events
-        Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
-                                               sequence_sliceNucleotideSequence2, kmer);
+        //Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
+        //                                       sequence_sliceNucleotideSequence2, kmer);
+        Sequence *refSeq = sequence_constructReferenceSequence(lX, ZymoReferenceSeq,
+                                                               sequence_getKmer3, sequence_sliceNucleotideSequence2,
+                                                               THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
         Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
                                                     sequence_sliceEventSequence2, event);
 
@@ -1238,12 +1254,10 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_getKmer4);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations); // known fail
     SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_strawMan_getDescaledAlignedPairsWithBanding);
-
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
-
     //SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
