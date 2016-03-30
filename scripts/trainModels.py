@@ -312,6 +312,7 @@ def main(argv):
                 "threshold": args.threshold,
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
+                "twoWay": False,
             }
             #alignment = SignalAlignment(**alignment_args)
             #alignment.run(get_expectations=True)
