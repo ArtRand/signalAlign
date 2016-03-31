@@ -162,15 +162,17 @@ def main(args):
     alignments = randomly_select_alignments(args.alns)
     f, b = parse_substitution_file(args.positions)
     forward_sub, forward_pos = f[0], f[1]
+    print "Getting canonical assignments"
     canonical_assignments = collect_assignments(alignments,
                                                 args.threshold,
                                                 args.max_assignments,
                                                 forward_pos)
-
+    print "Got {} canonical assignments".format(canonical_assignments.shape[0])
     targeted_alignments = []
     for target_alignment in args.labeled:
         targeted_alignments += randomly_select_alignments(target_alignment)
 
+    print "Getting labeled assignments"
     labeled_assignments = []
     total = 0
     while total < args.max_labels:
@@ -184,12 +186,15 @@ def main(args):
             assignments = [x for x in assignments if not x.empty]
             labeled_assignments += assignments
         if total < args.max_labels:
-            print "Didn't get enough labels, exiting"
+            print "Didn't get enough labels only got {notEnough} was aiming for {wanted}, exiting" \
+                  "".format(notEnough=total, wanted=args.max_labels)
             sys.exit(1)
 
     print "Got {} labeled assignments".format(total)
 
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t0.0\t{event}\t0.0\n"
+
+    print "Writing to file {}".format(args.out_file)
 
     with open(args.out_file, 'w') as f:
         for row in canonical_assignments.itertuples():
@@ -199,6 +204,7 @@ def main(args):
             for row in frame.itertuples():
                 f.write(entry_line.format(strand=row[5], kmer=row[2], event=row[1]))
 
+    print "DONE"
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
