@@ -34,6 +34,7 @@ def parse_args():
                         dest='max_assignments',
                         help='total number of assignments to collect FOR EACH GROUP')
     # initial HDP
+
     parser.add_argument('--threshold', '-t', action='store', type=float, default=0.9, dest='threshold')
     parser.add_argument('--hdp_type', action='store', type=str, required=False, dest='hdp_type', default='Prior',
                         help="Build Hdp, specify type, options: "

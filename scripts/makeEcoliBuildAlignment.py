@@ -182,6 +182,8 @@ def main(args):
             else:
                 forward = True
             assignments = get_labeled_assignmets_from_read(alignment, forward_pos, forward, args.threshold)
+            new_assignment_total = sum([x.shape[0] for x in assignments])
+            print "Got {assignments} for {file}".format(assignments=new_assignment_total, file=alignment)
             total += sum([x.shape[0] for x in assignments])
             assignments = [x for x in assignments if not x.empty]
             labeled_assignments += assignments
