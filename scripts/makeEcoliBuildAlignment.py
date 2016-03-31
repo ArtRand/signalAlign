@@ -171,6 +171,7 @@ def main(args):
     targeted_alignments = []
     for target_alignment in args.labeled:
         targeted_alignments += randomly_select_alignments(target_alignment)
+        shuffle(targeted_alignments)
 
     print "Getting labeled assignments"
     labeled_assignments = []

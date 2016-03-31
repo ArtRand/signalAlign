@@ -34,7 +34,8 @@ def parse_args():
                         dest='max_assignments',
                         help='total number of assignments to collect FOR EACH GROUP')
     # initial HDP
-
+    parser.add_argument('--build_alignment', action='store', type=str, default=None,
+                        required=False, dest='build_alignment')
     parser.add_argument('--threshold', '-t', action='store', type=float, default=0.9, dest='threshold')
     parser.add_argument('--hdp_type', action='store', type=str, required=False, dest='hdp_type', default='Prior',
                         help="Build Hdp, specify type, options: "
@@ -103,6 +104,12 @@ def get_hdp_type(requested_type):
         return hdp_types[requested_type]
 
 
+def count_lines_in_build_alignment(build_alignment_path):
+    count = 0
+    for line in open(build_alignment_path, 'r').xreadlines():
+        count += 1
+    return count
+
 def get_initial_hdp_args(args, hdp_type):
     # if we're making a HDP with fixed concentration parameters
     if hdp_type in [0, 2, 4, 6, 8]:
@@ -146,7 +153,6 @@ HDP_TYPES_2 = [
     ("multisetPrior2", 11),
 ]
 
-
 # Pipeline Script
 args = parse_args()  # parse arguments
 working_directory = args.out  # this is the directory we will use for everything
@@ -154,28 +160,34 @@ assert os.path.isdir(working_directory), "ERROR: the working directory you speci
 pipeline_log = open(working_directory + "pipeline.log", 'a')
 command_line = " ".join(sys.argv[:])
 pipeline_log.write("[pipeline] Command Line: {}\n".format(command_line))
-
-# build alignment
 signalAlign_directory = "../../signalAlign/"
 build_alignment_location = working_directory + "buildAlignment.tsv"
-build_alignment_command = "{sA}scripts/makeBuildAlignments.py -o={bA} -t={threshold} -n={nbAssignments} " \
-                          "".format(sA=signalAlign_directory, C=args.C_alns, mC=args.mC_alns, threshold=args.threshold,
-                                    hmC=args.hmC_alns, bA=build_alignment_location,
-                                    nbAssignments=args.max_assignments)
-approx_total_build_assignments = 0  # keep track of about how many assignments we're going to get for gibbs burn in
-if args.C_alns is not None:  # add the alignments to the command
-    build_alignment_command += "-C={C} ".format(C=args.C_alns)
-    approx_total_build_assignments += args.max_assignments
-if args.mC_alns is not None:
-    build_alignment_command += "-mC={mC} ".format(mC=args.mC_alns)
-    approx_total_build_assignments += args.max_assignments
-if args.hmC_alns is not None:
-    build_alignment_command += "-hmC={hmC} ".format(hmC=args.hmC_alns)
-    approx_total_build_assignments += args.max_assignments
-pipeline_log.write("[pipeline] NOTICE: Making build alignment using files from:\n\t{C}\n\t{mC}\n\t{hmC}\n"
-                   "".format(C=args.C_alns, mC=args.mC_alns, hmC=args.hmC_alns))
-pipeline_log.write("[pipeline] Command: {}\n".format(build_alignment_command))
-check_call(build_alignment_command.split(), stderr=pipeline_log, stdout=pipeline_log)
+if args.build_alignment is None:
+    # build alignment
+    build_alignment_command = "{sA}scripts/makeBuildAlignments.py -o={bA} -t={threshold} -n={nbAssignments} " \
+                              "".format(sA=signalAlign_directory, C=args.C_alns, mC=args.mC_alns,
+                                        threshold=args.threshold, hmC=args.hmC_alns, bA=build_alignment_location,
+                                        nbAssignments=args.max_assignments)
+    approx_total_build_assignments = 0  # keep track of about how many assignments we're going to get for gibbs burn in
+    if args.C_alns is not None:  # add the alignments to the command
+        build_alignment_command += "-C={C} ".format(C=args.C_alns)
+        approx_total_build_assignments += args.max_assignments
+    if args.mC_alns is not None:
+        build_alignment_command += "-mC={mC} ".format(mC=args.mC_alns)
+        approx_total_build_assignments += args.max_assignments
+    if args.hmC_alns is not None:
+        build_alignment_command += "-hmC={hmC} ".format(hmC=args.hmC_alns)
+        approx_total_build_assignments += args.max_assignments
+    pipeline_log.write("[pipeline] NOTICE: Making build alignment using files from:\n\t{C}\n\t{mC}\n\t{hmC}\n"
+                       "".format(C=args.C_alns, mC=args.mC_alns, hmC=args.hmC_alns))
+    pipeline_log.write("[pipeline] Command: {}\n".format(build_alignment_command))
+    check_call(build_alignment_command.split(), stderr=pipeline_log, stdout=pipeline_log)
+else:
+    pipeline_log.write("[pipeline] NOTICE: using build alignment {}".format(args.build_alignment))
+    assert os.path.isfile(args.build_alignment), "ERROR: Didn't find input BuildAlignment"
+    approx_total_build_assignments = count_lines_in_build_alignment(build_alignment_location)
+    copyfile(args.build_alignment, build_alignment_location)
+
 
 # initial HDP
 assert (os.path.isfile(build_alignment_location)), "ERROR: Didn't find build alignment"
