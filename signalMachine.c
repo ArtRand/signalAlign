@@ -499,7 +499,7 @@ int main(int argc, char *argv[]) {
     if (sMtype == threeStateHdp) {
         fprintf(stderr, "signalAlign - using three-state HMM-HDP model\n");
     }
-    
+
     NanoporeHDP *nHdpT, *nHdpC;
 
     #pragma omp parallel sections
