@@ -185,9 +185,8 @@ if args.build_alignment is None:
 else:
     pipeline_log.write("[pipeline] NOTICE: using build alignment {}".format(args.build_alignment))
     assert os.path.isfile(args.build_alignment), "ERROR: Didn't find input BuildAlignment"
-    approx_total_build_assignments = count_lines_in_build_alignment(build_alignment_location)
     copyfile(args.build_alignment, build_alignment_location)
-
+    approx_total_build_assignments = count_lines_in_build_alignment(build_alignment_location)
 
 # initial HDP
 assert (os.path.isfile(build_alignment_location)), "ERROR: Didn't find build alignment"
