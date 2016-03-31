@@ -187,6 +187,8 @@ def main(args):
             total += sum([x.shape[0] for x in assignments])
             assignments = [x for x in assignments if not x.empty]
             labeled_assignments += assignments
+            if total >= args.max_labels:
+                break
         if total < args.max_labels:
             print "Didn't get enough labels only got {notEnough} was aiming for {wanted}, exiting" \
                   "".format(notEnough=total, wanted=args.max_labels)
