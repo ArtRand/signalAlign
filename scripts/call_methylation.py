@@ -4,6 +4,7 @@ from __future__ import print_function, division
 import glob
 import os
 import sys
+import numpy as np
 from argparse import ArgumentParser
 from alignmentAnalysisLib import CallMethylation
 from serviceCourse.parsers import read_fasta
@@ -18,8 +19,10 @@ def parse_args():
     parser.add_argument('--input', '-i', action='store',
                         dest='in_files', required=False, type=str, default=None,
                         help="files, with file-suffix")
-    parser.add_argument('--ref', '-r', required=True, action='store', type=str, dest='ref',
+    parser.add_argument('--ref', '-r', required=False, action='store', type=str, dest='ref', default=None,
                         help="path to fasta reference file")
+    parser.add_argument('--positions', '-p', required=False, action='store', type=str, dest='positions',
+                        help='positions file')
     parser.add_argument('-n', required=False, action='store', type=int, dest='n', default=100,
                         help='Max number of alignments from each category to look at')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
@@ -73,6 +76,17 @@ def get_alignments_labels_and_mask(path_to_alignments, max):
     return alignments, mask
 
 
+def parse_substitution_file(substitution_file):
+    fH = open(substitution_file, 'r')
+    line = fH.readline().split()
+    forward_sub = line[0]
+    forward_pos = map(np.int64, line[1:])
+    line = fH.readline().split()
+    backward_sub = line[0]
+    backward_pos = map(np.int64, line[1:])
+    return (forward_sub, forward_pos), (backward_sub, backward_pos)
+
+
 def run_methyl_caller(work_queue, done_queue):
     try:
         for f in iter(work_queue.get, 'STOP'):
@@ -84,11 +98,23 @@ def run_methyl_caller(work_queue, done_queue):
 
 def main(args):
     args = parse_args()
-    reference_sequence = get_reference_sequence(args.ref)
+
+    if args.ref is not None:
+        reference_sequence = get_reference_sequence(args.ref)
+    else:
+        reference_sequence = None
 
     alns, forward_mask = get_alignments_labels_and_mask(args.in_files, args.n)
 
     out_file = args.out
+
+    if args.positions is not None:
+        positions = {}
+        f, b = parse_substitution_file(args.positions)
+        positions['forward'] = f[1]
+        positions['backward'] = b[1]
+    else:
+        positions = None
 
     workers = args.nb_jobs
     work_queue = Manager().Queue()
@@ -101,6 +127,7 @@ def main(args):
             "alignment_file": aln,
             "forward": forward_bool,
             "out_file": out_file,
+            "positions": positions,
         }
         work_queue.put(call_methyl_args)
         #c = CallMethylation(**call_methyl_args)

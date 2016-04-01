@@ -81,7 +81,7 @@ class KmerHistogram(object):
 
 
 class CallMethylation(object):
-    def __init__(self, sequence, alignment_file, forward, label=None, out_file=None):
+    def __init__(self, sequence, alignment_file, forward, label=None, positions=None, out_file=None):
         self.sequence = sequence
         self.forward = forward
         self.alignment_file = alignment_file
@@ -91,6 +91,7 @@ class CallMethylation(object):
         self.complement_calls = []
         self.parse_alignment()
         self.out_file = out_file
+        self.positions = positions
         if label is not None:
             self.label = label
 
@@ -117,9 +118,13 @@ class CallMethylation(object):
     def get_range(position):
         return range(position - 5, position + 1)
 
-    def call_methyls(self):
-        template_sites = self.find_occurences("C") if self.forward is True else self.find_occurences("G")
-        complement_sites = self.find_occurences("G") if self.forward is True else self.find_occurences("C")
+    def call_methyls(self, positions=None):
+        if positions is None:
+            template_sites = self.find_occurences("C") if self.forward is True else self.find_occurences("G")
+            complement_sites = self.find_occurences("G") if self.forward is True else self.find_occurences("C")
+        else:
+            template_sites = positions['forward'] if self.forward is True else positions['backward']
+            complement_sites = positions['backward'] if self.forward is True else positions['forward']
 
         def get_calls(sites, strand, regular_offset):
             for site in sites:
@@ -157,28 +162,8 @@ class CallMethylation(object):
         get_calls(template_sites, 't', template_offset)
         get_calls(complement_sites, 'c', complement_offset)
 
-    def test(self):
-        self.call_methyls()
-        for strand, site, prob in self.probs:
-            if strand == 't':
-                self.template_calls.append(max(prob, key=prob.get))
-            else:
-                self.complement_calls.append(max(prob, key=prob.get))
-
-        correct_calls = {
-            "template": self.template_calls.count(self.label),
-            "complement": self.complement_calls.count(self.label)
-        }
-        template_acc = self.template_calls.count(self.label) / \
-                       len(self.template_calls) if len(self.template_calls) > 0 else 0
-        complement_acc = self.complement_calls.count(self.label) / \
-                         len(self.complement_calls) if len(self.complement_calls) > 0 else 0
-        file_name = self.alignment_file.split("/")[-1]
-        print("{file}\t{t}\t{c}".format(t=template_acc, c=complement_acc, file=file_name), file=sys.stderr)
-        return correct_calls
-
     def write(self, out_file=None):
-        self.call_methyls()
+        self.call_methyls(positions=self.positions)
         fH = open(out_file, 'a') if self.out_file is None else open(self.out_file, 'a')
 
         file_name = self.alignment_file.split("/")[-1]

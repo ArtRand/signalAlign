@@ -359,7 +359,7 @@ class NanoporeRead(object):
             return False
 
     def get_alignment_sequence(self):
-        """The 2D read sequence contains kmers that may not map to a tempalte or complement event, which can make
+        """The 2D read sequence contains kmers that may not map to a template or complement event, which can make
         mapping difficult downstream. This function makes a sequence from the 2D alignment table, which is usually
         pretty similar to the 2D read, except it is guaranteed to have an event map to every position.
 
