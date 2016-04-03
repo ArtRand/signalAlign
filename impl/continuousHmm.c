@@ -759,7 +759,7 @@ void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMac
     }
 
     Hmm *hmm = hmmContinuous_loadSignalHmmFromFile(hmmFile, type, 0.0, 0.001); // TODO make sure you want these pseudocounts
-    if (expectations != NULL) {
+    if ((expectations != NULL) && (type == threeState)) {
         hmmContinuous_loadModelPrior(hmm, expectations);
     }
     hmmContinuous_loadIntoStateMachine(sM, hmm, type); // todo remove types here, they're in the hmm object
