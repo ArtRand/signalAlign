@@ -527,7 +527,6 @@ double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, vo
     }
     kmer_i[KMER_LENGTH] = '\0';
 
-    // this is meant to work with getKmer (NOT getKmer2)
     // wrangle e_j data
     double eventMean = *(double *) e_j;
 

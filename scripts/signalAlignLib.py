@@ -154,15 +154,69 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
         return False
 
 
-def make_temp_sequence(fasta, forward, destination):
+def parse_substitution_file(substitution_file):
+    fH = open(substitution_file, 'r')
+    line = fH.readline().split()
+    forward_sub = line[0]
+    forward_pos = map(np.int64, line[1:])
+    line = fH.readline().split()
+    backward_sub = line[0]
+    backward_pos = map(np.int64, line[1:])
+    return (forward_sub, forward_pos), (backward_sub, backward_pos)
+
+
+def make_temp_sequence(fasta, sequence_outfile, rc_sequence_outfile):
     """extract the sequence from a fasta and put into a simple file that is used by signalAlign
     """
-    out_file = open(destination, "w")
+    assert (not os.path.isfile(sequence_outfile)), "ERROR: forward file already exists"
+    assert (not os.path.isfile(rc_sequence_outfile)), "ERROR: backward file already exists"
+
     for header, comment, sequence in read_fasta(fasta):
-        if forward is False:
-            sequence = reverse_complement(sequence)
-        print(sequence, end='\n', file=out_file)
+        print(sequence, end='\n', file=open(sequence_outfile, 'w'))
+        complement_sequence = reverse_complement(sequence, reverse=False, complement=True)
+        print(complement_sequence, end='\n', file=open(rc_sequence_outfile, 'w'))
         break
+
+
+def add_ambiguity_chars_to_reference(input_fasta, substitution_file, sequence_outfile, rc_sequence_outfile,
+                                     sub_out="C", ambig_char="X"):
+    assert os.path.isfile(input_fasta), "ERROR: Didn't find reference FASTA {}".format(input_fasta)
+    assert os.path.isfile(substitution_file), "ERROR: Didn't find substitution file {}".format(substitution_file)
+    assert (not os.path.isfile(sequence_outfile)), "ERROR: forward file already exists"
+    assert (not os.path.isfile(rc_sequence_outfile)), "ERROR: forward file already exists"
+
+    # get the first sequence from the FASTA
+    seq = ""
+    for header, comment, sequence in read_fasta(input_fasta):
+        seq += sequence
+        break
+
+    # turn the sequence into a list so we can change the nucleotides
+    r_seq = reverse_complement(dna=seq, reverse=False, complement=True)
+    seq = list(seq)
+    r_seq = list(r_seq)
+
+    # parse the substitution file
+    f, b = parse_substitution_file(substitution_file=substitution_file)
+    forward_pos = f[1]
+    backward_pos = b[1]
+
+    # substitute the nucleotides with ambiguity character
+    for position in forward_pos:
+        assert seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed".format(seq_pos=seq[position])
+        seq[position] = ambig_char
+    for position in backward_pos:
+        assert r_seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed".format(seq_pos=seq[position])
+        r_seq[position] = ambig_char
+
+    # make them back into strings
+    seq = ''.join(seq)
+    r_seq = ''.join(r_seq)
+
+    # write to files
+    print(seq, end='\n', file=open(sequence_outfile, "w"))
+    print(r_seq, end='\n', file=open(rc_sequence_outfile, "w"))
+    return
 
 
 def parse_cigar(cigar_string, ref_start):
@@ -763,12 +817,14 @@ class ComplementModel(NanoporeModel):
 
 
 class SignalAlignment(object):
-    def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
-                 in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
+    def __init__(self, in_fast5, forward_reference, backward_reference, destination, stateMachineType,
+                 banded, bwa_index, in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
                  threshold, diagonal_expansion, constraint_trim, twoWay,
                  target_regions=None, cytosine_substitution=None, sparse_output=False):
         self.in_fast5 = in_fast5  # fast5 file to align
-        self.reference = reference  # reference sequence
+        #self.reference = reference  # reference sequence
+        self.forward_reference = forward_reference
+        self.backward_reference = backward_reference
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for vanillaAlign
         self.banded = banded
@@ -777,7 +833,7 @@ class SignalAlignment(object):
         self.diagonal_expansion = diagonal_expansion
         self.constraint_trim = constraint_trim
         self.target_regions = target_regions
-        self.cytosine_substitution = cytosine_substitution
+        #self.cytosine_substitution = cytosine_substitution
         self.sparse_output = sparse_output
         self.twoWayClassification = twoWay
 
@@ -925,10 +981,10 @@ class SignalAlignment(object):
         else:
             trim_flag = "-m 9999"
 
-        if self.cytosine_substitution is not None:
-            cytosine_flag = "-M {cytosineMod}".format(cytosineMod=self.cytosine_substitution)
-        else:
-            cytosine_flag = ""
+        #if self.cytosine_substitution is not None:
+        #    cytosine_flag = "-M {cytosineMod}".format(cytosineMod=self.cytosine_substitution)
+        #else:
+        #    cytosine_flag = ""
 
         # sparse output
         if self.sparse_output is True:
@@ -948,24 +1004,26 @@ class SignalAlignment(object):
             complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
 
             command = \
-                "echo {cigar} | {vA} {model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
-                "{expansion}{trim} {hdp}-L {readLabel} -t {templateExpectations} -c {complementExpectations} " \
-                "{cytosine}"\
+                "echo {cigar} | {vA} {model}-f {f_ref} -b {b_ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
+                "{expansion}{trim} {hdp}-L {readLabel} -t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag,
-                        ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
+                        f_ref=self.forward_reference, b_ref=self.backward_reference, readLabel=read_label,
+                        npRead=temp_np_read, t_hmm=template_hmm_flag,
                         c_hmm=complement_hmm_flag, templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag, cytosine=cytosine_flag)
+                        trim=trim_flag)
         else:
             command = \
-                "echo {cigar} | {vA} {twoWay}{sparse}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
-                "{expansion}{trim} -u {posteriors} {hdp}-L {readLabel} {cytosine}"\
+                "echo {cigar} | {vA} {twoWay}{sparse}{model}-f {f_ref} -b {b_ref} -q {npRead} " \
+                "{t_model}{c_model}{t_hmm}{c_hmm}{thresh}{expansion}{trim} " \
+                "-u {posteriors} {hdp}-L {readLabel}"\
                 .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, sparse=sparse_flag,
-                        ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
+                        f_ref=self.forward_reference, b_ref=self.backward_reference,
+                        readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
                         t_model=template_model_flag, c_model=complement_model_flag, c_hmm=complement_hmm_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag, cytosine=cytosine_flag, hdp=hdp_flags, twoWay=twoWay_flag)
+                        trim=trim_flag, hdp=hdp_flags, twoWay=twoWay_flag)
 
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)

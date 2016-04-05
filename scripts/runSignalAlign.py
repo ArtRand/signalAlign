@@ -46,9 +46,12 @@ def parse_args():
                         default=4, type=int, help="number of jobs to run concurrently")
     parser.add_argument('-nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=50, type=int, help="maximum number of reads to align")
-    parser.add_argument('--cytosine_substitution', '-cs', action='append', default=None,
-                        dest='cytosine_sub', required=False, type=str,
-                        help="mutate cytosines to this letter in the reference")
+    parser.add_argument('-ambiguity_positions', '-x', action='store', required=False, default=None,
+                        dest='substitution_file', help="Ambiguity positions")
+
+    #parser.add_argument('--cytosine_substitution', '-cs', action='append', default=None,
+    #                    dest='cytosine_sub', required=False, type=str,
+    #                    help="mutate cytosines to this letter in the reference")
 
     parser.add_argument('--sparse_output', '-s', action='store_true', default=False, dest='sparse',
                         help="Sparse output flag")
@@ -95,8 +98,16 @@ def main(args):
     # make directory to put temporary files
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
-    reference_seq = temp_folder.add_file_path("reference_seq.txt")
-    make_temp_sequence(args.ref, True, reference_seq)
+    #reference_seq = temp_folder.add_file_path("reference_seq.txt")
+    forward_seq = temp_folder.add_file_path("forward_reference.txt")
+    backward_seq = temp_folder.add_file_path("backward_reference.txt")
+
+    # parse the substitution file, if given
+    if args.substitution_file is not None:
+        add_ambiguity_chars_to_reference(input_fasta=args.ref, substitution_file=args.substitution_file,
+                                         sequence_outfile=forward_seq, rc_sequence_outfile=backward_seq)
+    else:
+        make_temp_sequence(fasta=args.ref, sequence_outfile=forward_seq, rc_sequence_outfile=backward_seq)
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -116,8 +127,6 @@ def main(args):
 
     fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
 
-    cytosine_sub = args.cytosine_sub[0] if args.cytosine_sub is not None else None
-
     nb_files = args.nb_files
     if nb_files < len(fast5s):
         shuffle(fast5s)
@@ -125,8 +134,8 @@ def main(args):
 
     for fast5 in fast5s:
         alignment_args = {
-            "reference": reference_seq,
-            "cytosine_substitution": cytosine_sub,
+            "forward_reference": forward_seq,
+            "backward_reference": backward_seq,
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,

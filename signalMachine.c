@@ -1,4 +1,5 @@
 #include <getopt.h>
+#include <string.h>
 #include "pairwiseAlignment.h"
 #include "pairwiseAligner.h"
 #include "emissionMatrix.h"
@@ -10,6 +11,21 @@
 void usage() {
     fprintf(stderr, "vanillaAlign binary, meant to be used through the signalAlign program.\n");
     fprintf(stderr, "See doc for signalAlign for help\n");
+}
+
+// Borrowed from Bob Stout http://stjarnhimlen.se/snippets/strrev.c
+char *strrev(char *str) {
+    char *p1, *p2;
+
+    if (! str || ! *str)
+        return str;
+    for (p1 = str, p2 = str + strlen(str) - 1; p2 > p1; ++p1, --p2)
+    {
+        *p1 ^= *p2;
+        *p2 ^= *p1;
+        *p1 ^= *p2;
+    }
+    return str;
 }
 
 void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
@@ -73,7 +89,7 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         }
 
         // get the kmer index
-        int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromKmer(k_i);
+        int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromKmer(pathKmer);
 
         // get the expected event mean amplitude and noise
         double E_mean = matchModel[1 + (targetKmerIndex * MODEL_PARAMS)];
@@ -176,8 +192,6 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
 
     if (type == threeState) {
         StateMachine *sM = getSM3_descaled(modelFile, npp);
-        //StateMachine *sM = getStrawManStateMachine3(modelFile);
-        //emissions_signal_scaleModel(sM, npp.scale, npp.shift, npp.var, npp.scale_sd, npp.var_sd);
         return sM;
     }
     if (type == threeStateHdp) {
@@ -372,7 +386,8 @@ int main(int argc, char *argv[]) {
     char *complementModelFile = stString_print("../../signalAlign/models/testModel_complement.model");
     char *readLabel = NULL;
     char *npReadFile = NULL;
-    char *targetFile = NULL;
+    char *forwardReference = NULL;
+    char *backwardReference = NULL;
     char *posteriorProbsFile = NULL;
     char *templateHmmFile = NULL;
     char *complementHmmFile = NULL;
@@ -396,7 +411,8 @@ int main(int argc, char *argv[]) {
                 {"complementModel",         required_argument,  0,  'C'},
                 {"readLabel",               required_argument,  0,  'L'},
                 {"npRead",                  required_argument,  0,  'q'},
-                {"reference",               required_argument,  0,  'r'},
+                {"forward_reference",       required_argument,  0,  'f'},
+                {"backward_reference",      required_argument,  0,  'b'},
                 {"posteriors",              required_argument,  0,  'u'},
                 {"inTemplateHmm",           required_argument,  0,  'y'},
                 {"inComplementHmm",         required_argument,  0,  'z'},
@@ -411,7 +427,7 @@ int main(int argc, char *argv[]) {
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:osd:p:M:a:T:C:L:q:r:u:y:z:v:w:t:c:x:D:m:",
+        key = getopt_long(argc, argv, "h:osd:p:M:a:T:C:L:q:f:b:u:y:z:v:w:t:c:x:D:m:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -446,8 +462,11 @@ int main(int argc, char *argv[]) {
             case 'q':
                 npReadFile = stString_copy(optarg);
                 break;
-            case 'r':
-                targetFile = stString_copy(optarg);
+            case 'f':
+                forwardReference = stString_copy(optarg);
+                break;
+            case 'b':
+                backwardReference= stString_copy(optarg);
                 break;
             case 'u':
                 posteriorProbsFile = stString_copy(optarg);
@@ -493,6 +512,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if ((forwardReference == NULL) || (backwardReference == NULL)) {
+        st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n", forwardReference, backwardReference);
+    }
+
+
     if (sMtype == threeState) {
         fprintf(stderr, "signalAlign - using three-state HMM model\n");
     }
@@ -525,8 +549,10 @@ int main(int argc, char *argv[]) {
     }
 
     // load reference sequence (reference sequence)
-    FILE *reference = fopen(targetFile, "r");
+    FILE *reference = fopen(forwardReference, "r");
+    FILE *rc_reference = fopen(backwardReference, "r");
     char *referenceSequence = stFile_getLineFromFile(reference);
+    char *rc_referenceSequence = stFile_getLineFromFile(rc_reference);
 
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
@@ -543,22 +569,30 @@ int main(int argc, char *argv[]) {
     struct PairwiseAlignment *pA;
     pA = cigarRead(fileHandleIn);
 
-    // put in to help with debugdebugging
-    // printPairwiseAlignmentSummary(pA);
+    //printPairwiseAlignmentSummary(pA);
 
     // slice out the section of the reference we're aligning to
-    char *trimmedRefSeq = getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);
-    trimmedRefSeq = (pA->strand1 ? trimmedRefSeq : stString_reverseComplementString(trimmedRefSeq));
+    char *trimmedForwardSeq = getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);
+    char *trimmedBackwardSeq = getSubSequence(rc_referenceSequence, pA->start1, pA->end1, pA->strand1);
 
+    // flip around complement (minus) strand
+    strrev(trimmedBackwardSeq);
+
+    //char *trimmedRefSeq = getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);
+    //trimmedRefSeq = (pA->strand1 ? trimmedRefSeq : stString_reverseComplementString(trimmedRefSeq));
     // reverse complement for complement event sequence
-    char *rc_trimmedRefSeq = stString_reverseComplementString(trimmedRefSeq);
+    //char *rc_trimmedRefSeq = stString_reverseComplementString(trimmedRefSeq);
 
     // change bases to methylated/hydroxymethylated, if asked to
-    char *templateTargetSeq = cytosine_substitute == NULL ? trimmedRefSeq : stString_replace(trimmedRefSeq, "C",
-                                                                                             cytosine_substitute);
-    char *complementTargetSeq = cytosine_substitute == NULL ? rc_trimmedRefSeq : stString_replace(rc_trimmedRefSeq,
-                                                                                                  "C",
-                                                                                                  cytosine_substitute);
+    //char *templateTargetSeq = cytosine_substitute == NULL ? trimmedRefSeq : stString_replace(trimmedRefSeq, "C",
+    //                                                                                         cytosine_substitute);
+    //char *complementTargetSeq = cytosine_substitute == NULL ? rc_trimmedRefSeq : stString_replace(rc_trimmedRefSeq,
+    //                                                                                              "C",
+    //                                                                                              cytosine_substitute);
+
+    char *templateTargetSeq = pA->strand1 ? trimmedForwardSeq : trimmedBackwardSeq;
+    char *complementTargetSeq = pA->strand1 ? trimmedBackwardSeq : trimmedForwardSeq;
+
 
     // constrain the event sequence to the positions given by the guide alignment
     Sequence *tEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->templateEvents,
@@ -673,11 +707,11 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             if (sparseOutput) {
-                writePosteriorProbsSparse(posteriorProbsFile, readLabel, trimmedRefSeq, forward, pA->contig1,
+                writePosteriorProbsSparse(posteriorProbsFile, readLabel, templateTargetSeq, forward, pA->contig1,
                                           tCoordinateShift, rCoordinateShift_t, templateAlignedPairs, template);
             } else {
                 writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_MATRIX,
-                                    npRead->templateParams, npRead->templateEvents, trimmedRefSeq, forward,
+                                    npRead->templateParams, npRead->templateEvents, templateTargetSeq, forward,
                                     pA->contig1, sMt->type, tCoordinateShift, rCoordinateShift_t,
                                     templateAlignedPairs, template);
             }
@@ -703,11 +737,11 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             if (sparseOutput) {
-                writePosteriorProbsSparse(posteriorProbsFile, readLabel, rc_trimmedRefSeq, forward, pA->contig1,
+                writePosteriorProbsSparse(posteriorProbsFile, readLabel, complementTargetSeq, forward, pA->contig1,
                                           cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complement);
             } else {
                 writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_MATRIX,
-                                    npRead->complementParams, npRead->complementEvents, rc_trimmedRefSeq,
+                                    npRead->complementParams, npRead->complementEvents, complementTargetSeq,
                                     forward, pA->contig1, sMc->type,cCoordinateShift, rCoordinateShift_c,
                                     complementAlignedPairs, complement);
             }

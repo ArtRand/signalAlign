@@ -4,9 +4,10 @@ from __future__ import print_function, division
 import glob
 import os
 import sys
-import numpy as np
+sys.path.append("../")
 from argparse import ArgumentParser
 from alignmentAnalysisLib import CallMethylation
+from signalAlignLib import parse_substitution_file
 from serviceCourse.parsers import read_fasta
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
@@ -74,17 +75,6 @@ def get_alignments_labels_and_mask(path_to_alignments, max):
     alignments = randomly_select_alignments(path_to_alignments, max)
     mask = get_forward_mask(alignments)
     return alignments, mask
-
-
-def parse_substitution_file(substitution_file):
-    fH = open(substitution_file, 'r')
-    line = fH.readline().split()
-    forward_sub = line[0]
-    forward_pos = map(np.int64, line[1:])
-    line = fH.readline().split()
-    backward_sub = line[0]
-    backward_pos = map(np.int64, line[1:])
-    return (forward_sub, forward_pos), (backward_sub, backward_pos)
 
 
 def run_methyl_caller(work_queue, done_queue):
