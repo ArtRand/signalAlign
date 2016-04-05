@@ -537,7 +537,7 @@ double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, vo
     *normedMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean,
                                                                 self->scale, self->shift, self->var);
 
-    double density = get_nanopore_kmer_density(self->hdpModel, x_i, normedMean);
+    double density = (1 / self->var) * get_nanopore_kmer_density(self->hdpModel, x_i, normedMean);
     free(normedMean);
     free(kmer_i);
     return log(density);

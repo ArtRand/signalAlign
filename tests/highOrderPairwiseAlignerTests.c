@@ -704,8 +704,8 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
 
     // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 1107);
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 1213);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
