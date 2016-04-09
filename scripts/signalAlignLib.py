@@ -583,6 +583,7 @@ class NanoporeRead(object):
             # time since first event
             delta_time = event[1] - start_time
             # drift adjust
+            # TODO change adjustment here
             event[0] -= (delta_time * drift)
         return True
 

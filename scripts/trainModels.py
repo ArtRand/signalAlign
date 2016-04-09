@@ -41,6 +41,7 @@ def parse_args():
                         help="Flag to train emissions, False by default")
     parser.add_argument('--transitions', action='store_true', default=False, dest='transitions',
                         help='Flag to train transitions, False by default')
+
     # disabled input HMMs, only start from scratch right now
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
@@ -59,9 +60,8 @@ def parse_args():
                         help="path to template HDP model to use")
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
                         help="path to complement HDP model to use")
-    parser.add_argument('--cytosine_substitution', '-cs', action='append', default=None,
-                        dest='cytosine_sub', required=False, type=str,
-                        help="mutate cytosines to this letter in the reference")
+    parser.add_argument('-ambiguity_positions', '-x', action='store', required=False, default=None,
+                        dest='substitution_file', help="Ambiguity positions")
     # gibbs
     parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
     parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
@@ -86,33 +86,31 @@ def get_2d_length(fast5):
         return read_length
 
 
-def cull_training_files(directories, cytosine_substitutions, training_amount):
+def cull_training_files(directories, training_amount):
     print("trainModels - culling training files.\n", end="", file=sys.stderr)
-    assert len(directories) == len(cytosine_substitutions), "[trainModels] ERROR: need to have the same number of " \
-                                                            "substitutions as directories"
+
     training_files = []
     add_to_training_files = training_files.append
-    substitutions = []
-    add_to_subs = substitutions.append
 
+    # loop over the directories and collect reads for training
     for j, directory in enumerate(directories):
         fast5s = [x for x in os.listdir(directory) if x.endswith(".fast5")]
         shuffle(fast5s)
-
         total_amount = 0
         n = 0
+        # loop over files and add them to training list, break when we have enough bases to complete a batch
         for i in xrange(len(fast5s)):
             add_to_training_files(directory + fast5s[i])
-            add_to_subs(cytosine_substitutions[j])
             n += 1
             total_amount += get_2d_length(directory + fast5s[i])
             if total_amount >= training_amount:
                 break
-        print("Culled {nb_files} training files from {dir}.".format(nb_files=n,
-                                                                    dir=directory),
+        print("Culled {nb_files} training files, for {bases} from {dir}.".format(nb_files=len(training_files),
+                                                                                 bases=total_amount,
+                                                                                 dir=directory),
               end="\n", file=sys.stderr)
 
-    return zip(training_files, substitutions)
+    return training_files
 
 
 def get_expectations(work_queue, done_queue):
@@ -192,9 +190,12 @@ def build_hdp(template_hdp_path, complement_hdp_path, template_assignments, comp
     return
 
 
-def main(argv):
+def main(args):
     # parse command line arguments
     args = parse_args()
+
+    command_line = " ".join(sys.argv[:])
+    print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
     start_message = """\n
     # Starting Baum-Welch training.
@@ -205,25 +206,41 @@ def main(argv):
     # Performing {iterations} iterations.
     # Using model: {model}
     # Using HDPs: {thdp} / {chdp}
+    # Training emissions: {emissions}
+    #          tranistions: {transitions}
     \n
     """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref, outLoc=args.out, iter=args.iter,
-               iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP)
+               iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP,
+               emissions=args.emissions, transitions=args.transitions)
 
     assert (args.files_dir is not None), "Need to specify which files to train on"
     assert (args.ref is not None), "Need to provide a reference file"
     assert (args.out is not None), "Need to know the working directory for training"
 
-    print(start_message, file=sys.stdout)
-
     if not os.path.isfile(args.ref):  # TODO make this is_fasta(args.ref)
         print("Did not find valid reference file", file=sys.stderr)
         sys.exit(1)
 
+    print(start_message, file=sys.stdout)
+
     # make directory to put the files we're using files
     working_folder = FolderHandler()
     working_directory_path = working_folder.open_folder(args.out + "tempFiles_expectations")
-    reference_seq = working_folder.add_file_path("reference_seq.txt")
-    make_temp_sequence(args.ref, True, reference_seq)
+
+    # make the plus and minus strand sequences
+    plus_strand_sequence = working_folder.add_file_path("forward_reference.txt")
+    minus_strand_sequence = working_folder.add_file_path("backward_reference.txt")
+
+    # parse the substitution file, if given
+    if args.substitution_file is not None:
+        add_ambiguity_chars_to_reference(input_fasta=args.ref,
+                                         substitution_file=args.substitution_file,
+                                         sequence_outfile=plus_strand_sequence,
+                                         rc_sequence_outfile=minus_strand_sequence)
+    else:
+        make_temp_sequence(fasta=args.ref,
+                           sequence_outfile=plus_strand_sequence,
+                           rc_sequence_outfile=minus_strand_sequence)
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -279,15 +296,8 @@ def main(argv):
     # start iterating
     i = 0
     while i < args.iter:
-        # if we're using 'mutated' or non-canonical reference sequences, they come in a list. if we're not then
-        # we make a list of the 'normal' reference sequence
-        if args.cytosine_sub is None:
-            cytosine_substitutions = [None] * len(args.files_dir)
-        else:
-            cytosine_substitutions = args.cytosine_sub
-
         # first cull a set of files to get expectations on
-        training_files_and_subtitutions = cull_training_files(args.files_dir, cytosine_substitutions, args.amount)
+        training_files = cull_training_files(args.files_dir, args.amount)
 
         # setup
         workers = args.nb_jobs
@@ -296,11 +306,11 @@ def main(argv):
         jobs = []
 
         # get expectations for all the files in the queue
-        for fast5, sub in training_files_and_subtitutions:
+        for fast5 in training_files:
             alignment_args = {
+                "forward_reference": plus_strand_sequence,
+                "backward_reference": minus_strand_sequence,
                 "in_fast5": fast5,
-                "reference": reference_seq,
-                "cytosine_substitution": sub,
                 "destination": working_directory_path,
                 "stateMachineType": args.stateMachineType,
                 "banded": args.banded,

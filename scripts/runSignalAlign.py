@@ -16,9 +16,10 @@ def parse_args():
 
     parser.add_argument('--file_directory', '-d', action='store',
                         dest='files_dir', required=False, type=str, default=None,
-                        help="directory with fast5s for alignment")
+                        help="directory with MinION fast5 reads to align")
     parser.add_argument('--ref', '-r', action='store',
-                        dest='ref', required=True, type=str, help="reference sequence to align to, in FASTA")
+                        dest='ref', required=True, type=str,
+                        help="reference sequence to align to, in FASTA")
 
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
@@ -26,10 +27,12 @@ def parse_args():
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for complement events, if you don't want the default")
-    parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None)
-    parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None)
+    parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None,
+                        help="template serialized HDP file")
+    parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
+                        help="complement serialized HDP file")
     parser.add_argument('--twoWay', action='store_true', dest='twoWay', default=False,
-                        help="Two way classification")
+                        help="Flag, two way classification")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         required=True, default="threeState", help="decide which model to use, threeState by default")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
@@ -48,13 +51,8 @@ def parse_args():
                         default=50, type=int, help="maximum number of reads to align")
     parser.add_argument('-ambiguity_positions', '-x', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
-
-    #parser.add_argument('--cytosine_substitution', '-cs', action='append', default=None,
-    #                    dest='cytosine_sub', required=False, type=str,
-    #                    help="mutate cytosines to this letter in the reference")
-
     parser.add_argument('--sparse_output', '-s', action='store_true', default=False, dest='sparse',
-                        help="Sparse output flag")
+                        help="flag, sparse output")
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
@@ -76,18 +74,24 @@ def main(args):
     # parse args
     args = parse_args()
 
+    command_line = " ".join(sys.argv[:])
+    print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
+
     start_message = """
 #   Starting Signal Align
 #   Aligning files from: {fileDir}
 #   Aligning to reference: {reference}
-#   Aligning {nbFiles}
+#   Aligning {nbFiles} files
 #   Using model: {model}
 #   Using banding: {banding}
 #   Aligning to regions in: {regions}
-#   Input template HMM: {inThmm}
-#   Input complement HMM: {inChmm}
+#   Non-default template HMM: {inThmm}
+#   Non-default complement HMM: {inChmm}
+#   Template HDP: {tHdp}
+#   Complement HDP: {cHdp}
     """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files, banding=args.banded,
-               inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType, regions=args.target_regions)
+               inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType, regions=args.target_regions,
+               tHdp=args.templateHDP, cHdp=args.complementHDP)
 
     print(start_message, file=sys.stdout)
 
@@ -98,16 +102,19 @@ def main(args):
     # make directory to put temporary files
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
-    #reference_seq = temp_folder.add_file_path("reference_seq.txt")
-    forward_seq = temp_folder.add_file_path("forward_reference.txt")
-    backward_seq = temp_folder.add_file_path("backward_reference.txt")
+    plus_strand_sequence = temp_folder.add_file_path("forward_reference.txt")
+    minus_strand_sequence = temp_folder.add_file_path("backward_reference.txt")
 
     # parse the substitution file, if given
     if args.substitution_file is not None:
-        add_ambiguity_chars_to_reference(input_fasta=args.ref, substitution_file=args.substitution_file,
-                                         sequence_outfile=forward_seq, rc_sequence_outfile=backward_seq)
+        add_ambiguity_chars_to_reference(input_fasta=args.ref,
+                                         substitution_file=args.substitution_file,
+                                         sequence_outfile=plus_strand_sequence,
+                                         rc_sequence_outfile=minus_strand_sequence)
     else:
-        make_temp_sequence(fasta=args.ref, sequence_outfile=forward_seq, rc_sequence_outfile=backward_seq)
+        make_temp_sequence(fasta=args.ref,
+                           sequence_outfile=plus_strand_sequence,
+                           rc_sequence_outfile=minus_strand_sequence)
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -115,16 +122,19 @@ def main(args):
     print("signalAlign - indexing reference, done", file=sys.stderr)
 
     # parse the target regions, if provided
+    # TODO make this the same as the 'labels' file
     if args.target_regions is not None:
         target_regions = TargetRegions(args.target_regions)
     else:
         target_regions = None
 
+    # setup workers for multiprocessing
     workers = args.nb_jobs
     work_queue = Manager().Queue()
     done_queue = Manager().Queue()
     jobs = []
 
+    # list of alignment files
     fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
 
     nb_files = args.nb_files
@@ -134,8 +144,8 @@ def main(args):
 
     for fast5 in fast5s:
         alignment_args = {
-            "forward_reference": forward_seq,
-            "backward_reference": backward_seq,
+            "forward_reference": plus_strand_sequence,
+            "backward_reference": minus_strand_sequence,
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,
