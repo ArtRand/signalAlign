@@ -27,8 +27,11 @@ def parse_args():
                         dest='max_labels', help='total number of assignments to collect for labeled and null')
     parser.add_argument('--threshold', '-t', action='store', type=float, default=0.75, dest='threshold')
     parser.add_argument('--label', action='store', default="E", dest='label')
-    parser.add_argument('--methylated_positions', '-m', action='store', dest='positive_positions', required=True)
-    parser.add_argument('--null_positions', '-n', action='store', dest='null_positions', required=True)
+    parser.add_argument('--methylated_positions', '-m', action='store', dest='positive_positions', required=True,
+                        help="file with positions to label as 'label' ")
+    parser.add_argument('--null_positions', '-n', action='store', dest='null_positions', required=False,
+                        default=None, help="file with extra positions to add without labeling, and positions to"
+                                           "ignore in the canonical alignments")
     parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out_file')
 
     return parser.parse_args()
@@ -210,8 +213,12 @@ def main(args):
     # wrangle the positions we're calling positive and null
     pf, pb = parse_substitution_file(args.positive_positions)
     f_positive_substitution, forward_positive_sites = pf[0], pf[1]
-    nf, nb = parse_substitution_file(args.null_positions)
-    f_null_substitution, forward_null_sites = nf[0], nf[1]
+
+    if args.null_positions is not None:
+        nf, nb = parse_substitution_file(args.null_positions)
+        f_null_substitution, forward_null_sites = nf[0], nf[1]
+    else:
+        forward_null_sites = []
 
     # randomly collect some alignments, and remove the events that correspond to positions we're going to label
     alignments = cull_list_of_alignment_files(args.alns)
