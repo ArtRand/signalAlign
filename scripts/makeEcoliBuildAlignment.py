@@ -18,7 +18,7 @@ def parse_args():
                         help="alignment files")
     parser.add_argument('--methylated', '-ma', action='append', dest='positive', required=True, type=str,
                         help="alignments to get labeled events from")
-    parser.add_argument('--null', '-na', action='append', dest='null', required=True, type=str,
+    parser.add_argument('--null', '-na', action='append', dest='null', required=False, type=str, default=None,
                         help="alignments to get null events from")
     parser.add_argument('--number_of_assignments', '-nb', action='store', type=int, default=10000,
                         dest='max_assignments',
@@ -232,18 +232,21 @@ def main(args):
     if positive_assignments is None:
         sys.exit(1)
 
-    print "Getting null assignments"
-    null_alignments = cull_list_of_alignment_files(args.null)
-    null_assignments = get_labeled_assignments(alignments=null_alignments, max_labels=args.max_labels,
-                                               positions=forward_null_sites, threshold=args.threshold,
-                                               label="C")
-    if null_assignments is None:
-        sys.exit(1)
+    if args.null is not None:
+        print "Getting null assignments"
+        null_alignments = cull_list_of_alignment_files(args.null)
+        null_assignments = get_labeled_assignments(alignments=null_alignments, max_labels=args.max_labels,
+                                                   positions=forward_null_sites, threshold=args.threshold,
+                                                   label="C")
+        if null_assignments is None:
+            sys.exit(1)
 
-    total_labeled = sum([x.shape[0] for x in positive_assignments])
-    total_null = sum([x.shape[0] for x in null_assignments])
-    print "Got {labeled} labeled assignments and {null} null assignments".format(labeled=total_labeled,
-                                                                                 null=total_null)
+        total_labeled = sum([x.shape[0] for x in positive_assignments])
+        total_null = sum([x.shape[0] for x in null_assignments])
+        print "Got {labeled} labeled assignments and {null} null assignments".format(labeled=total_labeled,
+                                                                                     null=total_null)
+    else:
+        null_assignments = None
 
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t0.0\t{event}\t0.0\n"
 
@@ -256,10 +259,10 @@ def main(args):
         for dataframe in positive_assignments:
             for row in dataframe.itertuples():
                 f.write(entry_line.format(strand=row[6], kmer=row[3], event=row[2]))
-
-        for dataframe in null_assignments:
-            for row in dataframe.itertuples():
-                f.write(entry_line.format(strand=row[6], kmer=row[3], event=row[2]))
+        if null_assignments is not None:
+            for dataframe in null_assignments:
+                for row in dataframe.itertuples():
+                    f.write(entry_line.format(strand=row[6], kmer=row[3], event=row[2]))
 
     print "DONE"
 
