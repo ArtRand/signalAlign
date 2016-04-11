@@ -6,7 +6,7 @@ import glob
 import os
 import numpy as np
 import pandas as pd
-from random import shuffle
+from alignmentAnalysisLib import parse_alignment_file, cull_list_of_alignment_files, parse_substitution_file
 from argparse import ArgumentParser
 
 
@@ -35,30 +35,6 @@ def parse_args():
     parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out_file')
 
     return parser.parse_args()
-
-
-def parse_alignment_file(alignment_file):
-    data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
-                         dtype={'ref_pos': np.int64,
-                                'strand': np.str,
-                                'event_index': np.int64,
-                                'kmer': np.str,
-                                'posterior_prob': np.float64,
-                                'event_mean': np.float64},
-                         header=None,
-                         names=['ref_pos', 'strand', 'event_index', 'kmer', 'posterior_prob', 'event_mean'])
-    return data
-
-
-def parse_substitution_file(substitution_file):
-    fH = open(substitution_file, 'r')
-    line = fH.readline().split()
-    forward_sub = line[0]
-    forward_pos = map(np.int64, line[1:])
-    line = fH.readline().split()
-    backward_sub = line[0]
-    backward_pos = map(np.int64, line[1:])
-    return (forward_sub, forward_pos), (backward_sub, backward_pos)
 
 
 def substitute_kmer(kmer, i, sub="E"):
@@ -163,20 +139,6 @@ def get_labeled_assignments(alignments, max_labels, positions, threshold, label,
         return None
 
     return labeled_assignments
-
-
-def get_alignments_from_directory(path_to_alignments):
-    alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
-    shuffle(alignments)
-    return alignments
-
-
-def cull_list_of_alignment_files(list_of_directories):
-    list_of_alignments = []
-    for directory in list_of_directories:
-        list_of_alignments += get_alignments_from_directory(directory)
-    shuffle(list_of_alignments)
-    return list_of_alignments
 
 
 def collect_assignments(alignments, threshold, max_assignments, positions):

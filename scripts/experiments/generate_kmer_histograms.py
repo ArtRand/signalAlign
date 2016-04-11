@@ -3,7 +3,7 @@
 import os
 import sys
 sys.path.append("../")
-from alignmentAnalysisLib import KmerHistogram
+from alignmentAnalysisLib import KmerHistogram, parse_substitution_file
 from serviceCourse.parsers import read_fasta
 from signalAlignLib import kmer_iterator
 from argparse import ArgumentParser
@@ -17,14 +17,16 @@ def parse_args():
     parser.add_argument('--alignments', '-a', action='store',
                         dest='alns', required=False, type=str, default=None,
                         help="alignment files, add file extension")
-    parser.add_argument('--number_of_assignments', '-n', action='store', type=int, default=10000,
+    parser.add_argument('--number_of_assignments', '-nb', action='store', type=int, default=100,
                         dest='max_assignments',
                         help='total number of points to collect')
     parser.add_argument('--ref', action='store', type=str, dest='ref', required=True,
                         help="Reference fasta file")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run concurrently")
-    parser.add_argument('--threshold', '-t', action='store', type=float, default=0.25, dest='threshold')
+    parser.add_argument('--threshold', '-t', action='store', type=float, default=0.8, dest='threshold')
+    parser.add_argument('--ignore_positions', '-ig', action='store', dest='ignore', required=False, default=None,
+                        help="file with positions to label as 'label' ")
     parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out')
 
     return parser.parse_args()
@@ -69,7 +71,8 @@ def main(args):
     # Generating Kmer histograms from alignments: {alns}
     # Getting a maximum of {maxNb} assignments
     # Using threshold: {thresh}
-    """.format(alns=args.alns, maxNb=args.max_assignments, thresh=args.threshold)
+    # Ignoring events aligned to positions in {ignore}
+    """.format(alns=args.alns, maxNb=args.max_assignments, thresh=args.threshold, ignore=args.ignore)
 
     print start_message
 
@@ -89,6 +92,9 @@ def main(args):
         print >> sys.stderr, "problem making destination directories"
         sys.exit(1)
 
+    f, b = parse_substitution_file(args.ignore)
+    ignore_positions = f[1]
+
     for strand, destination in zip(["t", "c"], [template_directory, complement_directory]):
         for kmer in kmers_of_interest:
             hist_args = {
@@ -98,10 +104,11 @@ def main(args):
                 "threshold": args.threshold,
                 "max_assignments": args.max_assignments,
                 "out_dir": destination,
+                "ignore_positions": ignore_positions,
             }
-            #k = Kmer_histogram(**hist_args)
-            #k.run()
-            work_queue.put(hist_args)
+            k = Kmer_histogram(**hist_args)
+            k.run()
+            #work_queue.put(hist_args)
 
     for w in xrange(workers):
         p = Process(target=histogram_runner, args=(work_queue, done_queue))

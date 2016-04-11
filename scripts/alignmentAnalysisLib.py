@@ -9,6 +9,30 @@ import numpy as np
 from random import shuffle
 
 
+def parse_alignment_file(alignment_file):
+    data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
+                         dtype={'ref_pos': np.int64,
+                                'strand': np.str,
+                                'event_index': np.int64,
+                                'kmer': np.str,
+                                'posterior_prob': np.float64,
+                                'event_mean': np.float64},
+                         header=None,
+                         names=['ref_pos', 'strand', 'event_index', 'kmer', 'posterior_prob', 'event_mean'])
+    return data
+
+
+def parse_substitution_file(substitution_file):
+    fH = open(substitution_file, 'r')
+    line = fH.readline().split()
+    forward_sub = line[0]
+    forward_pos = map(np.int64, line[1:])
+    line = fH.readline().split()
+    backward_sub = line[0]
+    backward_pos = map(np.int64, line[1:])
+    return (forward_sub, forward_pos), (backward_sub, backward_pos)
+
+
 def randomly_select_alignments(path_to_alignments):
     files = os.listdir(path_to_alignments)
     files = [f for f in files if f.endswith(".tsv")]
@@ -19,14 +43,28 @@ def randomly_select_alignments(path_to_alignments):
     return files
 
 
+def get_alignments_from_directory(path_to_alignments):
+    alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
+    return alignments
+
+
+def cull_list_of_alignment_files(list_of_directories):
+    list_of_alignments = []
+    for directory in list_of_directories:
+        list_of_alignments += get_alignments_from_directory(directory)
+    shuffle(list_of_alignments)
+    return list_of_alignments
+
+
 class KmerHistogram(object):
-    def __init__(self, path_to_alignments, kmer, strand, threshold, max_assignments, out_dir):
+    def __init__(self, path_to_alignments, kmer, strand, threshold, max_assignments, ignore_positions, out_dir):
         self.path_to_alignments = path_to_alignments
         self.kmer = kmer
         self.strand = strand
         self.threshold = threshold
         self.max_assignments = max_assignments
         self.output_directory = out_dir
+        self.ignore_positions = ignore_positions
         self.histogram = None
         self.n_points = 0
 
@@ -37,17 +75,17 @@ class KmerHistogram(object):
         assert len(alignments) > 0, "Didn't find any alignments"
         for alignment in alignments:
             try:
-                data = pd.read_table(alignment, usecols=(4, 9, 12, 13),
-                                     dtype={'strand': np.str,
-                                            'kmer': np.str,
-                                            'posterior_prob': np.float64,
-                                            'event_mean': np.float64},
-                                     header=None,
-                                     names=['strand', 'kmer', 'posterior_prob', 'event_mean'])
+                data = parse_alignment_file(alignment)
+                if self.ignore_positions is not None:
+                    crit = data['ref_pos'].map(lambda p: p not in self.ignore_positions)
+                    selected_rows = data[crit].ix[(data['strand'] == self.strand) &
+                                                  (data['posterior_prob'] >= self.threshold) &
+                                                  (data['kmer'] == self.kmer)]
+                else:
+                    selected_rows = data.ix[(data['strand'] == self.strand) &
+                                            (data['posterior_prob'] >= self.threshold) &
+                                            (data['kmer'] == self.kmer)]
 
-                selected_rows = data.ix[(data['strand'] == self.strand) &
-                                        (data['posterior_prob'] >= self.threshold) &
-                                        (data['kmer'] == self.kmer)]
                 total += selected_rows.shape[0]
                 aln_kmer_hist = pd.DataFrame({"event_mean": selected_rows["event_mean"]})
                 add_to_hist(aln_kmer_hist)
@@ -70,7 +108,7 @@ class KmerHistogram(object):
             f.close()
 
     def run(self):
-        alignments = randomly_select_alignments(self.path_to_alignments)
+        alignments = cull_list_of_alignment_files(self.path_to_alignments)
         self.get_kmer_hist(alignments)
         print("{n} points for {kmer} found".format(n=self.n_points, kmer=self.kmer), file=sys.stdout)
         if self.n_points > 0:
