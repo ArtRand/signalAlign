@@ -91,8 +91,11 @@ def main(args):
         print >> sys.stderr, "problem making destination directories"
         sys.exit(1)
 
-    f, b = parse_substitution_file(args.ignore)
-    ignore_positions = f[1]
+    if args.ignore is not None:
+        f, b = parse_substitution_file(args.ignore)
+        ignore_positions = f[1]
+    else:
+        ignore_positions = None
 
     for strand, destination in zip(["t", "c"], [template_directory, complement_directory]):
         for kmer in kmers_of_interest:
