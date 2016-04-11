@@ -106,9 +106,9 @@ def main(args):
                 "out_dir": destination,
                 "ignore_positions": ignore_positions,
             }
-            k = Kmer_histogram(**hist_args)
-            k.run()
-            #work_queue.put(hist_args)
+            #k = Kmer_histogram(**hist_args)
+            #k.run()
+            work_queue.put(hist_args)
 
     for w in xrange(workers):
         p = Process(target=histogram_runner, args=(work_queue, done_queue))
