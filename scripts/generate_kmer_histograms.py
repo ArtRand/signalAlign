@@ -13,7 +13,7 @@ def parse_args():
     parser = ArgumentParser(description=__doc__)
 
     # query files
-    parser.add_argument('--alignments', '-a', action='store',
+    parser.add_argument('--alignments', '-a', action='append',
                         dest='alns', required=False, type=str, default=None,
                         help="alignment files, add file extension")
     parser.add_argument('--number_of_assignments', '-nb', action='store', type=int, default=100,
@@ -96,7 +96,7 @@ def main(args):
         ignore_positions = f[1]
     else:
         ignore_positions = None
-
+    
     for strand, destination in zip(["t", "c"], [template_directory, complement_directory]):
         for kmer in kmers_of_interest:
             hist_args = {
@@ -108,9 +108,9 @@ def main(args):
                 "out_dir": destination,
                 "ignore_positions": ignore_positions,
             }
-            #k = Kmer_histogram(**hist_args)
-            #k.run()
-            work_queue.put(hist_args)
+            k = KmerHistogram(**hist_args)
+            k.run()
+            #work_queue.put(hist_args)
 
     for w in xrange(workers):
         p = Process(target=histogram_runner, args=(work_queue, done_queue))
