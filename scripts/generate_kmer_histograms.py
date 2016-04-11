@@ -2,7 +2,6 @@
 
 import os
 import sys
-sys.path.append("../")
 from alignmentAnalysisLib import KmerHistogram, parse_substitution_file
 from serviceCourse.parsers import read_fasta
 from signalAlignLib import kmer_iterator
