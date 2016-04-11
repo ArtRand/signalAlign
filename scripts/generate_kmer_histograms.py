@@ -96,7 +96,7 @@ def main(args):
         ignore_positions = f[1]
     else:
         ignore_positions = None
-    
+
     for strand, destination in zip(["t", "c"], [template_directory, complement_directory]):
         for kmer in kmers_of_interest:
             hist_args = {
@@ -108,9 +108,9 @@ def main(args):
                 "out_dir": destination,
                 "ignore_positions": ignore_positions,
             }
-            k = KmerHistogram(**hist_args)
-            k.run()
-            #work_queue.put(hist_args)
+            #k = KmerHistogram(**hist_args)
+            #k.run()
+            work_queue.put(hist_args)
 
     for w in xrange(workers):
         p = Process(target=histogram_runner, args=(work_queue, done_queue))
