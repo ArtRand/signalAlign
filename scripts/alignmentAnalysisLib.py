@@ -22,17 +22,6 @@ def parse_alignment_file(alignment_file):
     return data
 
 
-def parse_substitution_file(substitution_file):
-    fH = open(substitution_file, 'r')
-    line = fH.readline().split()
-    forward_sub = line[0]
-    forward_pos = map(np.int64, line[1:])
-    line = fH.readline().split()
-    backward_sub = line[0]
-    backward_pos = map(np.int64, line[1:])
-    return (forward_sub, forward_pos), (backward_sub, backward_pos)
-
-
 def randomly_select_alignments(path_to_alignments):
     files = os.listdir(path_to_alignments)
     files = [f for f in files if f.endswith(".tsv")]

@@ -74,7 +74,6 @@ class KmerAlignmentHistogram(KmerDistribution):
     def make_kde(self, x_vals):
         kernel = gaussian_kde(self.histogram)
         KDE_PDF = kernel.evaluate(x_vals)
-        #kde = KernelDensity(kernel='gaussian', bandwidth=0.75).fit([self.histogram][:100])
         return KDE_PDF
 
 

@@ -1,0 +1,3 @@
+[submodule "externalTools/serviceCourse"]
+	path = externalTools/serviceCourse
+	url = https://github.com/ArtRand/serviceCourse.git
