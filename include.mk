@@ -1,5 +1,6 @@
 #Modify this variable to set the location of sonLib
-sonLibRootPath=${rootPath}../sonLib
+#sonLibRootPath=${rootPath}../sonLib
+sonLibRootPath=${rootPath}./externalTools/sonLib
 sonLibPath=${sonLibRootPath}/lib
 #Use sonLib bin and lib dirs
 binPath=${sonLibRootPath}/bin

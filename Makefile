@@ -1,4 +1,5 @@
 rootPath = ./
+signalAlignBin = ${rootPath}/bin
 include ./include.mk
 
 libSources = impl/*.c
@@ -8,47 +9,46 @@ libTests = tests/*.c
 signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
-all : ${libPath}/signalAlignLib.a ${binPath}/signalAlignLibTests ${binPath}/compareDistributions \
-      ${binPath}/signalMachine ${binPath}/runSignalAlign ${sonLibrootPath}/signalAlignLib.py \
-      ${binPath}/buildHdpUtil ${binPath}/trainModels ${binPath}/hdp_pipeline ${binPath}/testSignalAlign
-	# disabled right now so that we don't build Lastz every time I do an update
-	#cd externalTools && make all
+all : ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
+      ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py \
+      ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
+	cd externalTools && make all
 	
 clean :
 	rm -f ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanLibTests  ${libPath}/cPecanLib.a
 	cd externalTools && make clean
 
-${binPath}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -o ${binPath}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
+${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
+	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
 
-${binPath}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${binPath}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}
+${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies}
+	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}
 
-${binPath}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -o ${binPath}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}
+${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
+	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}
 
-${binPath}/buildHdpUtil : buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -o ${binPath}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib}
+${signalAlignBin}/buildHdpUtil : buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
+	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib}
 
-${binPath}/runSignalAlign : ${rootPath}scripts/runSignalAlign.py
-	cp ${rootPath}scripts/runSignalAlign.py ${binPath}/runSignalAlign
-	chmod +x ${binPath}/runSignalAlign
+${signalAlignBin}/runSignalAlign : ${rootPath}scripts/runSignalAlign.py
+	cp ${rootPath}scripts/runSignalAlign.py ${signalAlignBin}/runSignalAlign
+	chmod +x ${signalAlignBin}/runSignalAlign
 
-${binPath}/trainModels : ${rootPath}scripts/trainModels.py
-	cp ${rootPath}scripts/trainModels.py ${binPath}/trainModels
-	chmod +x ${binPath}/trainModels
+${signalAlignBin}/trainModels : ${rootPath}scripts/trainModels.py
+	cp ${rootPath}scripts/trainModels.py ${signalAlignBin}/trainModels
+	chmod +x ${signalAlignBin}/trainModels
 
-${binPath}/hdp_pipeline : ${rootPath}scripts/hdp_pipeline.py
-	cp ${rootPath}scripts/hdp_pipeline.py ${binPath}/hdp_pipeline
-	chmod +x ${binPath}/hdp_pipeline
+${signalAlignBin}/hdp_pipeline : ${rootPath}scripts/hdp_pipeline.py
+	cp ${rootPath}scripts/hdp_pipeline.py ${signalAlignBin}/hdp_pipeline
+	chmod +x ${signalAlignBin}/hdp_pipeline
 
-${binPath}/testSignalAlign : ${rootPath}scripts/testSignalAlign.py
-	cp ${rootPath}scripts/testSignalAlign.py ${binPath}/testSignalAlign
-	chmod +x ${binPath}/testSignalAlign
+${signalAlignBin}/testSignalAlign : ${rootPath}scripts/testSignalAlign.py
+	cp ${rootPath}scripts/testSignalAlign.py ${signalAlignBin}/testSignalAlign
+	chmod +x ${signalAlignBin}/testSignalAlign
 
 
-${sonLibrootPath}/signalAlignLib.py : ${rootPath}scripts/signalAlignLib.py
-	cp ${rootPath}scripts/signalAlignLib.py ${sonLibRootPath}/signalAlignLib.py
+${signalAlignBin}/signalAlignLib.py : ${rootPath}scripts/signalAlignLib.py
+	cp ${rootPath}scripts/signalAlignLib.py ${signalAlignBin}/signalAlignLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 	${cxx} ${cflags} -I inc -I ${libPath}/ -c ${libSources}

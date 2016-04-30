@@ -366,7 +366,6 @@ void *sequence_getKmer4(Sequence *sequence, int64_t index) {
     }
 }
 
-
 void *sequence_getEvent(void *elements, int64_t index) {
     index = index * NB_EVENT_PARAMS;
     //return index >= 0 ? &(((double *)elements)[index]) : NULL;
