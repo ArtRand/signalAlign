@@ -3,8 +3,8 @@ include ../include.mk
 
 all: 
 	cd lastz-distrib-1.03.54 && make install
-	mv ${signalAlignBin}/lastz ${signalAlignBin}/cPecanLastz
-	mv ${signalAlignBin}/lastz_D ${signalAlignBin}/cPecanLastz_D
+	mv ./bin/lastz ../bin/cPecanLastz
+	mv ./bin/lastz_D ../bin/cPecanLastz_D
 
 clean: 
 	cd lastz-distrib-1.03.54 && make clean 
