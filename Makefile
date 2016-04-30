@@ -12,8 +12,7 @@ signalAlignLib = ${basicLibs}
 all : ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
       ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py \
       ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
-	cd externalTools && make all
-	
+	cd ./sonLib && make
 clean :
 	rm -f ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanLibTests  ${libPath}/cPecanLib.a
 	cd externalTools && make clean
