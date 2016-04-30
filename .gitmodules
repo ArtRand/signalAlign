@@ -1,3 +1,6 @@
 [submodule "externalTools/serviceCourse"]
 	path = externalTools/serviceCourse
 	url = https://github.com/ArtRand/serviceCourse.git
+[submodule "externalTools/sonLib"]
+	path = externalTools/sonLib
+	url = https://github.com/ArtRand/sonLib.git
