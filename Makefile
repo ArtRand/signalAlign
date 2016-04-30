@@ -1,5 +1,4 @@
 rootPath = ./
-signalAlignBin = ${rootPath}/bin
 include ./include.mk
 
 libSources = impl/*.c
@@ -9,13 +8,15 @@ libTests = tests/*.c
 signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
-all : ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
+all : sL ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
       ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py \
       ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
-	cd ./sonLib && make
+	cd externalTools && make all
 clean :
 	rm -f ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanLibTests  ${libPath}/cPecanLib.a
 	cd externalTools && make clean
+sL :
+	cd sonLib && make
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}

@@ -2,6 +2,7 @@
 sonLibRootPath=${rootPath}./sonLib
 sonLibPath=${sonLibRootPath}/lib
 #Use sonLib bin and lib dirs
+signalAlignBin = ${rootPath}/bin
 binPath=${sonLibRootPath}/bin
 libPath=${sonLibPath}
 
