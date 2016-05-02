@@ -12,14 +12,21 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${
       ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py \
       ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
 	cd externalTools && make all
+
 clean :
-	rm -f ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanLibTests  ${libPath}/cPecanLib.a
+	rm -r ${signalAlignBin}
+	rm -f ${libPath}/signalAlignLib.a
 	cd externalTools && make clean
+
 sL :
 	cd sonLib && make
 
 bD :
 	mkdir -v -p ${rootPath}bin
+
+test : 
+	cd ${signalAlignBin} && ./signalAlignLibTests
+	cd ${binPath} && ./sonLibTests
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
