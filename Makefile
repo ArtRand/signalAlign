@@ -18,6 +18,8 @@ clean :
 	rm -f ${libPath}/signalAlignLib.a
 	cd externalTools && make clean
 
+signalAlignLib : ${libPath}/signalAlignLib.a
+
 sL :
 	cd sonLib && make
 

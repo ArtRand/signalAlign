@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument('--twoWay', action='store_true', dest='twoWay', default=False,
                         help="Flag, two way classification")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
-                        required=True, default="threeState", help="decide which model to use, threeState by default")
+                        default="threeState", help="decide which model to use, threeState by default")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
                         default=None, help="posterior match probability threshold")
     parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
@@ -81,7 +81,7 @@ def main(args):
 #   Starting Signal Align
 #   Aligning files from: {fileDir}
 #   Aligning to reference: {reference}
-#   Aligning {nbFiles} files
+#   Aligning {nbFiles} files, max
 #   Using model: {model}
 #   Using banding: {banding}
 #   Aligning to regions in: {regions}
