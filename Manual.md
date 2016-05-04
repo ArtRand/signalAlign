@@ -21,7 +21,7 @@ SignalAlign is a hidden Markov model (HMM) software package for aligning ionic c
 ```
 4. If you want to try the test _E. coli_ files run:
 ```bash
-././runSignalAlign -d ../tests/minion_test_reads/ecoli/ -r ../tests/test_sequences/E.coli_K12.fasta -o ../tests/ 2> ../tests/test_run.err
+./runSignalAlign -d ../tests/minion_test_reads/ecoli/ -r ../tests/test_sequences/E.coli_K12.fasta -o ../tests/ 2> ../tests/test_run.err
 ```
 
 ### Description of programs
