@@ -15,12 +15,11 @@ def parse_args():
     parser = ArgumentParser(description=__doc__)
 
     parser.add_argument('--file_directory', '-d', action='store',
-                        dest='files_dir', required=False, type=str, default=None,
+                        dest='files_dir', required=True, type=str, default=None,
                         help="directory with MinION fast5 reads to align")
     parser.add_argument('--ref', '-r', action='store',
                         dest='ref', required=True, type=str,
                         help="reference sequence to align to, in FASTA")
-
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -81,7 +80,7 @@ def main(args):
 #   Starting Signal Align
 #   Aligning files from: {fileDir}
 #   Aligning to reference: {reference}
-#   Aligning {nbFiles} files, max
+#   Aligning maximum of {nbFiles} files
 #   Using model: {model}
 #   Using banding: {banding}
 #   Aligning to regions in: {regions}

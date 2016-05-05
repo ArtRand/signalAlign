@@ -34,6 +34,14 @@ SignalAlign is a hidden Markov model (HMM) software package for aligning ionic c
 
 ### runSignalAlign
 #### Input
+*   A directory of MinION reads (*.fast5) that have been basecalled. Right now, Metrichor versions 1.15.0 and 1.19.0.
+*   A reference sequence in FASTA format.
+_Optional_
+*   A file containing trained HMM transitions parameters.
+*   A file containing a HDP model or other emissions (normal distributions) parameters.
+*   Target regions file. Only reads that map to these regions will follow on to event-alignment
+*   Ambiguity positions file. T
+
 #### Options
 #### Output
 
@@ -49,3 +57,5 @@ SignalAlign is a hidden Markov model (HMM) software package for aligning ionic c
 #### Input
 #### Options
 #### Output
+
+### File formats
