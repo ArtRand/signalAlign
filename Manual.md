@@ -54,7 +54,9 @@ _Optional_
 * `--jobs, -j` Number of jobs to run concurrently, Default: 4.
 * `--nb_files, -n` Maximum number of files to align. Default: 500.
 * `--sparse_output` Sparse output option (see output section)
+
 #### Output
+
 There are two output formats. Normal and sparse. Normal output has the following tab-separated-format:
 
 | Contig | Reference Index | Reference 6-mer | Read File | Strand | Event Index | Event Mean | Event Noise | Event Duration | Aligned 6-mer | Scaled Mean Current | Scaled Noise | Posterior Probability | Descaled Event Mean | Model (ONT) Mean | Path 6-mer |
