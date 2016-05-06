@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", help="decide which model to use, threeState by default")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
-                        default=None, help="posterior match probability threshold")
+                        default=None, help="posterior match probability threshold, Default: 0.01")
     parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
                         required=False, default=None, help="number of diagonals to expand around each anchor")
     parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
@@ -46,9 +46,9 @@ def parse_args():
                         default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run concurrently")
-    parser.add_argument('-nb_files', '-n', action='store', dest='nb_files', required=False,
-                        default=50, type=int, help="maximum number of reads to align")
-    parser.add_argument('-ambiguity_positions', '-x', action='store', required=False, default=None,
+    parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
+                        default=500, type=int, help="maximum number of reads to align")
+    parser.add_argument('--ambiguity_positions', '-x', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
     parser.add_argument('--sparse_output', '-s', action='store_true', default=False, dest='sparse',
                         help="flag, sparse output")

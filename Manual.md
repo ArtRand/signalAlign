@@ -34,19 +34,42 @@ SignalAlign is a hidden Markov model (HMM) software package for aligning ionic c
 
 ### runSignalAlign
 #### Input
-*   A directory of MinION reads (*.fast5) that have been basecalled. Right now, Metrichor versions 1.15.0 and 1.19.0.
-*   A reference sequence in FASTA format.
+* A directory of MinION reads (*.fast5) that have been basecalled. Right now, Metrichor versions 1.15.0 and 1.19.0.
+* A reference sequence in FASTA format.
+* Output location, a path to use as working directory. A new directory will be made here, so the program won't pollute this directory.
+
 _Optional_
-*   A file containing trained HMM transitions parameters.
-*   A file containing a HDP model or other emissions (normal distributions) parameters.
-*   Target regions file. Only reads that map to these regions will follow on to event-alignment
-*   Ambiguity positions file. T
+* A file containing trained HMM transitions parameters.
+* A file containing a HDP model or other emissions (normal distributions) parameters.
+* Target regions file. Only reads that map to these regions will follow on to event-alignment
+* Ambiguity positions file, specifies which positions in the reference to flag as 'methylation ambiguous' (used for methylation variant calling)
 
 #### Options
+* `--stateMachineType, -smt` HMM to use. Options: `threeState` and `threeStateHdp`.
+* `--twoWay`, specify for C vs mC classification. Three-way classification (C, mC, hmC) by default.
+* `--threshold, -t`. Minimum posterior match probability threshold (matches below this threshold will not be tabulated). Default: 0.01.
+* `--diagonalExpansion, -e` Mumber of diagonals to expand around each anchor, Default: 50.
+* `--constraintTrim, -m` Amount to remove from an anchor constraint. Default: 14.
+* `--un_banded, -ub` Remove all anchors, compute entire DP matrix. Default: False.
+* `--jobs, -j` Number of jobs to run concurrently, Default: 4.
+* `--nb_files, -n` Maximum number of files to align. Default: 500.
+* `--sparse_output` Sparse output option (see output section)
 #### Output
+There are two output formats. Normal and sparse. Normal output has the following tab-separated-format:
+
+| Contig | Reference Index | Reference 6-mer | Read File | Strand | Event Index | Event Mean | Event Noise | Event Duration | Aligned 6-mer | Scaled Mean Current | Scaled Noise | Posterior Probability | Descaled Event Mean | Model (ONT) Mean | Path 6-mer |
+|--- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+And sparse format:
+
+| Contig | Reference Index | Reference 6-mer | Read File | Strand | Event Index | Aligned 6-mer | Posterior Probability | Path 6-mer |
+|--- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+Each read that aligns to the target regions (if you specified that option) will come as a separate file.
 
 #### Using substitution and target files
-#### Calling methylation
+
+
 
 ### trainModels
 #### Input

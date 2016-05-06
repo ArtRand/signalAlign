@@ -982,11 +982,6 @@ class SignalAlignment(object):
         else:
             trim_flag = "-m 9999"
 
-        #if self.cytosine_substitution is not None:
-        #    cytosine_flag = "-M {cytosineMod}".format(cytosineMod=self.cytosine_substitution)
-        #else:
-        #    cytosine_flag = ""
-
         # sparse output
         if self.sparse_output is True:
             sparse_flag = "--sparse_output "
