@@ -69,12 +69,29 @@ And sparse format:
 
 Each read that aligns to the target regions (if you specified that option) will come as a separate file.
 
-#### Using substitution and target files
+#### Mapping cytosine methylation by using substitution and target files
+**signalAlign** uses two files to map methylation in a reference sequence. First it uses a *target file* that means only reads that map to regions specified in the file will be aligned on the signal-level. The *target file* has format: `start \t end \t sequence`. An example can be seen here:`/signalAlign/tests/test_regions/test_sites_bal_1.tgt`. The second file is a *label file* that tells signalAlign which bases to flag as ambiguous. This file has the format `X \t position \t ... \n` one line for both the template and complement strand. An example is at `/signalAlign/tests/test_regions/test_labels_bal_1.tsv`.
 
-
+An example command that would produce 2-way methylation probabilities in _E. coli_
+(n.b. to run this example, download the HDP models from the [HDP_models](https://github.com/ArtRand/HDP_models) repo)
+```bash
+./runSignalAlign \
+> -d=../tests/minion_test_reads/ecoli/ \
+> -r=../tests/test_sequences/E.coli_K12.fasta \
+> -T=../../HDP_models/ecoli_models/template_trained.hmm \
+> -C=../../HDP_models/ecoli_models/complement_trained.hmm \
+> -tH=../../HDP_models/ecoli_models/template.multisetPrior2.nhdp \
+> -cH=../../HDP_models/ecoli_models/complement.multisetPrior2.nhdp \
+> --twoWay \
+> -smt=threeStateHdp \
+> -s \
+> -o=../../ \
+> 2> ../../a.err
+```
 
 ### trainModels
 #### Input
+
 #### Options
 #### Output
 
