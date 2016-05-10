@@ -1501,5 +1501,3 @@ StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile) {
 void stateMachine_destruct(StateMachine *stateMachine) {
     free(stateMachine);
 }
-
-//silly test
