@@ -26,7 +26,7 @@ def parse_args():
                         required=False, type=str,
                         help="directory to put the trained model, and use for working directory.")
     parser.add_argument('--iterations', '-i', action='store', dest='iter', default=10,
-                        required=False, type=int)
+                        required=False, type=int, help='number of iterations to perform')
     parser.add_argument('--train_amount', '-a', action='store', dest='amount', default=15,
                         required=False, type=int,
                         help="limit the total length of sequence to use in training (batch size).")
@@ -42,7 +42,6 @@ def parse_args():
     parser.add_argument('--transitions', action='store_true', default=False, dest='transitions',
                         help='Flag to train transitions, False by default')
 
-    # disabled input HMMs, only start from scratch right now
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -55,11 +54,12 @@ def parse_args():
                         type=int, help="number of jobs to run concurrently")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", required=False,
-                        help="StateMachine options: threeState, threeStateHdp, vanilla")
+                        help="StateMachine options: threeState, threeStateHdp")
     parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None,
                         help="path to template HDP model to use")
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
                         help="path to complement HDP model to use")
+    # TODO build support for ambiguity characters in training
     parser.add_argument('-ambiguity_positions', '-x', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
     # gibbs
@@ -207,7 +207,7 @@ def main(args):
     # Using model: {model}
     # Using HDPs: {thdp} / {chdp}
     # Training emissions: {emissions}
-    #          tranistions: {transitions}
+    #          transitions: {transitions}
     \n
     """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref, outLoc=args.out, iter=args.iter,
                iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP,
@@ -280,8 +280,8 @@ def main(args):
 
     trained_models = [template_hmm, complement_hmm]
 
-    default_template_hmm = "../../signalAlign/models/default_template.hmm"
-    default_complement_hmm = "../../signalAlign/models/default_complement.hmm"
+    default_template_hmm = "../models/default_template.hmm"
+    default_complement_hmm = "../models/default_complement.hmm"
 
     default_models = [default_template_hmm, default_complement_hmm]
 

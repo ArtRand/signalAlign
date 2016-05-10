@@ -34,15 +34,15 @@ SignalAlign is a hidden Markov model (HMM) software package for aligning ionic c
 
 ### runSignalAlign
 #### Input
+_Required_
 * A directory of MinION reads (*.fast5) that have been basecalled. Right now, Metrichor versions 1.15.0 and 1.19.0 are supported.
 * A reference sequence in FASTA format.
 * Output location, a path to use as working directory. A new directory will be made here, so the program won't pollute this directory.
-
 _Optional_
-* A file containing trained HMM transitions parameters.
-* A file containing a HDP model or other emissions (normal distributions) parameters.
-* Target regions file. Only reads that map to these regions will follow on to event-alignment
-* Ambiguity positions file, specifies which positions in the reference to flag as 'methylation ambiguous' (used for methylation variant calling)
+* A file containing trained HMM transitions parameters `-T` (template HMM) `-C` (complement HMM).
+* A file containing a HDP model or other emissions (normal distributions) parameters `-tH` (template HDP) `-cH` (complement HDP).
+* Target regions file. Only reads that map to these regions will follow on to event-alignment `-q`
+* Ambiguity positions file, specifies which positions in the reference to flag as 'methylation ambiguous' (used for methylation variant calling) `-x`
 
 #### Options
 * `--stateMachineType, -smt` HMM to use. Options: `threeState` and `threeStateHdp`.
@@ -92,16 +92,62 @@ An example command that would produce 2-way methylation probabilities in _E. col
 ```
 ### trainModels
 #### Input
+_Required_
 * A directory of MinION reads (*.fast5) that have been basecalled. Right now, Metrichor versions 1.15.0 and 1.19.0 are supported.
 * A reference sequence in FASTA format.
 * Output location, a path to use as working directory. A new directory will be made here, so the program won't pollute this directory.
+_Optional_
+* A file containing trained HMM transitions parameters `-T` (template HMM) `-C` (complement HMM).
+* A file containing a HDP model or other emissions (normal distributions) parameters `-tH` (template HDP) `-cH` (complement HDP).
 
 #### Options
+* `--iterations, -i` number of iterations to perform.
+* `--train_amount, -a` batch size _in bases_
+* `--emissions` flag, train emissions
+* `--transitions` flag, train transitions
+* `--threshold, -t` Minimum posterior match probability threshold (matches below this threshold will not be tabulated). Default: 0.01.
+* `--diagonalExpansion, -e` Mumber of diagonals to expand around each anchor, Default: 50.
+* `--constraintTrim, -m` Amount to remove from an anchor constraint. Default: 14.
+* `--verbose` flag, verbose Gibbs sampling output, default: False
+* `--un_banded, -ub` Remove all anchors, compute entire DP matrix. Default: False.
+* `--jobs, -j` Number of jobs to run concurrently, Default: 4.
+* `--samples, -s` number of samples to collect during Gibbs sampling
+* `--thinning, -th` number of samples to thin (pick every `x` samples)
+* `--min_assignments` Do not initiate Gibbs sampling unless this many assignments have been accumulated
 #### Output
+Trained models, within the working `/tempFiles_expectations/` will have:
+* `template_trained.hmm` template HMM with trained parameters
+* `complement_trained.hmm` complement HMM with trained parameters
+If HDPs were used, a copy of the input HDP will also be here.
 
 ### hdp_pipeline
 #### Input
+* **Recommended** use a build alignment. There are scripts in the /signalAlign/scripts folder and examples in the [HDP_models](https://github.com/ArtRand/HDP_models) repo.
+* Alternatively alignments (in normal non-sparse format). In the case of using plain alignments, `-C`, `-mC`, and `-hmC` will globally change all of the cytosine bases to methyl or hydroxy-methyl cytosines. You may specify just `-C` if you don't want to label methylated cytosines.
 #### Options
-#### Output
+* `--threshold, -t` only take assignments (from the alignment) with posterior probability >= `t`
+* `--hdp_type` HDP type Options: `Prior`, `Fixed`, `twoWay` Default: `Prior`. `twoWay` is a Prior-type model that uses a gamma-distribution over the hyperparameters (concentration parameters) of the HDP.
+* `--template_model, -tM` Template lookup table for priors on 6-mers
+* `--complement_model, -cM` Template lookup table for priors on 6-mers
+* `-B`, `-M`, `-L` Base, middle, and leaf concentration parameters, respectively. Default: 1
+* `-Ba`, `-Bb,`, `-Ma`, `-Mb`, `-La`, `-Lb` Base alpha(`a`)/beta(`b`) parameters for gamma distribution prior over concentration parameters. Default: 1.
+* `--samples, -s` number of samples to collect during Gibbs sampling. Default: 10000.
+* `--thinning, -th` number of samples to thin (pick every `x` samples). Default: 100.
+* `--verbose` flag, verbose Gibbs sampling output, default: False.
+* `--grid_start` sampling grid start (in pA). Default: 30 pA.
+* `--grid_end` sampling grid end (in pA). Default: 90 pA.
+* `--grid_length` number of nodes in the sampling grid. Default 1200.
+* `--out, -o` output location
 
-### File formats
+#### Output
+Trained HDP models. Script will make all of the models for 3-way classification and the singleLevel and multiset models for 2-way classification.
+
+Example command:
+```bash
+./hdp_pipeline --build_alignment=/HDP_models/ecoli_models/buildAlignment_PCR_andLabeled_b1.tsv \
+> -tM ../models/testModel_template.model \
+> -cM ../models/testModel_complement.model \
+> -Ba 1 -Bb 1 -Ma 1 -Mb 1 -La 1 -Lb 1 -s 15000 --verbose --hdp_type=twoWay \
+> -o ./hdp_pipeline/
+```
+

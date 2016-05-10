@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Master pipeline script for generating trained HDPs for MinION signal data
 
-Input: alignments using non-HDP model, desired HDP type
+Input: alignments using non-HDP model
 Output: trained HDP and model
 
 The objective of this pipeline is to:
@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument('--threshold', '-t', action='store', type=float, default=0.9, dest='threshold')
     parser.add_argument('--hdp_type', action='store', type=str, required=False, dest='hdp_type', default='Prior',
                         help="Build Hdp, specify type, options: "
-                             "singleLevelFixed, singleLevelPrior, multisetFixed, multisetPrior")
+                             "Prior, Fixed, twoWay. twoWay is a Prior-type model (recommended)")
     parser.add_argument('--template_model', '-tM', action='store', type=str, default=None, dest='template_lookup',
                         required=False, help="Input template lookup table")
     parser.add_argument('--complement_model', '-cM', action='store', type=str, default=None, dest='complement_lookup',
