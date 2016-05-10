@@ -1502,3 +1502,4 @@ void stateMachine_destruct(StateMachine *stateMachine) {
     free(stateMachine);
 }
 
+//silly test
