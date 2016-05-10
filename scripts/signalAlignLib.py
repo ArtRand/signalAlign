@@ -5,6 +5,7 @@ from __future__ import print_function, division
 import os
 import h5py
 import sys
+sys.path.append("../")
 import subprocess
 import re
 import numpy as np
@@ -15,6 +16,7 @@ from serviceCourse.file_handlers import FolderHandler
 
 # Globals
 NORM_DIST_PARAMS = 2
+
 
 def kmer_iterator(dna, k):
     for i in xrange(len(dna)):

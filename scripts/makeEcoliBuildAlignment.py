@@ -2,11 +2,9 @@
 """ Make supervised training alignment from E coli alignments
 """
 import sys
-import glob
-import os
-import numpy as np
 import pandas as pd
-from alignmentAnalysisLib import parse_alignment_file, cull_list_of_alignment_files, parse_substitution_file
+from alignmentAnalysisLib import parse_alignment_file, cull_list_of_alignment_files
+from signalAlignLib import parse_substitution_file
 from argparse import ArgumentParser
 
 
@@ -15,18 +13,21 @@ def parse_args():
 
     # query files
     parser.add_argument('--alignments', '-a', action='append', dest='alns', required=True, type=str,
-                        help="alignment files")
+                        help="alignment files to get 6-mer assignments from. Does not label assignments")
     parser.add_argument('--methylated', '-ma', action='append', dest='positive', required=True, type=str,
-                        help="alignments to get labeled events from")
+                        help="alignments to get labeled events from, will label 6-mers based on positions in "
+                             "'methylated_positions file")
     parser.add_argument('--null', '-na', action='append', dest='null', required=False, type=str, default=None,
-                        help="alignments to get null events from")
+                        help="alignments to get null events from, same as '-ma' gets assignments based on "
+                             "'null_positions' file, but does not label them. Optional.")
     parser.add_argument('--number_of_assignments', '-nb', action='store', type=int, default=10000,
-                        dest='max_assignments',
-                        help='total number of canonical assignments to get')
+                        dest='max_assignments', help='total number of canonical assignments to get, Default: 10000')
     parser.add_argument('--number_of_labeled_assignments', '-l', action='store', type=int, default=10000,
-                        dest='max_labels', help='total number of assignments to collect for labeled and null')
+                        dest='max_labels', help='total number of assignments to collect for labeled and (optionally) '
+                                                'null')
     parser.add_argument('--threshold', '-t', action='store', type=float, default=0.75, dest='threshold')
-    parser.add_argument('--label', action='store', default="E", dest='label')
+    parser.add_argument('--label', action='store', default="E", dest='label', help="Only collect assignments above this"
+                                                                                   "posterior probability.")
     parser.add_argument('--methylated_positions', '-m', action='store', dest='positive_positions', required=True,
                         help="file with positions to label as 'label' ")
     parser.add_argument('--null_positions', '-n', action='store', dest='null_positions', required=False,

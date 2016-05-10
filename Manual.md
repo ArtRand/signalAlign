@@ -1,7 +1,7 @@
 ## SignalAlign Manual
 
 #### Art Rand
-Updated 5/2/16
+Updated 5/5/16
 
 ### Introduction
 SignalAlign is a hidden Markov model (HMM) software package for aligning ionic current from the Oxford Nanopore Technologies (ONT) MinION to a reference sequence and inferring properties of the reference sequence.
@@ -38,6 +38,7 @@ _Required_
 * A directory of MinION reads (*.fast5) that have been basecalled. Right now, Metrichor versions 1.15.0 and 1.19.0 are supported.
 * A reference sequence in FASTA format.
 * Output location, a path to use as working directory. A new directory will be made here, so the program won't pollute this directory.
+
 _Optional_
 * A file containing trained HMM transitions parameters `-T` (template HMM) `-C` (complement HMM).
 * A file containing a HDP model or other emissions (normal distributions) parameters `-tH` (template HDP) `-cH` (complement HDP).
@@ -146,10 +147,10 @@ Trained HDP models. Script will make all of the models for 3-way classification 
 
 Example command:
 ```bash
-./hdp_pipeline --build_alignment=/HDP_models/ecoli_models/buildAlignment_PCR_andLabeled_b1.tsv \
+./hdp_pipeline --build_alignment=../../HDP_models/ecoli_models/buildAlignment_PCR_andLabeled_b1.tsv \
 > -tM ../models/testModel_template.model \
 > -cM ../models/testModel_complement.model \
-> -Ba 1 -Bb 1 -Ma 1 -Mb 1 -La 1 -Lb 1 -s 15000 --verbose --hdp_type=twoWay \
+> -Ba 1 -Bb 1 -Ma 1 -Mb 1 -La 1 -Lb 1 -s 15000 --verbose --hdp_type twoWay \
 > -o ./hdp/
 2> ./hdp/a.err
 ```
