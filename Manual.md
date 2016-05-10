@@ -96,6 +96,7 @@ _Required_
 * A directory of MinION reads (*.fast5) that have been basecalled. Right now, Metrichor versions 1.15.0 and 1.19.0 are supported.
 * A reference sequence in FASTA format.
 * Output location, a path to use as working directory. A new directory will be made here, so the program won't pollute this directory.
+
 _Optional_
 * A file containing trained HMM transitions parameters `-T` (template HMM) `-C` (complement HMM).
 * A file containing a HDP model or other emissions (normal distributions) parameters `-tH` (template HDP) `-cH` (complement HDP).
@@ -124,6 +125,7 @@ If HDPs were used, a copy of the input HDP will also be here.
 #### Input
 * **Recommended** use a build alignment. There are scripts in the /signalAlign/scripts folder and examples in the [HDP_models](https://github.com/ArtRand/HDP_models) repo.
 * Alternatively alignments (in normal non-sparse format). In the case of using plain alignments, `-C`, `-mC`, and `-hmC` will globally change all of the cytosine bases to methyl or hydroxy-methyl cytosines. You may specify just `-C` if you don't want to label methylated cytosines.
+
 #### Options
 * `--threshold, -t` only take assignments (from the alignment) with posterior probability >= `t`
 * `--hdp_type` HDP type Options: `Prior`, `Fixed`, `twoWay` Default: `Prior`. `twoWay` is a Prior-type model that uses a gamma-distribution over the hyperparameters (concentration parameters) of the HDP.
@@ -148,6 +150,7 @@ Example command:
 > -tM ../models/testModel_template.model \
 > -cM ../models/testModel_complement.model \
 > -Ba 1 -Bb 1 -Ma 1 -Mb 1 -La 1 -Lb 1 -s 15000 --verbose --hdp_type=twoWay \
-> -o ./hdp_pipeline/
+> -o ./hdp/
+2> ./hdp/a.err
 ```
 
