@@ -1089,34 +1089,6 @@ static double stateMachine3_raggedEndStateProb(StateMachine *sM, int64_t state) 
     return 0.0;
 }
 
-static double stateMachineEchelon_startStateProb(StateMachine *sM, int64_t state) {
-    //Match state is like going to a match.
-    state_check(sM, state);
-    return state == match1 ? 0 : LOG_ZERO;
-}
-
-static double stateMachineEchelon_raggedStartStateProb(StateMachine *sM, int64_t state) {
-    state_check(sM, state);
-    return state == gapX ? 0 : LOG_ZERO;
-}
-
-static double stateMachineEchelon_endStateProb(StateMachine *sM, int64_t state) {
-    StateMachineEchelon *sMe = (StateMachineEchelon *) sM;
-    state_check(sM, state);
-    switch (state) {
-        case match0:
-        case match1:
-        case match2:
-        case match3:
-        case match4:
-        case match5:
-            return sMe->DEFAULT_END_MATCH_PROB;
-        case gapX:
-            return sMe->DEFAULT_END_FROM_X_PROB;
-    }
-    return 0.0;
-}
-
 void stateMachine3_setTransitionsToNucleotideDefaults(StateMachine *sM) {
     StateMachine3 *sM3 = (StateMachine3 *) sM;
     sM3->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
@@ -1279,57 +1251,6 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
     }
 }
 
-static void stateMachineEchelon_cellCalculate(StateMachine *sM,
-                                              double *current, double *lower, double *middle, double *upper,
-                                              void *cX, void *cY,
-                                              void (*doTransition)(double *, double *, int64_t, int64_t,
-                                                                   double, double, void *),
-                                              void *extraArgs) {
-    StateMachineEchelon *sMe = (StateMachineEchelon *) sM;
-    // transitions
-    // from M
-    double a_mx = sMe->getKmerSkipProb((StateMachine *)sMe, cX, 0), la_mx = log(a_mx); // beta
-    double a_mh = 1 - a_mx, la_mh = log(a_mh); // 1 - beta
-
-    // from X (kmer skip)
-    //double a_xx = a_mx, la_xx = log(a_xx); // alpha, to seperate alpha, need to change here
-    double a_xx = sMe->getKmerSkipProb((StateMachine *)sMe, cX, 1), la_xx = log(a_xx);
-    double a_xh = 1 - a_xx, la_xh = log(a_xh); // 1 - alpha
-
-    if (lower != NULL) {
-        // go from all of the match states to gapX
-        for (int64_t n = 1; n < 6; n++) {
-            doTransition(lower, current, n, gapX, 0, la_mx, extraArgs);
-        }
-        // gapX --> gapX
-        doTransition(lower, current, gapX, gapX, 0, la_xx, extraArgs);
-    }
-    if (middle != NULL) {
-        // first we handle going from all of the match states to match1 through match5
-        for (int64_t n = 1; n < 6; n++) {
-            for (int64_t from = 0; from < 6; from++) {
-                doTransition(middle, current, from, n,
-                             sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_MATRIX, cX, cY, n),
-                             (la_mh + sMe->getDurationProb(cY, n)), extraArgs);
-            }
-        }
-        // now do from gapX to the match states
-        for (int64_t n = 1; n < 6; n++) {
-            doTransition(middle, current, gapX, n, sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_MATRIX, cX, cY, n),
-                         (la_xh + sMe->getDurationProb(cY, n)), extraArgs);
-        }
-    }
-    if (upper != NULL) {
-        // only allowed to go from match states to match0 (extra event state)
-        for (int64_t n = 1; n < 6; n++) {
-            doTransition(upper, current, n, match0,
-                         sMe->getScaledMatchProbFcn(sMe->model.EMISSION_GAP_Y_MATRIX, cX, cY),
-                         //sMe->getDurationProb(cY, 0), extraArgs);
-                         (la_mh + sMe->getDurationProb(cY, 0)), extraArgs);
-        }
-    }
-}
-
 ///////////////////////////////////////////// CORE FUNCTIONS ////////////////////////////////////////////////////////
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
@@ -1428,49 +1349,6 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t paramete
     }
     return (StateMachine *) sM3;
 }
-
-StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t parameterSetSize,
-                                            void (*setEmissionsToDefaults)(StateMachine *sM, int64_t nbSkipParams),
-                                            double (*durationProbFcn)(void *event, int64_t n),
-                                            double (*skipProbFcn)(StateMachine *sM, void *kmerList, bool),
-                                            double (*matchProbFcn)(const double *, void *, void *, int64_t n),
-                                            double (*scaledMatchProbFcn)(const double *, void *, void *),
-                                            void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
-                                                                         int64_t from, int64_t to,
-                                                                         double eP, double tP, void *extraArgs)) {
-    StateMachineEchelon *sMe = st_malloc(sizeof(StateMachineEchelon));
-
-    if (type != echelon) {
-        st_errAbort("Tried to create a echelon state machine with the wrong type?");
-    }
-
-    // setup end state probabilities // todo these aren't log and won't work
-    sMe->DEFAULT_END_MATCH_PROB = 0.79015888282447311; // stride_prb
-    sMe->DEFAULT_END_FROM_X_PROB = 0.19652425498269727; // skip_prob
-    sMe->BACKGROUND_EVENT_PROB = -3.0;
-
-    // parent class setup
-    sMe->model.type = type;
-    sMe->model.parameterSetSize = parameterSetSize;
-    sMe->model.stateNumber = 7;
-    sMe->model.matchState = match1; // take a look at this, might need to change
-    sMe->model.startStateProb = stateMachineEchelon_startStateProb;
-    sMe->model.raggedStartStateProb = stateMachineEchelon_raggedStartStateProb;
-    sMe->model.endStateProb = stateMachineEchelon_endStateProb;
-    sMe->model.raggedEndStateProb = stateMachineEchelon_endStateProb;
-    sMe->model.cellCalculate = stateMachineEchelon_cellCalculate;
-    sMe->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
-
-    // class functions
-    sMe->getKmerSkipProb = skipProbFcn;
-    sMe->getDurationProb = durationProbFcn;
-    sMe->getMatchProbFcn = matchProbFcn;
-    sMe->getScaledMatchProbFcn = scaledMatchProbFcn;
-
-    setEmissionsToDefaults((StateMachine *) sMe, 60);
-    return (StateMachine *) sMe;
-}
-
 
 /*
 static void stateMachine3_loadAsymmetric(StateMachine3 *sM3, Hmm *hmm) {
@@ -1618,19 +1496,6 @@ StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile) {
                                                       cell_signal_updateTransAndKmerSkipExpectations2);
     emissions_signal_loadPoreModel(sM3Hdp, modelFile, sM3Hdp->type);
     return sM3Hdp;
-}
-
-StateMachine *getStateMachineEchelon(const char *modelFile) {
-    StateMachine *sMe = stateMachineEchelon_construct(echelon, NUM_OF_KMERS,
-                                                      emissions_signal_initEmissionsToZero,
-                                                      emissions_signal_getDurationProb,
-                                                      //emissions_signal_getKmerSkipProb,
-                                                      emissions_signal_getBetaOrAlphaSkipProb,
-                                                      emissions_signal_multipleKmerMatchProb,
-                                                      emissions_signal_getEventMatchProbWithTwoDists,
-                                                      NULL); // cell update expectation, to be implemented
-    emissions_signal_loadPoreModel(sMe, modelFile, sMe->type);
-    return sMe;
 }
 
 void stateMachine_destruct(StateMachine *stateMachine) {
