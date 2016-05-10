@@ -1278,58 +1278,6 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
         }
     }
 }
-
-static void stateMachineEchelon_cellCalculate(StateMachine *sM,
-                                              double *current, double *lower, double *middle, double *upper,
-                                              void *cX, void *cY,
-                                              void (*doTransition)(double *, double *, int64_t, int64_t,
-                                                                   double, double, void *),
-                                              void *extraArgs) {
-    StateMachineEchelon *sMe = (StateMachineEchelon *) sM;
-    // transitions
-    // from M
-    double a_mx = sMe->getKmerSkipProb((StateMachine *)sMe, cX, 0), la_mx = log(a_mx); // beta
-    double a_mh = 1 - a_mx, la_mh = log(a_mh); // 1 - beta
-
-    // from X (kmer skip)
-    //double a_xx = a_mx, la_xx = log(a_xx); // alpha, to seperate alpha, need to change here
-    double a_xx = sMe->getKmerSkipProb((StateMachine *)sMe, cX, 1), la_xx = log(a_xx);
-    double a_xh = 1 - a_xx, la_xh = log(a_xh); // 1 - alpha
-
-    if (lower != NULL) {
-        // go from all of the match states to gapX
-        for (int64_t n = 1; n < 6; n++) {
-            doTransition(lower, current, n, gapX, 0, la_mx, extraArgs);
-        }
-        // gapX --> gapX
-        doTransition(lower, current, gapX, gapX, 0, la_xx, extraArgs);
-    }
-    if (middle != NULL) {
-        // first we handle going from all of the match states to match1 through match5
-        for (int64_t n = 1; n < 6; n++) {
-            for (int64_t from = 0; from < 6; from++) {
-                doTransition(middle, current, from, n,
-                             sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_MATRIX, cX, cY, n),
-                             (la_mh + sMe->getDurationProb(cY, n)), extraArgs);
-            }
-        }
-        // now do from gapX to the match states
-        for (int64_t n = 1; n < 6; n++) {
-            doTransition(middle, current, gapX, n, sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_MATRIX, cX, cY, n),
-                         (la_xh + sMe->getDurationProb(cY, n)), extraArgs);
-        }
-    }
-    if (upper != NULL) {
-        // only allowed to go from match states to match0 (extra event state)
-        for (int64_t n = 1; n < 6; n++) {
-            doTransition(upper, current, n, match0,
-                         sMe->getScaledMatchProbFcn(sMe->model.EMISSION_GAP_Y_MATRIX, cX, cY),
-                         //sMe->getDurationProb(cY, 0), extraArgs);
-                         (la_mh + sMe->getDurationProb(cY, 0)), extraArgs);
-        }
-    }
-}
-
 ///////////////////////////////////////////// CORE FUNCTIONS ////////////////////////////////////////////////////////
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
