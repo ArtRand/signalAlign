@@ -108,8 +108,10 @@ void add_true_metric_tests(CuTest* ct, DistributionMetricMemo* memo, Hierarchica
 }
 
 void test_distr_metrics(CuTest* ct) {
-    FILE* data_file = fopen("../../signalAlign/tests/test_hdp/data.txt","r");
-    FILE* dp_id_file = fopen("../../signalAlign/tests/test_hdp/dps.txt", "r");
+    stFile_exists(stString_print("../tests/test_hdp/data.txt"));
+    stFile_exists(stString_print("../tests/test_hdp/dps.txt"));
+    FILE* data_file = fopen("../tests/test_hdp/data.txt","r");
+    FILE* dp_id_file = fopen("../tests/test_hdp/dps.txt", "r");
 
     stList* data_list = stList_construct3(0, free);
     stList* dp_id_list = stList_construct3(0, free);
@@ -209,9 +211,9 @@ void test_distr_metrics(CuTest* ct) {
 void test_nhdp_distrs(CuTest* ct) {
 
     NanoporeHDP* nhdp = flat_hdp_model("ACGT", 4, 6, 4.0, 20.0, 0.0, 100.0, 100,
-                                       "../../signalAlign/models/template_median68pA.model");
+                                       "../models/template_median68pA.model");
 
-    update_nhdp_from_alignment(nhdp, "../../signalAlign/tests/test_alignments/simple_alignment.tsv",
+    update_nhdp_from_alignment(nhdp, "../tests/test_alignments/simple_alignment.tsv",
                                false);
 
     execute_nhdp_gibbs_sampling(nhdp, 100, 0, 1, false);

@@ -1261,8 +1261,7 @@ CuSuite *highOrderPairwiseAlignerTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
-    //SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
-
+    //SUITE_ADD_TEST(suite, test_continuousPairHmm_em); // TODO make 'sample' method
     //SUITE_ADD_TEST(suite, test_hdpHmm_em);
 
     return suite;

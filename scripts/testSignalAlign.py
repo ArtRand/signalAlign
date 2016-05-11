@@ -39,7 +39,8 @@ class signalAlign_alignment_test(unittest.TestCase):
         shutil.rmtree(test_directory)
 
     def test_zymo_reads(self):
-        signalAlign_root_directory = "../../signalAlign/"
+        #signalAlign_root_directory = "../../signalAlign/"
+        signalAlign_root_directory = "../"
         zymo_true_alignments = signalAlign_root_directory + "tests/test_alignments/zymo_C_test_alignments_sm3/" \
                                                             "tempFiles_alignment/"
         zymo_c_reads = signalAlign_root_directory + "tests/minion_test_reads/C/"
