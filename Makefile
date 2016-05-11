@@ -14,7 +14,8 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${
 	cd externalTools && make all
 
 clean :
-	rm -r ${signalAlignBin}
+	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
+	#rm -r ${signalAlignBin}
 	rm -f ${libPath}/signalAlignLib.a
 	cd externalTools && make clean
 
