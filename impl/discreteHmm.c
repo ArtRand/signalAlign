@@ -290,14 +290,3 @@ void hmmDiscrete_destruct(Hmm *hmm) {
     free(hmmD);
 }
 
-// stateMachine interface
-StateMachineFunctions *stateMachineFunctions_construct(double (*gapXProbFcn)(const double *, void *),
-                                                       double (*gapYProbFcn)(const double *, void *),
-                                                       double (*matchProbFcn)(const double *, void *, void *)) {
-    StateMachineFunctions *sMfs = malloc(sizeof(StateMachineFunctions));
-    sMfs->gapXProbFcn = gapXProbFcn;
-    sMfs->gapYProbFcn = gapYProbFcn;
-    sMfs->matchProbFcn = matchProbFcn;
-    return sMfs;
-}
-

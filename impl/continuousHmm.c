@@ -73,10 +73,10 @@ static double continuousPairHmm_descaleEventMean_JordanStyle(ContinuousPairHmm *
     return (eventMean + self->var * levelMean - self->scale * levelMean - self->shift) / self->var;
 }
 
-static double continuousPairHmm_descaleEventMean(ContinuousPairHmm *self, double eventMean, double levelMean) {
-    (void) levelMean;
-    return (eventMean - self->shift) / self->scale;
-}
+//static double continuousPairHmm_descaleEventMean(ContinuousPairHmm *self, double eventMean, double levelMean) {
+//    (void) levelMean;
+//    return (eventMean - self->shift) / self->scale;
+//}
 
 Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPseudocount,
                                  int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,

@@ -1,9 +1,8 @@
 #ifndef DISCRETE_HMM_H_
 #define DISCRETE_HMM_H_
 
-#include <stdio.h>
-#include <stdint.h>
 #include "stateMachine.h"
+
 
 typedef struct _hmmDiscrete {
     Hmm baseHmm;
@@ -54,8 +53,5 @@ void hmmDiscrete_destruct(Hmm *hmmD);
 StateMachineFunctions *stateMachineFunctions_construct(double (*gapXProbFcn)(const double *, void *),
                                                        double (*gapYProbFcn)(const double *, void *),
                                                        double (*matchProbFcn)(const double *, void *, void *));
-
-// Not yet implemented
-//StateMachineFunctions *stateMachineFunctions_constructFromType(int64_t stateMachineType);
 
 #endif

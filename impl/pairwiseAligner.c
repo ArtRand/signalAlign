@@ -14,18 +14,11 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <inttypes.h>
-#include <stdint.h>
-#include <discreteHmm.h>
-#include "nanopore.h"
-#include "sonLib.h"
+#include "discreteHmm.h"
 #include "bioioC.h"
 #include "pairwiseAlignment.h"
 #include "pairwiseAligner.h"
 #include "continuousHmm.h"
-#include "stateMachine.h"
-#include "emissionMatrix.h"
-
-
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -558,6 +551,7 @@ char *hdCell_getSubstitutedKmer(stList *methylPositions, int64_t nbPositions, ch
         int64_t position = *(int64_t *)stList_get(methylPositions, i);
         kmer[position] = pattern[i];
     }
+
     return kmer;
 }
 
@@ -1480,6 +1474,7 @@ stList *filterToRemoveOverlap(stList *sortedOverlappingPairs) {
     pX = INT64_MIN;
     pY = INT64_MIN;
     int64_t pY2 = INT64_MIN;
+
     for (int64_t i = 0; i < stList_length(sortedOverlappingPairs); i++) {
         stIntTuple *pair = stList_get(sortedOverlappingPairs, i);
         int64_t x = stIntTuple_get(pair, 0);
@@ -1497,7 +1492,7 @@ stList *filterToRemoveOverlap(stList *sortedOverlappingPairs) {
         pY = y > pY ? y : pY;
     }
     stSortedSet_destruct(set);
-
+    (void) pY2;  // silence unused variable compiler warning
     return nonOverlappingPairs;
 }
 

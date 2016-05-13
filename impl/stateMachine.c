@@ -10,15 +10,9 @@
 #include <math.h>
 #include <ctype.h>
 #include <assert.h>
-#include <stdint.h>
-#include <stateMachine.h>
-#include "nanopore.h"
-#include "nanopore_hdp.h"
-#include "bioioC.h"
-#include "sonLib.h"
-#include "pairwiseAligner.h"
 #include "stateMachine.h"
-#include "emissionMatrix.h"
+#include "bioioC.h"
+#include "pairwiseAligner.h"
 #include "discreteHmm.h"
 
 //////////////////////////////////////////////////////////////////////////////
@@ -29,6 +23,7 @@
 static void state_check(StateMachine *sM, State s) {
     assert(s >= 0 && s < sM->stateNumber);
 }
+
 
 void stateMachine_index_check(int64_t c) {
     assert(c >= 0 && c < NUM_OF_KMERS);
@@ -823,13 +818,15 @@ static double stateMachine5_raggedEndStateProb(StateMachine *sM, int64_t state) 
 }
 
 static void stateMachine5_cellCalculate(StateMachine *sM,
-                                        double *current, double *lower, double *middle, double *upper,
+                                        void *current, void *lower, void *middle, void *upper,
                                         void *cX, void *cY,
                                         void (*doTransition)(double *, double *, // fromCells, toCells
                                                              int64_t, int64_t,   // from, to
                                                              double, double,     // emissionProb, transitionProb
                                                              void *),            // extraArgs
                                         void *extraArgs) {
+    st_errAbort("5-state stateMachine not implemented\n");
+
     StateMachine5 *sM5 = (StateMachine5 *) sM;
     if (lower != NULL) {
         double eP = sM5->getXGapProbFcn(sM5->model.EMISSION_GAP_X_PROBS, cX);
@@ -1453,6 +1450,7 @@ StateMachine *getSM3_descaled(const char *modelFile, NanoporeReadAdjustmentParam
 
     return (StateMachine *)sM3;
 }
+
 
 StateMachine *getStrawManStateMachine3(const char *modelFile) {
     if (!stFile_exists(modelFile)) {
