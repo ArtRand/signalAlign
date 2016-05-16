@@ -53,6 +53,7 @@ struct _sequence {
 
 Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t), SequenceType type);
 
+// same as sequence construct, but initializes slice function
 Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
                               Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t), SequenceType type);
 

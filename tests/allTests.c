@@ -12,8 +12,8 @@
 #include "sonLibCommon.h"
 
 //CuSuite *pairwiseAlignmentTestSuite(void);
-//CuSuite *signalPairwiseTestSuite(void);
-//CuSuite *NanoporeHdpTestSuite(void);
+CuSuite *signalPairwiseTestSuite(void);
+CuSuite *NanoporeHdpTestSuite(void);
 CuSuite *HdpTestSuite(void);
 CuSuite *highOrderPairwiseAlignerTestSuite(void);
 //CuSuite* multipleAlignerTestSuite(void);
@@ -25,7 +25,7 @@ int stBaseAlignerRunAllTests(void) {
     CuSuite *suite = CuSuiteNew();
     //CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
     //CuSuiteAddSuite(suite, signalPairwiseTestSuite());
-    //CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
+    CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
     CuSuiteAddSuite(suite, HdpTestSuite());
     CuSuiteAddSuite(suite, highOrderPairwiseAlignerTestSuite());
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());

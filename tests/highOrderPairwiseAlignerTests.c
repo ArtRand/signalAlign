@@ -158,8 +158,6 @@ static void test_dpDiagonal(CuTest *testCase) {
         for (int64_t s = 0; s < path1->stateNumber; s++) {
             CuAssertDblEquals(testCase, path1->cells[s], sM->endStateProb(sM, s), 0.0);
             CuAssertDblEquals(testCase, path2->cells[s], sM->endStateProb(sM, s), 0.0);
-            //totalProb = logAdd(totalProb, (1/c1->numberOfPaths) * path1->cells[s]);
-            //totalProb = logAdd(totalProb, (1/c1->numberOfPaths) * path2->cells[s]);
             totalProb = logAdd(totalProb, 2 * path1->cells[s]);
             totalProb = logAdd(totalProb, 2 * path2->cells[s]);
         }
