@@ -285,11 +285,7 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, eventSequence, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs, 1, 1);
-
-
-    //stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset, target, p,
-    //                                               unmappedAncors, sequence_getKmer3,
-    //                                               diagonalCalculationPosteriorMatchProbs, twoWay);
+    
     return alignedPairs;
 }
 
