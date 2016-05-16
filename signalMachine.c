@@ -2,14 +2,11 @@
 #include <string.h>
 #include "pairwiseAlignment.h"
 #include "pairwiseAligner.h"
-#include "emissionMatrix.h"
-#include "stateMachine.h"
-#include "nanopore.h"
 #include "continuousHmm.h"
 
 
 void usage() {
-    fprintf(stderr, "vanillaAlign binary, meant to be used through the signalAlign program.\n");
+    fprintf(stderr, "signalMachine binary, meant to be used through the signalAlign program.\n");
     fprintf(stderr, "See doc for signalAlign for help\n");
 }
 
@@ -377,13 +374,13 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
 
 int main(int argc, char *argv[]) {
     StateMachineType sMtype = threeState;
-    // HDP stuff
+
     int64_t j = 0;
     int64_t diagExpansion = 50;
     double threshold = 0.01;
     int64_t constraintTrim = 14;
-    char *templateModelFile = stString_print("../../signalAlign/models/testModel_template.model");
-    char *complementModelFile = stString_print("../../signalAlign/models/testModel_complement.model");
+    char *templateModelFile = stString_print("../models/testModel_template.model");
+    char *complementModelFile = stString_print("../models/testModel_complement.model");
     char *readLabel = NULL;
     char *npReadFile = NULL;
     char *forwardReference = NULL;
@@ -395,7 +392,6 @@ int main(int argc, char *argv[]) {
     char *complementExpectationsFile = NULL;
     char *templateHdp = NULL;
     char *complementHdp = NULL;
-    char *cytosine_substitute = NULL;
     bool sparseOutput = FALSE;
     bool twoWay = FALSE;
 
@@ -406,7 +402,6 @@ int main(int argc, char *argv[]) {
                 {"sm3Hdp",                  no_argument,        0,  'd'},
                 {"twoWay",                  no_argument,        0,  'o'},
                 {"sparse_output",           no_argument,        0,  's'},
-                {"substitute",              required_argument,  0,  'M'},
                 {"templateModel",           required_argument,  0,  'T'},
                 {"complementModel",         required_argument,  0,  'C'},
                 {"readLabel",               required_argument,  0,  'L'},
@@ -427,7 +422,7 @@ int main(int argc, char *argv[]) {
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:osd:p:M:a:T:C:L:q:f:b:u:y:z:v:w:t:c:x:D:m:",
+        key = getopt_long(argc, argv, "h:osd:p:a:T:C:L:q:f:b:u:y:z:v:w:t:c:x:D:m:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -446,9 +441,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'd':
                 sMtype = threeStateHdp;
-                break;
-            case 'M':
-                cytosine_substitute = stString_copy(optarg);
                 break;
             case 'T':
                 templateModelFile = stString_copy(optarg);
@@ -512,10 +504,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    (void) j;  // silence unused variable warning.
+
     if ((forwardReference == NULL) || (backwardReference == NULL)) {
         st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n", forwardReference, backwardReference);
     }
-
 
     if (sMtype == threeState) {
         fprintf(stderr, "signalAlign - using three-state HMM model\n");
@@ -557,11 +550,12 @@ int main(int argc, char *argv[]) {
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
 
-    // make some params
+    // make the pairwise alignment parameters
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
     p->threshold = threshold;
     p->constraintDiagonalTrim = constraintTrim;
     p->diagonalExpansion = diagExpansion;
+
     // get pairwise alignment from stdin, in exonerate CIGAR format
     FILE *fileHandleIn = stdin;
 
@@ -578,21 +572,8 @@ int main(int argc, char *argv[]) {
     // flip around complement (minus) strand
     strrev(trimmedBackwardSeq);
 
-    //char *trimmedRefSeq = getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);
-    //trimmedRefSeq = (pA->strand1 ? trimmedRefSeq : stString_reverseComplementString(trimmedRefSeq));
-    // reverse complement for complement event sequence
-    //char *rc_trimmedRefSeq = stString_reverseComplementString(trimmedRefSeq);
-
-    // change bases to methylated/hydroxymethylated, if asked to
-    //char *templateTargetSeq = cytosine_substitute == NULL ? trimmedRefSeq : stString_replace(trimmedRefSeq, "C",
-    //                                                                                         cytosine_substitute);
-    //char *complementTargetSeq = cytosine_substitute == NULL ? rc_trimmedRefSeq : stString_replace(rc_trimmedRefSeq,
-    //                                                                                              "C",
-    //                                                                                              cytosine_substitute);
-
     char *templateTargetSeq = pA->strand1 ? trimmedForwardSeq : trimmedBackwardSeq;
     char *complementTargetSeq = pA->strand1 ? trimmedBackwardSeq : trimmedForwardSeq;
-
 
     // constrain the event sequence to the positions given by the guide alignment
     Sequence *tEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->templateEvents,
@@ -606,7 +587,7 @@ int main(int argc, char *argv[]) {
 
     // the aligned pairs start at (0,0) so we need to correct them based on the guide alignment later.
     // record the pre-zeroed alignment start and end coordinates here
-
+    // TODO this could go into the alignment routine
     // for the events:
     int64_t tCoordinateShift = npRead->templateEventMap[pA->start2];
     int64_t cCoordinateShift = npRead->complementEventMap[pA->start2];
