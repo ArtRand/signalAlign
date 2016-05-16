@@ -266,14 +266,30 @@ stList *performSignalAlignmentP(StateMachine *sM, Sequence *sY, int64_t *eventMa
 
 stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_t *eventMap,
                                int64_t mapOffset, char *target, PairwiseAlignmentParameters *p,
-                               stList *unmappedAncors, bool twoWay) {
+                               stList *unmappedAnchors, bool twoWay) {
     if ((sM->type != threeState) && (sM->type != threeStateHdp)) {
         st_errAbort("signalAlign - You're trying to do the wrong king of alignment");
     }
 
-    stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset, target, p,
-                                                   unmappedAncors, sequence_getKmer3,
-                                                   diagonalCalculationPosteriorMatchProbs, twoWay);
+    int64_t lX = sequence_correctSeqLength(strlen(target), kmer);
+
+    // remap anchor pairs
+    stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
+
+    // make sequences
+    Sequence *sX = sequence_constructReferenceSequence(lX, target, sequence_getKmer3, sequence_sliceNucleotideSequence2,
+                                                       (twoWay ? TWO_CYTOSINES : THREE_CYTOSINES),
+                                                       (twoWay ? TWO_WAY_CYTOSINE_OPTIONS : NB_CYTOSINE_OPTIONS),
+                                                       kmer);
+
+    // do alignment
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, eventSequence, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs, 1, 1);
+
+
+    //stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset, target, p,
+    //                                               unmappedAncors, sequence_getKmer3,
+    //                                               diagonalCalculationPosteriorMatchProbs, twoWay);
     return alignedPairs;
 }
 
