@@ -342,8 +342,8 @@ void test_serialization(CuTest* ct) {
     set_dir_proc_parent(original_hdp, 7, 2);
     finalize_hdp_structure(original_hdp);
 
-    char* filepath = "../../cPecan/tests/test_hdp/test.hdp";
-    char* copy_filepath = "../../cPecan/tests/test_hdp/test_copy.hdp";
+    char* filepath = "../tests/test_hdp/test.hdp";
+    char* copy_filepath = "../tests/test_hdp/test_copy.hdp";
 
     FILE* main_file;
     FILE* copy_file;
