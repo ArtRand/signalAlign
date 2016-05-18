@@ -11,7 +11,7 @@ signalAlignLib = ${basicLibs}
 all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
       ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py \
       ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
-	#cd externalTools && make all
+	cd externalTools && make all
 
 clean :
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
