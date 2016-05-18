@@ -23,9 +23,8 @@
 #include <string.h>
 #include <inttypes.h>
 #include "pairwiseAligner.h"
-#include "emissionMatrix.h"
 #include "hdp.h"
-#include "hdp_math_utils.h"
+#include "hdp_math_utils.h"`
 #include "nanopore_hdp.h"
 #include "fastCMaths.h"
 #include "sonLib.h"

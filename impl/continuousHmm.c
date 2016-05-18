@@ -6,7 +6,6 @@
 #include <stateMachine.h>
 #include "hdp_math_utils.h"
 #include "discreteHmm.h"
-#include "emissionMatrix.h"
 #include "stateMachine.h"
 #include "pairwiseAligner.h"
 #include "continuousHmm.h"
