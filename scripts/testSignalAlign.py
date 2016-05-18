@@ -61,7 +61,7 @@ def main():
     testSuite = unittest.TestSuite()
     testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(signalAlign_alignment_test('test_zymo_reads'))
-    testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
+    #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
 
     testRunner = unittest.TextTestRunner(verbosity=1)
     testRunner.run(testSuite)

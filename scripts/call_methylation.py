@@ -7,7 +7,7 @@ import sys
 sys.path.append("../")
 from argparse import ArgumentParser
 from alignmentAnalysisLib import CallMethylation
-from signalAlignLib import parse_substitution_file
+from signalAlignLib import parse_substitution_file, degenerate_enum
 from serviceCourse.parsers import read_fasta
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
@@ -24,6 +24,9 @@ def parse_args():
                         help="path to fasta reference file")
     parser.add_argument('--positions', '-p', required=False, action='store', type=str, dest='positions',
                         help='positions file')
+    parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
+                        help="Specify degenerate nucleotide options: "
+                             "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
     parser.add_argument('-n', required=False, action='store', type=int, dest='n', default=100,
                         help='Max number of alignments from each category to look at')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
@@ -118,15 +121,12 @@ def main(args):
             "forward": forward_bool,
             "out_file": out_file,
             "positions": positions,
+            "degenerate_type": degenerate_enum(args.degenerate),
         }
-        work_queue.put(call_methyl_args)
-        #c = CallMethylation(**call_methyl_args)
-        #correct_calls = c.test()
-        #c.write(out_file=out_file)
-        #correct_template_calls += correct_calls["template"]
-        #correct_complement_calls += correct_calls["complement"]
-        #total_template_calls += len(c.template_calls)
-        #total_complement_calls += len(c.complement_calls)
+        c = CallMethylation(**call_methyl_args)
+        c.write()
+        #work_queue.put(call_methyl_args)
+
 
     for w in xrange(workers):
         p = Process(target=run_methyl_caller, args=(work_queue, done_queue))

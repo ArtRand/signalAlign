@@ -108,7 +108,7 @@ class KmerHistogram(object):
 
 
 class CallMethylation(object):
-    def __init__(self, sequence, alignment_file, forward, label=None, positions=None, out_file=None):
+    def __init__(self, sequence, alignment_file, forward, degenerate_type, label=None, positions=None, out_file=None):
         self.sequence = sequence
         self.forward = forward
         self.alignment_file = alignment_file
@@ -119,6 +119,10 @@ class CallMethylation(object):
         self.parse_alignment()
         self.out_file = out_file
         self.positions = positions
+        self.degenerate = degenerate_type
+        #self.marginal_probs = {"C": 0, "E": 0, "O": 0} if self.degenerate in [1, 2] \
+        #    else {"A": 0, "C": 0, "G": 0, "T": 0}
+
         if label is not None:
             self.label = label
 
@@ -166,23 +170,30 @@ class CallMethylation(object):
                 if select.empty:
                     continue
 
-                site_probs = {
-                    "C": 0,
-                    "E": 0,
-                    "O": 0,
-                }
+                #site_probs = {
+                #    "C": 0,
+                #    "E": 0,
+                #    "O": 0,
+                #}
+                marginal_probs = {"C": 0, "E": 0, "O": 0} if self.degenerate in [1, 2] \
+                    else {"A": 0, "C": 0, "G": 0, "T": 0}
 
                 for r in select.itertuples():
                     offset = site - r[1] if regular_offset is True else 5 - (site - r[1])
                     call = r[5][offset]
-                    site_probs[call] += r[4]
+                    #site_probs[call] += r[4]
+                    marginal_probs[call] += r[4]
 
-                total_prob = sum(site_probs.values())
+                #total_prob = sum(site_probs.values())
+                total_prob = sum(marginal_probs.values())
 
-                for call in site_probs:
-                    site_probs[call] /= total_prob
+                #for call in site_probs:
+                #    site_probs[call] /= total_prob
+                for call in marginal_probs:
+                    marginal_probs[call] /= total_prob
 
-                self.probs.append((strand, site, site_probs))
+                #self.probs.append((strand, site, site_probs))
+                self.probs.append((strand, site, marginal_probs))
 
         template_offset = True if self.forward is True else False
         complement_offset = False if self.forward is True else True
@@ -195,8 +206,21 @@ class CallMethylation(object):
 
         file_name = self.alignment_file.split("/")[-1]
 
+        def output_line():
+            return "{site}\t{strand}\t{c}\t{mc}\t{hmc}\t{read}\n" if self.degenerate in [1, 2] \
+                else "{site}\t{strand}\t{A}\t{C}\t{G}\t{T}\t{read}\n"
+
+        line = output_line()
+
         for strand, site, prob in self.probs:
-            line = "{site}\t{strand}\t{c}\t{mc}\t{hmc}\t{read}\n"
-            fH.write(line.format(site=site, strand=strand,
-                                 c=prob["C"], mc=prob["E"], hmc=prob["O"],
-                                 read=file_name))
+            if self.degenerate in [1, 2]:
+                fH.write(line.format(site=site, strand=strand,
+                                     c=prob["C"], mc=prob["E"], hmc=prob["O"],
+                                     read=file_name))
+            elif self.degenerate == 3:
+                fH.write(line.format(site=site, strand=strand,
+                                     A=prob["A"], C=prob["C"], G=prob["G"], T=prob["T"],
+                                     read=file_name))
+            else:
+                sys.exit(1)
+        return

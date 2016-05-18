@@ -181,7 +181,7 @@ def make_temp_sequence(fasta, sequence_outfile, rc_sequence_outfile):
 
 
 def add_ambiguity_chars_to_reference(input_fasta, substitution_file, sequence_outfile, rc_sequence_outfile,
-                                     sub_out="C", ambig_char="X"):
+                                     degenerate_type, sub_out="C", ambig_char="X"):
     assert os.path.isfile(input_fasta), "ERROR: Didn't find reference FASTA {}".format(input_fasta)
     assert os.path.isfile(substitution_file), "ERROR: Didn't find substitution file {}".format(substitution_file)
     assert (not os.path.isfile(sequence_outfile)), "ERROR: forward file already exists"
@@ -203,12 +203,15 @@ def add_ambiguity_chars_to_reference(input_fasta, substitution_file, sequence_ou
     forward_pos = f[1]
     backward_pos = b[1]
 
-    # substitute the nucleotides with ambiguity character
     for position in forward_pos:
-        assert seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed".format(seq_pos=seq[position])
+        if degenerate_type in ["twoWay", "threeWay"]:
+            assert seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed"\
+                .format(seq_pos=seq[position])
         seq[position] = ambig_char
     for position in backward_pos:
-        assert r_seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed".format(seq_pos=seq[position])
+        if degenerate_type in ["twoWay", "threeWay"]:
+            assert r_seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed"\
+                .format(seq_pos=seq[position])
         r_seq[position] = ambig_char
 
     # make them back into strings
@@ -299,6 +302,17 @@ def get_proceding_kmers(kmer, alphabet="ACGT"):
     for n in alphabet:
         proceding_kmers.append(n + suffix)
     return proceding_kmers
+
+
+def degenerate_enum(degenerate_request_string):
+    degenerate_type = {
+        "twoWay": 0,
+        "threeWay": 1,
+        "variant": 3,
+    }
+
+    assert (degenerate_request_string in degenerate_type.keys()), "Requested degenerate nucleotide set not recognized."
+    return degenerate_type[degenerate_request_string]
 
 
 class TargetRegions(object):
@@ -822,10 +836,9 @@ class ComplementModel(NanoporeModel):
 class SignalAlignment(object):
     def __init__(self, in_fast5, forward_reference, backward_reference, destination, stateMachineType,
                  banded, bwa_index, in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
-                 threshold, diagonal_expansion, constraint_trim, twoWay,
-                 target_regions=None, cytosine_substitution=None, sparse_output=False):
+                 threshold, diagonal_expansion, constraint_trim, degenerate,
+                 target_regions=None, sparse_output=False):
         self.in_fast5 = in_fast5  # fast5 file to align
-        #self.reference = reference  # reference sequence
         self.forward_reference = forward_reference
         self.backward_reference = backward_reference
         self.destination = destination  # place where the alignments go, should already exist
@@ -836,9 +849,8 @@ class SignalAlignment(object):
         self.diagonal_expansion = diagonal_expansion
         self.constraint_trim = constraint_trim
         self.target_regions = target_regions
-        #self.cytosine_substitution = cytosine_substitution
         self.sparse_output = sparse_output
-        self.twoWayClassification = twoWay
+        self.degenerate = degenerate
 
         # if we're using an input hmm, make sure it exists
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -990,11 +1002,8 @@ class SignalAlignment(object):
         else:
             sparse_flag = ""
 
-        # twoWay classification vs threeWay
-        if self.twoWayClassification is True:
-            twoWay_flag = "--twoWay "
-        else:
-            twoWay_flag = ""
+        # degenerate nucleotide information
+        degenerate_flag = "-o {} ".format(self.degenerate)
 
         # commands
         if get_expectations:
@@ -1021,7 +1030,7 @@ class SignalAlignment(object):
                         readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
                         t_model=template_model_flag, c_model=complement_model_flag, c_hmm=complement_hmm_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag, hdp=hdp_flags, twoWay=twoWay_flag)
+                        trim=trim_flag, hdp=hdp_flags, twoWay=degenerate_flag)
 
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)

@@ -24,20 +24,32 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 
 //Constant that gives the integer value equal to probability 1. Integer probability zero is always 0.
 #define PAIR_ALIGNMENT_PROB_1 10000000
-#define CYTOSINE_METHYL_AMBIG "X"
+
 #define NB_CYTOSINE_OPTIONS 3
+//#define TWO_WAY_CYTOSINE_OPTIONS 2
+#define NB_CANONICAL_BASES 4
+
+#define CYTOSINE_METHYL_AMBIG "X"
 #define THREE_CYTOSINES "CEO"
 #define TWO_CYTOSINES "CE"
-#define TWO_WAY_CYTOSINE_OPTIONS 2
+#define CANONICAL_NUCLEOTIDES "ACGT"
+
 #define KMER_LENGTH 6
 #define NUM_OF_KMERS 46656
 
-//Sequence
+// Sequence types
 typedef enum {
     nucleotide=0,
     kmer=1,
     event=2
 } SequenceType;
+
+// degenerate types, for flagging ambiguous bases
+typedef enum {
+    cytosineMethylation2 = 0,
+    cytosineMethylation3 = 1,
+    canonicalVariants = 3
+} DegenerateType;
 
 typedef struct _sequence Sequence;
 

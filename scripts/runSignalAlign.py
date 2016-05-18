@@ -30,8 +30,9 @@ def parse_args():
                         help="template serialized HDP file")
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
                         help="complement serialized HDP file")
-    parser.add_argument('--twoWay', action='store_true', dest='twoWay', default=False,
-                        help="Flag, two way classification")
+    parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
+                        help="Specify degenerate nucleotide options: "
+                             "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", help="decide which model to use, threeState by default")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
@@ -48,7 +49,7 @@ def parse_args():
                         default=4, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
-    parser.add_argument('--ambiguity_positions', '-x', action='store', required=False, default=None,
+    parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
     parser.add_argument('--sparse_output', '-s', action='store_true', default=False, dest='sparse',
                         help="flag, sparse output")
@@ -109,7 +110,8 @@ def main(args):
         add_ambiguity_chars_to_reference(input_fasta=args.ref,
                                          substitution_file=args.substitution_file,
                                          sequence_outfile=plus_strand_sequence,
-                                         rc_sequence_outfile=minus_strand_sequence)
+                                         rc_sequence_outfile=minus_strand_sequence,
+                                         degenerate_type=args.degenerate)
     else:
         make_temp_sequence(fasta=args.ref,
                            sequence_outfile=plus_strand_sequence,
@@ -159,7 +161,7 @@ def main(args):
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim,
             "target_regions": target_regions,
-            "twoWay": args.twoWay,
+            "degenerate": degenerate_enum(args.degenerate),
         }
         #alignment = SignalAlignment(**alignment_args)
         #alignment.run()
