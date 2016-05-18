@@ -271,8 +271,8 @@ void test_checkHDPs(CuTest *testCase, NanoporeHDP *nhdp1, NanoporeHDP *nhdp2, do
 
 void test_serialization(CuTest* ct) {
 
-    FILE* data_file = fopen("../../cPecan/tests/test_hdp/data.txt","r");
-    FILE* dp_id_file = fopen("../../cPecan/tests/test_hdp/dps.txt", "r");
+    FILE* data_file = fopen("../tests/test_hdp/data.txt","r");
+    FILE* dp_id_file = fopen("../tests/test_hdp/dps.txt", "r");
 
     stList* data_list = stList_construct3(0, free);
     stList* dp_id_list = stList_construct3(0, free);
@@ -342,8 +342,8 @@ void test_serialization(CuTest* ct) {
     set_dir_proc_parent(original_hdp, 7, 2);
     finalize_hdp_structure(original_hdp);
 
-    char* filepath = "../../cPecan/tests/test_hdp/test.hdp";
-    char* copy_filepath = "../../cPecan/tests/test_hdp/test_copy.hdp";
+    char* filepath = "../tests/test_hdp/test.hdp";
+    char* copy_filepath = "../tests/test_hdp/test_copy.hdp";
 
     FILE* main_file;
     FILE* copy_file;
