@@ -12,7 +12,6 @@
 #include "pairwiseAligner.h"
 #include "continuousHmm.h"
 #include "discreteHmm.h"
-#include "emissionMatrix.h"
 #include "multipleAligner.h"
 #include "randomSequences.h"
 #include "nanopore_hdp.h"

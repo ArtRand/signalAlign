@@ -12,7 +12,6 @@
 #include "sonLib.h"
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
-#include "emissionMatrix.h"
 #include "discreteHmm.h"
 #include "nanopore.h"
 #include "continuousHmm.h"
