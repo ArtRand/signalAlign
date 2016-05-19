@@ -105,7 +105,7 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
             refKmer = stString_reverseComplementString(k_i);
         }
         // write to disk
-        fprintf(fH, "%s\t%lld\t%s\t%s\t%s\t%lld\t%f\t%f\t%f\t%s\t%f\t%f\t%f\t%f\t%f\t%s\n",
+        fprintf(fH, "%s\t%"PRId64"\t%s\t%s\t%s\t%"PRId64"\t%f\t%f\t%f\t%s\t%f\t%f\t%f\t%f\t%f\t%s\n",
                 contig, x_adj, refKmer, readFile, strandLabel, y, eventMean, eventNoise, eventDuration, k_i,
                 scaled_Emean, scaled_Enoise, p, descaledEventMean, E_mean, pathKmer);
 
@@ -167,7 +167,7 @@ void writePosteriorProbsSparse(char *posteriorProbsFile, char *readFile, char *t
         if ((strand == complement && forward) || (strand == template && (!forward))) {
             refKmer = stString_reverseComplementString(k_i);
         }
-        fprintf(fH, "%s\t%lld\t%s\t%s\t%s\t%lld\t%s\t%f\t%s\n",
+        fprintf(fH, "%s\t%"PRId64"\t%s\t%s\t%s\t%"PRId64"\t%s\t%f\t%s\n",
                 contig, x_adj, refKmer, readFile, strandLabel, y, k_i, p, pathKmer);
         // cleanup
         free(k_i);
@@ -615,7 +615,7 @@ int main(int argc, char *argv[]) {
                               anchorPairs, template, degenerate);
 
         if (sMtype == threeStateHdp) {
-            fprintf(stderr, "signalAlign - got %lld template HDP assignments\n",
+            fprintf(stderr, "signalAlign - got %" PRId64 "template HDP assignments\n",
                     hmmContinuous_howManyAssignments(templateExpectations));
         }
 
@@ -632,7 +632,7 @@ int main(int argc, char *argv[]) {
                               complementTargetSeq, p, anchorPairs, complement, degenerate);
 
         if (sMtype == threeStateHdp) {
-            fprintf(stderr, "signalAlign - got %lld complement HDP assignments\n",
+            fprintf(stderr, "signalAlign - got %"PRId64"complement HDP assignments\n",
                     hmmContinuous_howManyAssignments(complementExpectations));
         }
 
@@ -725,9 +725,9 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        fprintf(stdout, "%s %lld\t%lld(%f)\t", readLabel, stList_length(anchorPairs),
+        fprintf(stdout, "%s %"PRId64"\t%"PRId64"(%f)\t", readLabel, stList_length(anchorPairs),
                 stList_length(templateAlignedPairs), templatePosteriorScore);
-        fprintf(stdout, "%lld(%f)\n", stList_length(complementAlignedPairs), complementPosteriorScore);
+        fprintf(stdout, "%"PRId64"(%f)\n", stList_length(complementAlignedPairs), complementPosteriorScore);
 
         // final alignment clean up
         stateMachine_destruct(sMt);

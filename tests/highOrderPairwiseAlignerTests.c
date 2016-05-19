@@ -1037,12 +1037,12 @@ void implantModelFromStateMachineIntoHmm(StateMachine *sM, ContinuousPairHmm *hm
 }
 
 static void test_continuousPairHmm_em(CuTest *testCase) {
-    char *referencePath = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
+    char *referencePath = stString_print("../tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(referencePath, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
 
     // load the npRead
-    char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    char *npReadFile = stString_print("../tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
 
     // get sequence lengths
@@ -1053,7 +1053,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
     double pLikelihood = -INFINITY;
 
     // load stateMachine and model
-    const char *model = "../../signalAlign/models/testModel_template.model";
+    const char *model = "../models/testModel_template.model";
     if (!stFile_exists(model)) {
         st_errAbort("Didn't find model file %s\n", model);
     }
@@ -1135,7 +1135,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
 
 static void test_hdpHmm_em(CuTest *testCase) {
     // load the reference sequence
-    char *referencePath = stString_print("../../signalAlign/tests/test_npReads/ZymoRef.txt");
+    char *referencePath = stString_print("../tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(referencePath, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
 
@@ -1143,7 +1143,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
     // load the npRead
-    char *npReadFile = stString_print("../../signalAlign/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    char *npReadFile = stString_print("../tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
 
     nanopore_descaleNanoporeRead(npRead);
@@ -1160,10 +1160,10 @@ static void test_hdpHmm_em(CuTest *testCase) {
     hmmDiscrete_randomizeTransitions(hdpHmm);
 
     // make initial NanoporeHdp from alignment
-    char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
-    char *alignmentFile = stString_print("../../signalAlign/tests/test_alignments/simple_alignment.tsv");
+    char *modelFile = stString_print("../models/testModel_template.model");
+    char *alignmentFile = stString_print("../tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
-    NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
+    NanoporeHDP *nHdp = deserialize_nhdp("../models/templateSingleLevelFixed.nhdp");
     execute_nhdp_gibbs_sampling(nHdp, 500, 10000, 100, TRUE);
     //finalize_nhdp_distributions(nHdp);
     //NanoporeHDP *nHdp = flat_hdp_model("ACEGOT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,

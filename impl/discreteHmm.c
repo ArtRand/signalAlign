@@ -166,8 +166,8 @@ void hmmDiscrete_write(Hmm *hmm, FILE *fileHandle) {
     HmmDiscrete *hmmD = (HmmDiscrete *) hmm;
     // basics
     fprintf(fileHandle, "%i\t", hmmD->baseHmm.type); // 0
-    fprintf(fileHandle, "%lld\t", hmmD->baseHmm.stateNumber); // 1
-    fprintf(fileHandle, "%lld\t", hmmD->baseHmm.symbolSetSize); // 2
+    fprintf(fileHandle, "%"PRId64"\t", hmmD->baseHmm.stateNumber); // 1
+    fprintf(fileHandle, "%"PRId64"\t", hmmD->baseHmm.symbolSetSize); // 2
     fprintf(fileHandle, "\n");
     // transitions
     for (int64_t i = 0; i < hmmD->baseHmm.stateNumber * hmmD->baseHmm.stateNumber; i++) {
@@ -203,12 +203,12 @@ Hmm *hmmDiscrete_loadFromFile(const char *fileName) {
         st_errAbort("Failed to parse type (int) from string: %s\n", string);
     }
     // get stateNumber
-    int64_t s = sscanf(stList_get(tokens, 1), "%lld", &stateNumber);
+    int64_t s = sscanf(stList_get(tokens, 1), "%"SCNd64, &stateNumber);
     if (s != 1) {
         st_errAbort("Failed to parse state number (int) from string: %s\n", string);
     }
     // get parameterSetSize
-    int64_t n = sscanf(stList_get(tokens, 2), "%lld", &parameterSetSize);
+    int64_t n = sscanf(stList_get(tokens, 2), "%"SCNd64, &parameterSetSize);
     if (n != 1) {
         st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
     }

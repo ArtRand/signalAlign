@@ -12,7 +12,7 @@ void usage() {
 
 void printStartMessage(int64_t hdpType, char *alignmentsFile, char *templateHdpOutfile, char *complementHdpOutfile) {
     fprintf(stderr, "Building Nanopore HDP\n");
-    fprintf(stderr, "Making HDP type %lld\n", hdpType);
+    fprintf(stderr, "Making HDP type %"PRId64"\n", hdpType);
     if (alignmentsFile != NULL) {
         fprintf(stderr, "Using alignment from %s\n", alignmentsFile);
     }
@@ -26,7 +26,7 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
     Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, nHdp);
     hmmContinuous_destruct(hdpHmm, hdpHmm->type);
 
-    fprintf(stderr, "signalAlign - Running Gibbs on HDP doing %lld samples %lld burn in %lld thinning\n",
+    fprintf(stderr, "signalAlign - Running Gibbs on HDP doing %"PRId64" samples %"PRId64"burn in %"PRId64"thinning\n",
             nbSamples, burnIn, thinning);
     execute_nhdp_gibbs_sampling(nHdp, nbSamples, burnIn, thinning, verbose);
     finalize_nhdp_distributions(nHdp);
@@ -37,9 +37,9 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
 }
 
 int main(int argc, char *argv[]) {
-    int64_t hdpType = NULL;
-    char *templateLookupTable = stString_print("../../signalAlign/models/template_median68pA.model");
-    char *complementLookupTable = stString_print("../../signalAlign/models/complement_median68pA_pop2.model");
+    int64_t hdpType = -1;
+    char *templateLookupTable = stString_print("../models/template_median68pA.model");
+    char *complementLookupTable = stString_print("../models/complement_median68pA_pop2.model");
     char *alignmentsFile = NULL;
     char *templateExpectationsFile = NULL;
     char *complementExpectationsFile = NULL;

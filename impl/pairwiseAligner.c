@@ -806,7 +806,7 @@ bool dpDiagonal_equals(DpDiagonal *diagonal1, DpDiagonal *diagonal2) {
             Path *path1 = hdCell_getPath(hdCell1, p);
             Path *path2 = hdCell_getPath(hdCell2, p);
             if (path1->stateNumber != path2->stateNumber) {
-                fprintf(stderr, "dpDiagonal_equals: different stateNumber in paths %lld\n", p);
+                fprintf(stderr, "dpDiagonal_equals: different stateNumber in paths %"PRId64"\n", p);
                 return 0;
             }
             for (int64_t s = 0; s < path1->stateNumber; s++) {
