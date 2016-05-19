@@ -560,9 +560,9 @@ void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     HdpHmm *hdpHmm = (HdpHmm *)hmm;
     // write the basic stuff to disk (positions are line:item#, not line:col)
     fprintf(fileHandle, "%i\t", hdpHmm->baseHmm.type); // type 0:0
-    fprintf(fileHandle, "%lld\t", hdpHmm->baseHmm.stateNumber); // stateNumber 0:1
+    fprintf(fileHandle, "%"PRId64"\t", hdpHmm->baseHmm.stateNumber); // stateNumber 0:1
     fprintf(fileHandle, "%lf\t", hdpHmm->threshold); // threshold 0:2
-    fprintf(fileHandle, "%lld\t", hdpHmm->numberOfAssignments); // number of assignments 0:3
+    fprintf(fileHandle, "%"PRId64"\t", hdpHmm->numberOfAssignments); // number of assignments 0:3
     fprintf(fileHandle, "\n"); // newLine
 
     // write the transitions to disk
