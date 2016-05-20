@@ -25,22 +25,22 @@ def kmer_iterator(dna, k):
             yield kmer
 
 
-def list_twoD_event_map(self):
-        """Print out tab separated mapping of the strand events to the 2D kmers
-        """
-        for te, ce, kmer in izip(self.template_event_map, self.complement_event_map,
-                                 kmer_iterator(self.twoD_read_sequence, self.kmer_length)):
-            print(te, ce, kmer, sep="\t")
+#def list_twoD_event_map(self):
+#        """Print out tab separated mapping of the strand events to the 2D kmers
+#        """
+#        for te, ce, kmer in izip(self.template_event_map, self.complement_event_map,
+#                                 kmer_iterator(self.twoD_read_sequence, self.kmer_length)):
+#            print(te, ce, kmer, sep="\t")
 
 
-def orient_read_with_bwa(bwa_index, query):
-    # align with bwa
-    command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
-    # this is a small SAM file that comes from bwa
-    aln = subprocess.check_output(command.split())
-    aln = aln.split("\t") # split
+#def orient_read_with_bwa(bwa_index, query):
+#    # align with bwa
+#    command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
+#    # this is a small SAM file that comes from bwa
+#    aln = subprocess.check_output(command.split())
+#    aln = aln.split("\t") # split
 
-    return int(aln[7])
+#    return int(aln[7])
 
 
 def write_fasta(id, sequence, destination):
@@ -78,8 +78,8 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
             return False
 
         # transform events
-        t_transformed = npRead.transform_events(npRead.template_events, npRead.template_drift)
-        c_transformed = npRead.transform_events(npRead.complement_events, npRead.complement_drift)
+        t_transformed = npRead.adjust_events_for_drift(npRead.template_events, npRead.template_drift)
+        c_transformed = npRead.adjust_events_for_drift(npRead.complement_events, npRead.complement_drift)
 
         # check if that worked
         if t_transformed is False or c_transformed is False:
@@ -296,12 +296,12 @@ def exonerated_bwa(bwa_index, query, target_regions=None):
     return completeCigarString, strand
 
 
-def get_proceding_kmers(kmer, alphabet="ACGT"):
-    proceding_kmers = []
-    suffix = kmer[1:]
-    for n in alphabet:
-        proceding_kmers.append(n + suffix)
-    return proceding_kmers
+#def get_proceding_kmers(kmer, alphabet="ACGT"):
+#    proceding_kmers = []
+#    suffix = kmer[1:]
+#    for n in alphabet:
+#        proceding_kmers.append(n + suffix)
+#    return proceding_kmers
 
 
 def degenerate_enum(degenerate_request_string):
@@ -343,12 +343,10 @@ class TargetRegions(object):
 
 
 class Bwa(object):
-    # TODO check if project is using this.
-    """run BWA easily
+    """run BWA, mostly used to make index files
     """
     def __init__(self, target):
         self.target = target
-        #self.bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"
         self.db_handle = ''
 
     def build_index(self, destination):
@@ -357,13 +355,11 @@ class Bwa(object):
 
         # build database
         self.db_handle = path_to_bwa_index + '/temp_bwaIndex'
-        #os.system("{0}bwa index -p {1} {2}".format(self.bwa_dir, self.db_handle, self.target))
         os.system("bwa index -p {0} {1}".format(self.db_handle, self.target))
 
-    def run(self, query):
-        # run alignment
-        #os.system("{0}bwa mem -x ont2d {1} {2}".format(self.bwa_dir, self.db_handle, query))
-        os.system("bwa mem -x ont2d {0} {1}".format(self.db_handle, query))
+    #def run(self, query):
+    #    # run alignment
+    #    os.system("bwa mem -x ont2d {0} {1}".format(self.db_handle, query))
 
 
 class NanoporeRead(object):
@@ -406,7 +402,7 @@ class NanoporeRead(object):
                 self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
                 self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
 
-        # initialize version-specific paths TODO come back and make this cleaner (use a version flag)
+        # initialize version-specific paths
         if self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"] == "1.15.0":
             self.template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
             self.template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
@@ -415,6 +411,7 @@ class NanoporeRead(object):
             self.complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
             self.complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
             self.complement_model_id = self.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_complement")
+            return True
 
         elif self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"] == '1.19.0':
             self.template_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_template/Events'
@@ -424,22 +421,23 @@ class NanoporeRead(object):
             self.complement_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_complement/Events'
             self.complement_model_address = "/Analyses/Basecall_1D_000/BaseCalled_complement/Model"
             self.complement_model_id = self.get_model_id("/Analyses/Basecall_1D_000/Summary/basecall_1d_complement")
+            return True
         else:
             print("Unsupported Version (1.15.0 and 1.19.0 supported)", file=sys.stdout)
             return False
 
-    def get_alignment_sequence(self):
+    def assemble_2d_sequence_from_table(self):
         """The 2D read sequence contains kmers that may not map to a template or complement event, which can make
         mapping difficult downstream. This function makes a sequence from the 2D alignment table, which is usually
         pretty similar to the 2D read, except it is guaranteed to have an event map to every position.
 
-        :return: sequence made from alignment table
+        returns: sequence made from alignment table
         """
         def find_kmer_overlap(k_i, k_j):
             """ finds the overlap between two non-identical kmers.
-            :param k_i: one kmer
-            :param k_j: another kmer
-            :return: The number of positions not matching
+            k_i: one kmer
+            k_j: another kmer
+            returns: The number of positions not matching
             """
             for i in xrange(1, len(k_i)):
                 sk_i = k_i[i:]
@@ -448,25 +446,30 @@ class NanoporeRead(object):
                     return i
             return len(k_i)
 
-        # init
         self.alignment_table_sequence = ''
-        p_kmer = ''
         self.alignment_table_sequence = self.twoD_alignment_table[0][2]
         p_kmer = self.twoD_alignment_table[0][2]
 
+        # iterate through the 6-mers in the alignment table
         for t, c, kmer in self.twoD_alignment_table:
+            # if we're at a new 6-mer
             if kmer != p_kmer:
+                # find overlap, could move up to len(6-mer) - 1 bases
                 i = find_kmer_overlap(p_kmer, kmer)
+
+                # append the suffix of the new 6-mer to the sequence
                 self.alignment_table_sequence += kmer[-i:]
+
+                # update
                 p_kmer = kmer
             else:
                 continue
         return
 
-    def get_strand_event_map(self):
+    def init_1d_event_maps(self):
         """Maps the events from the template and complement strands to their base called kmers the map
         generated by this function is called the "strand_event_map" because it only works for mapping the
-        strand read (1D read) to to it's events
+        strand read (1D read) to to it's events. Uses the same fields as 'get_twoD_event_map' below.
         """
         def make_map(events):
             event_map = [0]
@@ -509,7 +512,7 @@ class NanoporeRead(object):
         if not self.has2D_alignment_table:
             return False
 
-        self.get_alignment_sequence()
+        self.assemble_2d_sequence_from_table()
 
         # go thought the kmers in the read sequence and match up the events
         for i, seq_kmer in enumerate(kmer_iterator(self.alignment_table_sequence, self.kmer_length)):
@@ -585,7 +588,7 @@ class NanoporeRead(object):
         assert(len(self.complement_event_map) == len(self.alignment_table_sequence))
         return True
 
-    def transform_events(self, events, drift):
+    def adjust_events_for_drift(self, events, drift):
         """Adjust event means by drift
         """
         if (events == None or drift == None):
@@ -604,8 +607,6 @@ class NanoporeRead(object):
         return True
 
     def get_template_events(self):
-        #template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
-
         if self.template_event_table_address in self.fastFive:
             self.template_event_table = self.fastFive[self.template_event_table_address]
             # maybe move to transform function
@@ -617,8 +618,6 @@ class NanoporeRead(object):
             return False
 
     def get_complement_events(self):
-        #complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
-
         if self.complement_event_table_address in self.fastFive:
             #self.has_complement_events = True
             self.complement_event_table = self.fastFive[self.complement_event_table_address]
@@ -630,8 +629,6 @@ class NanoporeRead(object):
             return False
 
     def get_template_model_adjustments(self):
-        #template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
-
         if self.template_model_address in self.fastFive:
             self.has_template_model = True
             self.template_scale = self.fastFive[self.template_model_address].attrs["scale"]
@@ -647,8 +644,6 @@ class NanoporeRead(object):
             return False
 
     def get_complement_model_adjustments(self):
-        #complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
-
         if self.complement_model_address in self.fastFive:
             self.has_complement_model = True
             self.complement_scale = self.fastFive[self.complement_model_address].attrs["scale"]
@@ -705,8 +700,7 @@ class NanoporeRead(object):
             return False
 
     def export_template_model(self, destination):
-        template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
-
+        # for conditional HMM (as per JTS)
         t_skip_prob_bins = [0.487, 0.412, 0.311, 0.229, 0.174, 0.134, 0.115, 0.103, 0.096, 0.092,
                             0.088, 0.087, 0.084, 0.085, 0.083, 0.082, 0.085, 0.083, 0.084, 0.082,
                             0.080, 0.085, 0.088, 0.086, 0.087, 0.089, 0.085, 0.090, 0.087, 0.096]
@@ -716,8 +710,6 @@ class NanoporeRead(object):
         return got_model
 
     def export_complement_model(self, destination):
-        complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
-
         c_skip_prob_bins = [0.531, 0.478, 0.405, 0.327, 0.257, 0.207, 0.172, 0.154, 0.138, 0.132,
                             0.127, 0.123, 0.117, 0.115, 0.113, 0.113, 0.115, 0.109, 0.109, 0.107,
                             0.104, 0.105, 0.108, 0.106, 0.111, 0.114, 0.118, 0.119, 0.110, 0.119]
@@ -738,124 +730,28 @@ class NanoporeRead(object):
         self.fastFive.close()
 
 
-class NanoporeModel(object):
-    def __init__(self, fast5File):
-        self.fastFive = h5py.File(fast5File, "r")
-        self.stay_prob = 0
-        self.skip_prob_bins = []
-        self.model_name = ''
-        self.model = None
-
-    def export_model(self, destination_path):
-        """Exports the model to a file. Format:
-        line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean] 
-                    [noise_sd] [noise_lambda ] (.../kmer) \n
-        line 2: skip bins \n
-        line 3: [correlation coefficient] [level_mean] [level_sd, scaled] 
-                    [noise_mean] [noise_sd] [noise_lambda ] (.../kmer) \n
-        """
-        def calculate_lambda(noise_mean, noise_stdev):
-            return (np.power(noise_mean, 3)) / (np.power(noise_stdev, 2))
-
-        if self.model is None:
-            print("This method is meant to be used as part of the child class TemplateModel or ComplementModel",
-                  file=sys.stderr)
-        # output the model for cPecan to a file
-        model_path = destination_path + self.model_name
-        out_file = open(model_path, 'w')
-
-        # line 1
-        print("0", end=' ', file=out_file) # placeholder for correlation parameter
-        for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
-            lam = calculate_lambda(sd_mean, sd_stdev)
-            print(level_mean, level_stdev, sd_mean, sd_stdev, lam, end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-        # line 2
-        for _ in self.skip_prob_bins:
-            print(_, end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-        # line 3
-        print("0", end=' ', file=out_file) # placeholder for correlation parameter
-        for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
-            lam = calculate_lambda(sd_mean, sd_stdev)
-            print(level_mean, (level_stdev*1.75), sd_mean, sd_stdev, lam, end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-        return
-
-    def get_model_dict(self):
-        # check
-        if self.model is None:
-            print("This method is meant to be used as part of the child class TemplateModel or ComplementModel",
-                  file=sys.stderr)
-        # go through the model and build a lookup table
-        model_dict = {}
-        for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
-            model_dict[kmer] = [level_mean, level_stdev, sd_mean, sd_stdev]
-        return model_dict
-
-    def close(self):
-        self.fastFive.close()
-
-
-class TemplateModel(NanoporeModel):
-    def __init__(self, fast5File):
-        super(TemplateModel, self).__init__(fast5File=fast5File)
-        self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_template/Model']
-        self.stay_prob = np.log2(
-            self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["stay_prob"])
-        self.skip_prob_bins = [0.487, 0.412, 0.311, 0.229, 0.174, 0.134, 0.115, 0.103, 0.096, 0.092,
-                               0.088, 0.087, 0.084, 0.085, 0.083, 0.082, 0.085, 0.083, 0.084, 0.082,
-                               0.080, 0.085, 0.088, 0.086, 0.087, 0.089, 0.085, 0.090, 0.087, 0.096]
-        self.parse_model_name()
-
-    def parse_model_name(self):
-        model_name = self.fastFive["/Analyses/Basecall_2D_000/Summary/basecall_1d_template"].attrs["model_file"]
-        model_name = model_name.split('/')[-1]
-        self.model_name = model_name
-        return
-
-
-class ComplementModel(NanoporeModel):
-    def __init__(self, fast5File):
-        super(ComplementModel, self).__init__(fast5File=fast5File)
-        self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_complement/Model']
-        self.stay_prob = np.log2(
-            self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["stay_prob"])
-        self.skip_prob_bins = [0.531, 0.478, 0.405, 0.327, 0.257, 0.207, 0.172, 0.154, 0.138, 0.132,
-                               0.127, 0.123, 0.117, 0.115, 0.113, 0.113, 0.115, 0.109, 0.109, 0.107,
-                               0.104, 0.105, 0.108, 0.106, 0.111, 0.114, 0.118, 0.119, 0.110, 0.119]
-        self.parse_model_name()
-
-    def parse_model_name(self):
-        model_name = self.fastFive["/Analyses/Basecall_2D_000/Summary/basecall_1d_complement"].attrs["model_file"]
-        model_name = model_name.split('/')[-1]
-        self.model_name = model_name
-        return
-
-
 class SignalAlignment(object):
     def __init__(self, in_fast5, forward_reference, backward_reference, destination, stateMachineType,
                  banded, bwa_index, in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
                  threshold, diagonal_expansion, constraint_trim, degenerate,
                  target_regions=None, sparse_output=False):
         self.in_fast5 = in_fast5  # fast5 file to align
-        self.forward_reference = forward_reference
-        self.backward_reference = backward_reference
+        self.forward_reference = forward_reference  # forward 'FASTA-oriented' reference
+        self.backward_reference = backward_reference  # complement of the forward reference
         self.destination = destination  # place where the alignments go, should already exist
-        self.stateMachineType = stateMachineType  # flag for vanillaAlign
-        self.banded = banded
+        self.stateMachineType = stateMachineType  # flag for signalMachine
+        self.banded = banded  # use banded or not
         self.bwa_index = bwa_index  # index of reference sequence
-        self.threshold = threshold
-        self.diagonal_expansion = diagonal_expansion
-        self.constraint_trim = constraint_trim
-        self.target_regions = target_regions
-        self.sparse_output = sparse_output
-        self.degenerate = degenerate
+        self.threshold = threshold  # min posterior probability to keep
+        self.diagonal_expansion = diagonal_expansion  # alignment algorithm param
+        self.constraint_trim = constraint_trim  # alignment algorithm param
+        self.target_regions = target_regions  # only signal-align reads that map to these positions
+        self.sparse_output = sparse_output  # smaller output files  TODO make this an option
+        self.degenerate = degenerate  # set of nucleotides for degenerate characters
 
         # if we're using an input hmm, make sure it exists
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
-            print(in_templateHmm, file=sys.stderr)
         else:
             self.in_templateHmm = None
         if (in_complementHmm is not None) and os.path.isfile(in_complementHmm):
@@ -881,8 +777,6 @@ class SignalAlignment(object):
             print("signalAlign - problem with file path {file}".format(file=self.in_fast5))
             return False
 
-        # Preamble set up
-
         # containers and defaults
         read_label = self.in_fast5.split("/")[-1]      # used in the posteriors file as identifier
         read_name = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
@@ -895,7 +789,7 @@ class SignalAlignment(object):
         temp_np_read = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
         temp_2d_read = temp_folder.add_file_path("temp_2Dseq_{read}.fa".format(read=read_label))
 
-        # make the npRead and fasta todo make this assert
+        # make the npRead and fasta
         success, def_template_model, def_complement_model = get_npRead_2dseq_and_models(fast5=self.in_fast5,
                                                                                         npRead_path=temp_np_read,
                                                                                         twod_read_path=temp_2d_read)
@@ -946,14 +840,20 @@ class SignalAlignment(object):
         # flags
 
         # input (match) models
-        assert (os.path.exists("../../signalAlign/models/testModel_template.model")), \
+
+        template_lookup_table = "../models/testModel_template.model"
+        complement_lookup_table = "../models/testModel_complement.model" if def_complement_model else \
+            "../models/testModel_complement_pop1.model"
+
+        assert (os.path.exists(template_lookup_table)), \
             "Didn't find default template look-up table"
         template_model_flag = "-T {t_model} ".format(t_model="../../signalAlign/models/testModel_template.model")
 
-        assert (os.path.exists("../../signalAlign/models/testModel_complement.model")), \
-            "Didn't find default complement look-up table"
+        assert (os.path.exists(complement_lookup_table)), \
+            "Didn't find 'pop1' complement look-up table"
+
         complement_model_flag = "-C {c_model} " \
-                                "".format(c_model="../../signalAlign/models/testModel_complement.model")
+                                "".format(c_model=complement_lookup_table)
 
         # input HMMs
         if self.in_templateHmm is not None:
@@ -1041,7 +941,7 @@ class SignalAlignment(object):
 
 class SignalHmm(object):
     def __init__(self, model_type, symbol_set_size):
-        self.match_model_params = 5
+        self.match_model_params = 5  # level_mean, level_sd, noise_mean, noise_sd, noise_lambda
         self.model_type = model_type  # ID of model type
         self.state_number = {"threeState": 3, "threeStateHdp": 3}[model_type]
         self.symbol_set_size = symbol_set_size
