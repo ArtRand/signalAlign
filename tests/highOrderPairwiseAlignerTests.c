@@ -20,8 +20,8 @@ Sequence *makeTestKmerSequence() {
     char *s = "ATGXAXA"; // has 2 6mers
     int64_t lX = sequence_correctSeqLength(strlen(s), kmer);
     Sequence *seq = sequence_construct(lX, s, sequence_getKmer3, kmer);
-    seq->cytosines = "CEO";
-    seq->nbCytosineOptions = 3;
+    seq->degenerateBases = "CEO";
+    seq->nbDegenerateBases = 3;
     return seq;
 }
 

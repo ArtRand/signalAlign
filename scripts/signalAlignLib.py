@@ -746,7 +746,7 @@ class SignalAlignment(object):
         self.diagonal_expansion = diagonal_expansion  # alignment algorithm param
         self.constraint_trim = constraint_trim  # alignment algorithm param
         self.target_regions = target_regions  # only signal-align reads that map to these positions
-        self.sparse_output = sparse_output  # smaller output files  TODO make this an option
+        self.sparse_output = sparse_output  # smaller output files
         self.degenerate = degenerate  # set of nucleotides for degenerate characters
 
         # if we're using an input hmm, make sure it exists
@@ -805,7 +805,7 @@ class SignalAlignment(object):
             model_label = ".sm3Hdp"
             stateMachineType_flag = "--sm3Hdp "
             assert (self.in_templateHdp is not None) and (self.in_complementHdp is not None), "Need to provide HDPs"
-        else:
+        else:  # make invalid stateMachine control?
             model_label = ".sm"
             stateMachineType_flag = ""
 
@@ -828,7 +828,8 @@ class SignalAlignment(object):
 
         # didn't map
         elif (strand != "+") and (strand != "-"):
-            print("signalAlign - {} didn't map".format(read_label), file=sys.stderr)
+            print("signalAlign - {read} didn't map got flag: {flag}".format(read=read_label, flag=strand),
+                  file=sys.stderr)
             temp_folder.remove_folder()
             return False
 
@@ -840,7 +841,6 @@ class SignalAlignment(object):
         # flags
 
         # input (match) models
-
         template_lookup_table = "../models/testModel_template.model"
         complement_lookup_table = "../models/testModel_complement.model" if def_complement_model else \
             "../models/testModel_complement_pop1.model"

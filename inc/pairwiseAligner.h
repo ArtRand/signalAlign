@@ -52,13 +52,12 @@ typedef enum {
 } DegenerateType;
 
 typedef struct _sequence Sequence;
-
 struct _sequence {
     int64_t length;
     SequenceType type;
     void *elements;
-    char *cytosines;
-    int64_t nbCytosineOptions;
+    char *degenerateBases;
+    int64_t nbDegenerateBases;
     void *(*get)(void *elements, int64_t index);
     Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t);
 };
