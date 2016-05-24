@@ -353,7 +353,7 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
 
 int main(int argc, char *argv[]) {
     StateMachineType sMtype = threeState;
-    printFoo();
+
     int64_t j = 0;
     int64_t diagExpansion = 50;
     double threshold = 0.01;
