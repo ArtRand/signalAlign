@@ -193,8 +193,10 @@ def add_ambiguity_chars_to_reference(input_fasta, substitution_file, sequence_ou
         seq += sequence
         break
 
-    # turn the sequence into a list so we can change the nucleotides
+    # we want the complement, not the reverse complement, we actually flip it around later
     r_seq = reverse_complement(dna=seq, reverse=False, complement=True)
+
+    # turn the sequence into a list so we can change the nucleotides
     seq = list(seq)
     r_seq = list(r_seq)
 
@@ -356,10 +358,6 @@ class Bwa(object):
         # build database
         self.db_handle = path_to_bwa_index + '/temp_bwaIndex'
         os.system("bwa index -p {0} {1}".format(self.db_handle, self.target))
-
-    #def run(self, query):
-    #    # run alignment
-    #    os.system("bwa mem -x ont2d {0} {1}".format(self.db_handle, query))
 
 
 class NanoporeRead(object):
@@ -731,13 +729,14 @@ class NanoporeRead(object):
 
 
 class SignalAlignment(object):
-    def __init__(self, in_fast5, forward_reference, backward_reference, destination, stateMachineType,
+    def __init__(self, in_fast5, forward_reference, backward_reference, path_to_EC_refs, destination, stateMachineType,
                  banded, bwa_index, in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
                  threshold, diagonal_expansion, constraint_trim, degenerate,
                  target_regions=None, sparse_output=False):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.forward_reference = forward_reference  # forward 'FASTA-oriented' reference
         self.backward_reference = backward_reference  # complement of the forward reference
+        self.path_to_EC_refs = path_to_EC_refs  # place where the reference sequence with ambiguous characters is
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
         self.banded = banded  # use banded or not
@@ -771,7 +770,8 @@ class SignalAlignment(object):
 
     def run(self, get_expectations=False):
         if get_expectations:
-            assert self.in_templateHmm is not None and self.in_complementHmm is not None
+            assert self.in_templateHmm is not None and self.in_complementHmm is not None, "Need HMM files for model " \
+                                                                                          "training"
         # file checks
         if os.path.isfile(self.in_fast5) is False:
             print("signalAlign - problem with file path {file}".format(file=self.in_fast5))
@@ -836,7 +836,7 @@ class SignalAlignment(object):
         # Alignment/Expectations routine
 
         # containers and defaults
-        path_to_vanillaAlign = "./signalMachine"
+        path_to_signalAlign = "./signalMachine"
 
         # flags
 
@@ -854,6 +854,21 @@ class SignalAlignment(object):
 
         complement_model_flag = "-C {c_model} " \
                                 "".format(c_model=complement_lookup_table)
+
+        # reference sequences
+        if self.forward_reference is not None or self.backward_reference is not None:
+            assert self.forward_reference is not None and self.backward_reference is not None, \
+                "Need forward and backward reference sequences"
+            forward_ref_flag = "-f {f_ref} ".format(f_ref=self.forward_reference)
+            backward_ref_flag = "-b {b_ref} ".format(b_ref=self.backward_reference)
+            error_correct_ref_path = ""
+        else:
+            assert self.forward_reference is None and self.backward_reference is None, \
+                "Erroneously gave forward and backward references when trying to do error correction"
+            assert self.path_to_EC_refs is not None, "Need to provide path to ambigous reference sequences"
+            forward_ref_flag = ""
+            backward_ref_flag = ""
+            error_correct_ref_path = "-p {path}".format(path=self.path_to_EC_refs)
 
         # input HMMs
         if self.in_templateHmm is not None:
@@ -913,20 +928,20 @@ class SignalAlignment(object):
             command = \
                 "echo {cigar} | {vA} {model}-f {f_ref} -b {b_ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
                 "{expansion}{trim} {hdp}-L {readLabel} -t {templateExpectations} -c {complementExpectations}"\
-                .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag,
-                        f_ref=self.forward_reference, b_ref=self.backward_reference, readLabel=read_label,
-                        npRead=temp_np_read, t_hmm=template_hmm_flag,
+                .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag,
+                        f_ref=forward_ref_flag, b_ref=backward_ref_flag,
+                        npRead=temp_np_read, t_hmm=template_hmm_flag, readLabel=read_label,
                         c_hmm=complement_hmm_flag, templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag)
         else:
             command = \
-                "echo {cigar} | {vA} {twoWay}{sparse}{model}-f {f_ref} -b {b_ref} -q {npRead} " \
+                "echo {cigar} | {vA} {twoWay}{sparse}{model}{f_ref}{b_ref}{eC} -q {npRead} " \
                 "{t_model}{c_model}{t_hmm}{c_hmm}{thresh}{expansion}{trim} " \
                 "-u {posteriors} {hdp}-L {readLabel}"\
-                .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, sparse=sparse_flag,
-                        f_ref=self.forward_reference, b_ref=self.backward_reference,
+                .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=sparse_flag,
+                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, eC=error_correct_ref_path,
                         readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
                         t_model=template_model_flag, c_model=complement_model_flag, c_hmm=complement_hmm_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,

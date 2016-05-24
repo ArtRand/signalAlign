@@ -24,6 +24,8 @@ def parse_args():
                         help="path to fasta reference file")
     parser.add_argument('--positions', '-p', required=False, action='store', type=str, dest='positions',
                         help='positions file')
+    parser.add_argument('--error_correct', action='store_true', default=False, required=False,
+                        dest='error_correct', help="Enable error correction")
     parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
                         help="Specify degenerate nucleotide options: "
                              "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
@@ -101,11 +103,15 @@ def main(args):
 
     out_file = args.out
 
-    if args.positions is not None:
+    if args.positions is not None and args.error_correct is False:
         positions = {}
         f, b = parse_substitution_file(args.positions)
         positions['forward'] = f[1]
         positions['backward'] = b[1]
+    elif args.error_correct is True:
+        positions = {'forward': range(0, len(reference_sequence)),
+                     'backward': range(0, len(reference_sequence))
+                     }
     else:
         positions = None
 
@@ -123,10 +129,9 @@ def main(args):
             "positions": positions,
             "degenerate_type": degenerate_enum(args.degenerate),
         }
-        c = CallMethylation(**call_methyl_args)
-        c.write()
-        #work_queue.put(call_methyl_args)
-
+        #c = CallMethylation(**call_methyl_args)
+        #c.write()
+        work_queue.put(call_methyl_args)
 
     for w in xrange(workers):
         p = Process(target=run_methyl_caller, args=(work_queue, done_queue))

@@ -5,6 +5,7 @@ from __future__ import print_function
 import sys
 sys.path.append("../")
 from signalAlignLib import *
+from errorCorrectionLib import write_degenerate_reference_set
 from multiprocessing import Process, Queue, current_process, Manager
 from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
@@ -53,6 +54,8 @@ def parse_args():
                         dest='substitution_file', help="Ambiguity positions")
     parser.add_argument('--sparse_output', '-s', action='store_true', default=False, dest='sparse',
                         help="flag, sparse output")
+    parser.add_argument('--error_correct', action='store_true', default=False, required=False,
+                        dest='error_correct', help="Enable error correction")
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
@@ -102,20 +105,25 @@ def main(args):
     # make directory to put temporary files
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
-    plus_strand_sequence = temp_folder.add_file_path("forward_reference.txt")
-    minus_strand_sequence = temp_folder.add_file_path("backward_reference.txt")
 
-    # parse the substitution file, if given
-    if args.substitution_file is not None:
-        add_ambiguity_chars_to_reference(input_fasta=args.ref,
-                                         substitution_file=args.substitution_file,
-                                         sequence_outfile=plus_strand_sequence,
-                                         rc_sequence_outfile=minus_strand_sequence,
-                                         degenerate_type=args.degenerate)
+    if args.error_correct is True:
+        write_degenerate_reference_set(input_fasta=args.ref, out_path=temp_dir_path)
+        plus_strand_sequence = None
+        minus_strand_sequence = None
     else:
-        make_temp_sequence(fasta=args.ref,
-                           sequence_outfile=plus_strand_sequence,
-                           rc_sequence_outfile=minus_strand_sequence)
+        # parse the substitution file, if given
+        plus_strand_sequence = temp_folder.add_file_path("forward_reference.txt")
+        minus_strand_sequence = temp_folder.add_file_path("backward_reference.txt")
+        if args.substitution_file is not None:
+            add_ambiguity_chars_to_reference(input_fasta=args.ref,
+                                             substitution_file=args.substitution_file,
+                                             sequence_outfile=plus_strand_sequence,
+                                             rc_sequence_outfile=minus_strand_sequence,
+                                             degenerate_type=args.degenerate)
+        else:
+            make_temp_sequence(fasta=args.ref,
+                               sequence_outfile=plus_strand_sequence,
+                               rc_sequence_outfile=minus_strand_sequence)
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -147,6 +155,7 @@ def main(args):
         alignment_args = {
             "forward_reference": plus_strand_sequence,
             "backward_reference": minus_strand_sequence,
+            "path_to_EC_refs": (temp_dir_path if args.error_correct else None),
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,

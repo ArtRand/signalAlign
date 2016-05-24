@@ -11,7 +11,7 @@ signalAlignLib = ${basicLibs}
 all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
       ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py \
       ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
-	#cd externalTools && make all
+	cd externalTools && make all
 
 clean :
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
@@ -27,9 +27,10 @@ sL :
 bD :
 	mkdir -v -p ${rootPath}bin
 
-test : 
+test :
 	cd ${signalAlignBin} && ./signalAlignLibTests
-	cd ${binPath} && ./sonLibTests
+	cd ${signalAlignBin} && ./testSignalAlign
+	#cd ${binPath} && ./sonLibTests
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
@@ -38,7 +39,7 @@ ${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalA
 	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}
+	${cxx} ${cflags} -I inc -I${libPath} signalMachineUtils.h -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib} signalMachineUtils.c
 
 ${signalAlignBin}/buildHdpUtil : buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib}
@@ -62,6 +63,7 @@ ${signalAlignBin}/testSignalAlign : ${rootPath}scripts/testSignalAlign.py
 
 ${signalAlignBin}/signalAlignLib.py : ${rootPath}scripts/signalAlignLib.py
 	cp ${rootPath}scripts/signalAlignLib.py ${signalAlignBin}/signalAlignLib.py
+	cp ${rootPath}scripts/errorCorrectionLib.py ${signalAlignBin}/errorCorrectionLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 	${cxx} ${cflags} -I inc -I ${libPath}/ -c ${libSources}
