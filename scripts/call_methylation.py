@@ -8,8 +8,7 @@ sys.path.append("../")
 from argparse import ArgumentParser
 from alignmentAnalysisLib import CallMethylation
 from signalAlignLib import parse_substitution_file, degenerate_enum
-from serviceCourse.parsers import read_fasta
-from random import shuffle
+from variantCallingLib import get_alignments_labels_and_mask, get_reference_sequence
 from multiprocessing import Process, current_process, Manager
 
 
@@ -36,50 +35,6 @@ def parse_args():
     parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out')
 
     return parser.parse_args()
-
-
-def randomly_select_alignments(path_to_alignments, max):
-    alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
-    if len(alignments) == 0:
-        print("[error] Didn't find any alignment files here {}".format(path_to_alignments))
-        sys.exit(1)
-
-    shuffle(alignments)
-
-    if len(alignments) < max:
-        return alignments
-    else:
-        return alignments[:max]
-
-
-def get_forward_mask(list_of_alignments):
-    mask = []
-    for alignment in list_of_alignments:
-        if alignment.endswith(".backward.tsv"):
-            mask.append(False)
-        else:
-            mask.append(True)
-    return mask
-
-
-def get_reference_sequence(path_to_fasta):
-    seqs = []
-
-    for header, comment, sequence in read_fasta(path_to_fasta):
-        seqs.append(sequence)
-
-    assert len(seqs) > 0, "Didn't find any sequences in the reference file"
-
-    if len(seqs) > 1:
-        print("[NOTICE] Found more than one sequence in the reference file, using the first one")
-
-    return seqs[0]
-
-
-def get_alignments_labels_and_mask(path_to_alignments, max):
-    alignments = randomly_select_alignments(path_to_alignments, max)
-    mask = get_forward_mask(alignments)
-    return alignments, mask
 
 
 def run_methyl_caller(work_queue, done_queue):

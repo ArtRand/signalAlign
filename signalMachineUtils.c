@@ -51,7 +51,6 @@ static inline void referenceSequence_setTrimmedSeqeuences(ReferenceSequence *sel
 
 }
 
-
 static inline void referenceSequence_reset(ReferenceSequence *self) {
     free(self->reference);
     free(self->reverseComplementOfReference);
@@ -124,7 +123,10 @@ void signalUtils_ReferenceSequenceSet(ReferenceSequence *self,
 }
 
 void signalUtils_ReferenceSequenceDestruct(ReferenceSequence *self) {
-    destructPairwiseAlignment(self->A);
+    //destructPairwiseAlignment(self->A);
+    free(self->A->contig1);
+    free(self->A->contig2);
+    free(self->A);
     free(self->reference);
     free(self->reverseComplementOfReference);
     free(self->trimmedForwardSequence);

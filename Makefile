@@ -9,9 +9,9 @@ signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
 all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
-      ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py \
+      ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/zayante \
       ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
-	cd externalTools && make all
+	#cd externalTools && make all
 
 clean :
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
@@ -28,7 +28,7 @@ bD :
 	mkdir -v -p ${rootPath}bin
 
 test :
-	cd ${signalAlignBin} && ./signalAlignLibTests
+	#cd ${signalAlignBin} && ./signalAlignLibTests
 	cd ${signalAlignBin} && ./testSignalAlign
 	#cd ${binPath} && ./sonLibTests
 
@@ -60,10 +60,15 @@ ${signalAlignBin}/testSignalAlign : ${rootPath}scripts/testSignalAlign.py
 	cp ${rootPath}scripts/testSignalAlign.py ${signalAlignBin}/testSignalAlign
 	chmod +x ${signalAlignBin}/testSignalAlign
 
+${signalAlignBin}/zayante : ${rootPath}scripts/zayante.py
+	cp ${rootPath}scripts/zayante.py ${signalAlignBin}/zayante
+	chmod +x ${signalAlignBin}/zayante
 
 ${signalAlignBin}/signalAlignLib.py : ${rootPath}scripts/signalAlignLib.py
 	cp ${rootPath}scripts/signalAlignLib.py ${signalAlignBin}/signalAlignLib.py
-	cp ${rootPath}scripts/errorCorrectionLib.py ${signalAlignBin}/errorCorrectionLib.py
+	#cp ${rootPath}scripts/errorCorrectionLib.py ${signalAlignBin}/errorCorrectionLib.py
+	cp ${rootPath}scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.py
+	cp ${rootPath}scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 	${cxx} ${cflags} -I inc -I ${libPath}/ -c ${libSources}
