@@ -228,13 +228,16 @@ def main(args):
         for it in range(0, STEP):
 
             # parse the substitution file, if given
-            forward_reference = temp_folder.add_file_path("forward_reference.{}.txt".format(it))
-            backward_reference = temp_folder.add_file_path("backward_reference.{}.txt".format(it))
+            forward_reference = temp_folder.add_file_path("forward_reference.{cycle}.{iter}.txt".format(cycle=cycle,
+                                                                                                        iter=it))
+            backward_reference = temp_folder.add_file_path("backward_reference.{cycle}.{iter}.txt".format(cycle=cycle,
+                                                                                                          iter=it))
 
             # make N-ed reference sequence for this iteration
             deg, reference_sequence_length = make_degenerate_reference(reference_sequence, it,
                                                                        forward_reference, backward_reference)
-            assert deg, "Problem making degenerate reference for iteration {}".format(it)
+            assert deg, "Problem making degenerate reference for cycle {cycle} iteration {iter}" \
+                        "".format(cycle=cycle,iter=it)
 
             # index the reference for bwa
             print("signalAlign - indexing reference", file=sys.stderr)
@@ -303,7 +306,7 @@ def main(args):
                 'forward': range(it, reference_sequence_length, STEP),
                 'backward': range(it, reference_sequence_length, STEP) }
 
-            variant_call_file = temp_folder.add_file_path("variants.{}.calls".format(it))
+            variant_call_file = temp_folder.add_file_path("variants.{cycle}.{iter}.calls".format(cycle=cycle, iter=it))
 
             for aln, forward_bool in zip(alns, forward_mask):
                 call_methyl_args = {
@@ -334,9 +337,9 @@ def main(args):
 
             new_ref = update_reference(variant_call_file, reference_sequence, 0)
 
-            ref_path = temp_folder.add_file_path("iteration{}.fa".format(it))
+            ref_path = temp_folder.add_file_path("iteration.{cycle}.{iter}.fa".format(cycle=cycle, iter=it))
 
-            write_fasta("iteration{}".format(it), new_ref, open(ref_path, 'w'))
+            write_fasta("iteration.{cycle}.{iter}.fa".format(cycle=cycle, iter=it), new_ref, open(ref_path, 'w'))
 
             reference_sequence = ref_path
 
