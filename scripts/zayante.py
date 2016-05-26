@@ -56,7 +56,7 @@ def parse_args():
                         default=4, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
-    parser.add_argument('--cycles', dest='cycles', default=1, required=False)
+    parser.add_argument('--cycles', dest='cycles', default=1, required=False, type=int)
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
