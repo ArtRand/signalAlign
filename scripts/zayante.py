@@ -15,7 +15,7 @@ from argparse import ArgumentParser
 from random import shuffle
 
 
-STEP = 6
+STEP = 4
 
 
 def parse_args():
@@ -70,6 +70,7 @@ def get_first_sequence(input_fasta):
         input_sequence += sequence
         break
     return input_sequence
+
 
 def make_degenerate_reference(input_fasta, start, forward_sequence_path, backward_sequence_path,
                               block_size=1, step=6):
@@ -152,7 +153,6 @@ def rc_probs(probs):
 def update_reference(data, reference_sequence, min_depth=0):
     d = load_data(data)
 
-    #seqs = fasta_hash(reference_sequence)
     ref = get_first_sequence(reference_sequence)
     ref = list(ref)
 
@@ -226,7 +226,6 @@ def main(args):
 
     for cycle in range(0, args.cycles):
         for it in range(0, STEP):
-
             # parse the substitution file, if given
             forward_reference = temp_folder.add_file_path("forward_reference.{cycle}.{iter}.txt".format(cycle=cycle,
                                                                                                         iter=it))
@@ -235,7 +234,8 @@ def main(args):
 
             # make N-ed reference sequence for this iteration
             deg, reference_sequence_length = make_degenerate_reference(reference_sequence, it,
-                                                                       forward_reference, backward_reference)
+                                                                       forward_reference, backward_reference,
+                                                                       step=STEP)
             assert deg, "Problem making degenerate reference for cycle {cycle} iteration {iter}" \
                         "".format(cycle=cycle,iter=it)
 
