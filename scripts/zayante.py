@@ -184,7 +184,7 @@ def update_reference(data, reference_sequence, min_depth=0):
         called_base = marginal_prob.map(lambda x: x / sum(marginal_prob)).argmax()[1]
 
         if called_base != ref[site]:
-            print("Changing {orig} to {new}".format(orig=ref[site], new=called_base))
+            print("Changing {orig} to {new} at {site}".format(orig=ref[site], new=called_base, site=site))
             ref[site] = called_base
 
     return ''.join(ref)
