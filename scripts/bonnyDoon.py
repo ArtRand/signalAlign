@@ -269,6 +269,9 @@ def main(args):
 
             jobs = []
 
+            print("\n#  signalAlign - starting alignments\n", file=sys.stderr)
+            print("\n#  signalAlign - starting alignments\n", file=sys.stdout)
+
             # aligninment procedure
             for fast5 in fast5s:
                 alignment_args = {
@@ -352,7 +355,7 @@ def main(args):
 
             # get candidate sites
             sites = update_reference(variant_call_file, reference_sequence, min_depth=0, get_sites=True)
-            candidate_sites.append(sites)
+            candidate_sites += sites
 
             # remove old alignments
             for f in glob.glob(temp_dir_path + "*.tsv"):
