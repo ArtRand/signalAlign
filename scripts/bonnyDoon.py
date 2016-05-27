@@ -494,8 +494,11 @@ def main(args):
             for f in glob.glob(temp_dir_path + "*.tsv"):
                 os.remove(f)
 
-        copyfile(reference_sequence)
+        # keep track of how we're doing
+        cycle_snapshot = temp_folder.add_file_path("cycle_snapshot.{cycle}.fa".format(cycle=cycle))
+        copyfile(reference_sequence, cycle_snapshot)
 
+    # copy final file
     copyfile(reference_sequence, temp_dir_path + args.corrected)
 
     return
