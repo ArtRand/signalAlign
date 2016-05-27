@@ -480,17 +480,21 @@ def main(args):
 
             new_ref = update_reference(variant_call_file, reference_sequence)
 
+            temp_folder.remove_file(variant_call_file)
+
             ref_path = temp_folder.add_file_path("iteration.{site}.fa".format(site=site))
 
             write_fasta("iteration.{site}.fa".format(site=site), new_ref, open(ref_path, 'w'))
-            
-            temp_folder.remove_file("iteration.{site}.fa".format(site=candidate_sites[i - 1]))
+
+            temp_folder.remove_file(temp_dir_path + "iteration.{site}.fa".format(site=candidate_sites[i - 1]))
 
             reference_sequence = ref_path
 
             # remove old alignments
             for f in glob.glob(temp_dir_path + "*.tsv"):
                 os.remove(f)
+
+        copyfile(reference_sequence)
 
     copyfile(reference_sequence, temp_dir_path + args.corrected)
 
