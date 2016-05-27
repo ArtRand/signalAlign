@@ -375,7 +375,7 @@ def main(args):
 
         print("Got {nb} sites to check: {sites}".format(nb=len(candidate_sites), sites=candidate_sites))
 
-        for site in candidate_sites:
+        for i, site in enumerate(candidate_sites):
             # make reference .txt with candidate sites N-ed
             degenerate_seq = get_first_sequence(reference_sequence)
             rc_degenerate_seq = reverse_complement(dna=degenerate_seq, reverse=False, complement=True)
@@ -433,6 +433,9 @@ def main(args):
 
             done_queue.put('STOP')
 
+            temp_folder.remove_file(forward_Dreference)
+            temp_folder.remove_file(backward_Dreference)
+
             print("\n#  Starting variant calling\n", file=sys.stdout)
             print("\n#  Starting variant calling\n", file=sys.stderr)
 
@@ -480,6 +483,8 @@ def main(args):
             ref_path = temp_folder.add_file_path("iteration.{site}.fa".format(site=site))
 
             write_fasta("iteration.{site}.fa".format(site=site), new_ref, open(ref_path, 'w'))
+            
+            temp_folder.remove_file("iteration.{site}.fa".format(site=candidate_sites[i - 1]))
 
             reference_sequence = ref_path
 
