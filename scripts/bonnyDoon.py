@@ -376,8 +376,8 @@ def main(args):
         print("Got {} sites to check".format(len(candidate_sites)))
 
         for site in candidate_sites:
-            degenerate_seq[site] = "N"
-            rc_degenerate_seq[site] = "N"
+            degenerate_seq[site] = "X"
+            rc_degenerate_seq[site] = "X"
 
         degenerate_seq = ''.join(degenerate_seq)
         rc_degenerate_seq = ''.join(rc_degenerate_seq)
@@ -473,6 +473,10 @@ def main(args):
         write_fasta("iteration.{cycle}.fa".format(cycle=cycle), new_ref, open(ref_path, 'w'))
 
         reference_sequence = ref_path
+
+        # remove old alignments
+        for f in glob.glob(temp_dir_path + "*.tsv"):
+            os.remove(f)
 
     return
 
