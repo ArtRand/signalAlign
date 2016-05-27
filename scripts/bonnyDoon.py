@@ -11,6 +11,7 @@ from multiprocessing import Process, Queue, current_process, Manager
 from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
 from random import shuffle
+from shutil import copyfile
 
 
 STEP = 4
@@ -54,10 +55,14 @@ def parse_args():
                         default=4, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
+    # todo help string
     parser.add_argument('--cycles', dest='cycles', default=1, required=False, type=int)
+
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
+    # todo help string
+    parser.add_argument('--corrected', dest='corrected', required=False, default='corrected.fa')
 
     args = parser.parse_args()
     return args
@@ -366,6 +371,7 @@ def main(args):
             temp_folder.remove_file(backward_reference)
 
             print("\n#  Finished Scan {}\n".format(it), file=sys.stderr)
+            print("\n#  Finished Scan {}\n".format(it), file=sys.stdout)
 
         print("Got {nb} sites to check: {sites}".format(nb=len(candidate_sites), sites=candidate_sites))
 
@@ -464,7 +470,10 @@ def main(args):
 
             done_queue.put('STOP')
 
-            print("\n#  Starting to look for positions\n", file=sys.stdout)
+            print("\n#  Finished variant calling\n", file=sys.stdout)
+            print("\n#  Finished variant calling\n", file=sys.stderr)
+            print("\n#  Updating reference\n", file=sys.stdout)
+            print("\n#  Updating reference\n", file=sys.stderr)
 
             new_ref = update_reference(variant_call_file, reference_sequence)
 
@@ -477,6 +486,8 @@ def main(args):
             # remove old alignments
             for f in glob.glob(temp_dir_path + "*.tsv"):
                 os.remove(f)
+
+    copyfile(reference_sequence, temp_dir_path + args.corrected)
 
     return
 
