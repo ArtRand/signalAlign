@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Takes alignments from signalAlign and calls methylation status"""
 from __future__ import print_function, division
-import glob
-import os
 import sys
 sys.path.append("../")
 from argparse import ArgumentParser
