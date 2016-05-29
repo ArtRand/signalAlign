@@ -13,9 +13,6 @@ from argparse import ArgumentParser
 from random import shuffle
 
 
-STEP = 4
-
-
 def parse_args():
     parser = ArgumentParser(description=__doc__)
 
@@ -227,7 +224,8 @@ def main(args):
 
     reference_sequence = args.ref
 
-    for cycle in range(0, args.cycles):
+    STEP = 10
+    for cycle in range(0, 8):
         for it in range(0, STEP):
             # make paths for reference files
             forward_reference = temp_folder.add_file_path("forward_reference.{cycle}.{iter}.txt".format(cycle=cycle,
@@ -350,6 +348,7 @@ def main(args):
             # remove old alignments
             for f in glob.glob(temp_dir_path + "*.tsv"):
                 os.remove(f)
+        STEP -= 1
     return
 
 if __name__ == "__main__":
