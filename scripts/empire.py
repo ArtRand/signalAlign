@@ -299,8 +299,11 @@ def main(args):
             print("#  Starting Variant Calling, register: {}...".format(register), file=sys.stdout, end='\n')
             print("#  Starting Variant Calling, register: {}...".format(register), file=sys.stderr, end='')
             # cull the alignment files for this register
-            alns, forward_mask = get_alignments_labels_and_mask(temp_dir_path + "*.tsv.{}".format(register),
-                                                                args.nb_files)
+            alns, forward_mask = get_alignments_labels_and_mask(
+                path_to_alignments=temp_dir_path + "*.tsv.{}".format(register),
+                max=args.nb_files,
+                suffix=".{}".format(register)
+            )
             # this is the list of positions that we're going to look at, based on this register
             degenerate_positions = {'forward': range(register, reference_sequence_length, STEP),
                                     'backward': range(register, reference_sequence_length, STEP)

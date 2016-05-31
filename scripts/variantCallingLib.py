@@ -23,19 +23,19 @@ def randomly_select_alignments(path_to_alignments, max_alignments_to_use):
         return alignments[:max_alignments_to_use]
 
 
-def get_forward_mask(list_of_alignments):
+def get_forward_mask(list_of_alignments, suffix):
     mask = []
     for alignment in list_of_alignments:
-        if alignment.endswith(".backward.tsv"):
+        if alignment.endswith(".backward.tsv{}".format(suffix)):
             mask.append(False)
         else:
             mask.append(True)
     return mask
 
 
-def get_alignments_labels_and_mask(path_to_alignments, max):
+def get_alignments_labels_and_mask(path_to_alignments, max, suffix=""):
     alignments = randomly_select_alignments(path_to_alignments, max)
-    mask = get_forward_mask(alignments)
+    mask = get_forward_mask(alignments, suffix)
     return alignments, mask
 
 
