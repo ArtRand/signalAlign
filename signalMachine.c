@@ -605,6 +605,10 @@ int main(int argc, char *argv[]) {
         //stList *aP = stList_construct3(0, &free);
 
         for (int64_t i = 0; i < STEP; i++) {
+            if (posteriorProbsFile == NULL) {
+                st_errAbort("SignalAlign - didn't find output file path\n");
+            }
+
             // load the first forward and backward reference sequences
             char *fR = stString_print("%sforward_sub%i.txt", errorCorrectPath, i);
             char *bR = stString_print("%sbackward_sub%i.txt", errorCorrectPath, i);
@@ -625,23 +629,23 @@ int main(int argc, char *argv[]) {
 
             double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
-            fprintf(stdout, "%s :: Iteration %lld, #alignedPairs (template): %lld, score: %f\n",
+            fprintf(stdout, "%s :: Iteration %lld, # alignedPairs (template): %lld, score: %f\n",
                     readLabel, i, stList_length(templateAlignedPairs), templatePosteriorScore);
 
             stList_sort(templateAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
 
+            char *perIterationOutputFile = stString_print("%s.%i", posteriorProbsFile, i);
+
             // write to file
-            if (posteriorProbsFile != NULL) {
-                if (sparseOutput) {
-                    writePosteriorProbsSparse(posteriorProbsFile, readLabel, R->getTemplateTargetSequence(R),
-                                              forward, pA->contig1, tCoordinateShift,
-                                              rCoordinateShift_t, templateAlignedPairs, template);
-                } else {
-                    writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_MATRIX,
-                                        npRead->templateParams, npRead->templateEvents, R->getTemplateTargetSequence(R),
-                                        forward, pA->contig1, sMt->type, tCoordinateShift, rCoordinateShift_t,
-                                        templateAlignedPairs, template);
-                }
+            if (sparseOutput) {
+                writePosteriorProbsSparse(perIterationOutputFile, readLabel, R->getTemplateTargetSequence(R),
+                                          forward, pA->contig1, tCoordinateShift,
+                                          rCoordinateShift_t, templateAlignedPairs, template);
+            } else {
+                writePosteriorProbs(perIterationOutputFile, readLabel, sMt->EMISSION_MATCH_MATRIX,
+                                    npRead->templateParams, npRead->templateEvents, R->getTemplateTargetSequence(R),
+                                    forward, pA->contig1, sMt->type, tCoordinateShift, rCoordinateShift_t,
+                                    templateAlignedPairs, template);
             }
 
             stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
@@ -657,24 +661,25 @@ int main(int argc, char *argv[]) {
             fprintf(stdout, "%s :: Iteration %lld, # alignedPairs (complement): %lld, score: %f\n",
                     readLabel, i, stList_length(complementAlignedPairs), complementPosteriorScore);
 
-            if (posteriorProbsFile != NULL) {
-                if (sparseOutput) {
-                    writePosteriorProbsSparse(posteriorProbsFile, readLabel, R->getComplementTargetSequence(R),
-                                              forward, pA->contig1, cCoordinateShift,
-                                              rCoordinateShift_c, complementAlignedPairs, complement);
-                } else {
-                    writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_MATRIX,
-                                        npRead->complementParams, npRead->complementEvents,
-                                        R->getComplementTargetSequence(R), forward, pA->contig1,
-                                        sMc->type, cCoordinateShift, rCoordinateShift_c,
-                                        complementAlignedPairs, complement);
-                }
+            if (sparseOutput) {
+                writePosteriorProbsSparse(perIterationOutputFile, readLabel, R->getComplementTargetSequence(R),
+                                          forward, pA->contig1, cCoordinateShift,
+                                          rCoordinateShift_c, complementAlignedPairs, complement);
+            } else {
+                writePosteriorProbs(perIterationOutputFile, readLabel, sMc->EMISSION_MATCH_MATRIX,
+                                    npRead->complementParams, npRead->complementEvents,
+                                    R->getComplementTargetSequence(R), forward, pA->contig1,
+                                    sMc->type, cCoordinateShift, rCoordinateShift_c,
+                                    complementAlignedPairs, complement);
             }
 
             //stList_appendAll(aP, templateAlignedPairs);
             // per-loop cleanup
             stList_destruct(templateAlignedPairs);
             stList_destruct(complementAlignedPairs);
+            free(perIterationOutputFile);
+            free(fR);
+            free(bR);
         }
         stateMachine_destruct(sMt);
         stateMachine_destruct(sMc);

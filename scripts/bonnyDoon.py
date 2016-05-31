@@ -373,130 +373,134 @@ def main(args):
             print("\n#  Finished Scan {}\n".format(it), file=sys.stderr)
             print("\n#  Finished Scan {}\n".format(it), file=sys.stdout)
 
-        print("Got {nb} sites to check: {sites}".format(nb=len(candidate_sites), sites=candidate_sites))
+        for sweep in xrange(0, 10):
+            print("Beginning sweep {sweep}\nGot {nb} sites to check: {sites}".format(nb=len(candidate_sites),
+                                                                                     sites=candidate_sites,
+                                                                                     sweep=sweep))
+            shuffle(candidate_sites)
+            for i, site in enumerate(candidate_sites):
+                # make reference .txt with candidate sites N-ed
+                degenerate_seq = get_first_sequence(reference_sequence)
+                rc_degenerate_seq = reverse_complement(dna=degenerate_seq, reverse=False, complement=True)
+                degenerate_seq = list(degenerate_seq)
+                rc_degenerate_seq = list(rc_degenerate_seq)
 
-        for i, site in enumerate(candidate_sites):
-            # make reference .txt with candidate sites N-ed
-            degenerate_seq = get_first_sequence(reference_sequence)
-            rc_degenerate_seq = reverse_complement(dna=degenerate_seq, reverse=False, complement=True)
-            degenerate_seq = list(degenerate_seq)
-            rc_degenerate_seq = list(rc_degenerate_seq)
+                degenerate_seq[site] = "X"
+                rc_degenerate_seq[site] = "X"
 
-            degenerate_seq[site] = "X"
-            rc_degenerate_seq[site] = "X"
+                degenerate_seq = ''.join(degenerate_seq)
+                rc_degenerate_seq = ''.join(rc_degenerate_seq)
 
-            degenerate_seq = ''.join(degenerate_seq)
-            rc_degenerate_seq = ''.join(rc_degenerate_seq)
+                forward_Dreference = temp_folder.add_file_path("deg_seq_forward.{site}.txt".format(site=site))
+                backward_Dreference = temp_folder.add_file_path("deg_seq_backward.{site}.txt".format(site=site))
 
-            forward_Dreference = temp_folder.add_file_path("deg_seq_forward.{site}.txt".format(site=site))
-            backward_Dreference = temp_folder.add_file_path("deg_seq_backward.{site}.txt".format(site=site))
+                with open(forward_Dreference, 'w') as f:
+                    f.write("{seq}".format(seq=degenerate_seq))
+                with open(backward_Dreference, 'w') as f:
+                    f.write("{seq}".format(seq=rc_degenerate_seq))
 
-            with open(forward_Dreference, 'w') as f:
-                f.write("{seq}".format(seq=degenerate_seq))
-            with open(backward_Dreference, 'w') as f:
-                f.write("{seq}".format(seq=rc_degenerate_seq))
+                # aligninment procedure
+                for fast5 in fast5s:
+                    alignment_args = {
+                        "forward_reference": forward_Dreference,
+                        "backward_reference": backward_Dreference,
+                        "path_to_EC_refs": None,
+                        "destination": temp_dir_path,
+                        "stateMachineType": args.stateMachineType,
+                        "bwa_index": bwa_ref_index,
+                        "in_templateHmm": args.in_T_Hmm,
+                        "in_complementHmm": args.in_C_Hmm,
+                        "in_templateHdp": args.templateHDP,
+                        "in_complementHdp": args.complementHDP,
+                        "banded": args.banded,
+                        "sparse_output": True,
+                        "in_fast5": args.files_dir + fast5,
+                        "threshold": args.threshold,
+                        "diagonal_expansion": args.diag_expansion,
+                        "constraint_trim": args.constraint_trim,
+                        "target_regions": None,
+                        "degenerate": degenerate_enum(args.degenerate),
+                    }
+                    #alignment = SignalAlignment(**alignment_args)
+                    #alignment.run()
+                    work_queue.put(alignment_args)
 
-            # aligninment procedure
-            for fast5 in fast5s:
-                alignment_args = {
-                    "forward_reference": forward_Dreference,
-                    "backward_reference": backward_Dreference,
-                    "path_to_EC_refs": None,
-                    "destination": temp_dir_path,
-                    "stateMachineType": args.stateMachineType,
-                    "bwa_index": bwa_ref_index,
-                    "in_templateHmm": args.in_T_Hmm,
-                    "in_complementHmm": args.in_C_Hmm,
-                    "in_templateHdp": args.templateHDP,
-                    "in_complementHdp": args.complementHDP,
-                    "banded": args.banded,
-                    "sparse_output": True,
-                    "in_fast5": args.files_dir + fast5,
-                    "threshold": args.threshold,
-                    "diagonal_expansion": args.diag_expansion,
-                    "constraint_trim": args.constraint_trim,
-                    "target_regions": None,
-                    "degenerate": degenerate_enum(args.degenerate),
+                for w in xrange(workers):
+                    p = Process(target=aligner, args=(work_queue, done_queue))
+                    p.start()
+                    jobs.append(p)
+                    work_queue.put('STOP')
+
+                for p in jobs:
+                    p.join()
+
+                done_queue.put('STOP')
+
+                temp_folder.remove_file(forward_Dreference)
+                temp_folder.remove_file(backward_Dreference)
+
+                print("\n#  Starting variant calling\n", file=sys.stdout)
+                print("\n#  Starting variant calling\n", file=sys.stderr)
+
+                # cull the alignment files
+                alns, forward_mask = get_alignments_labels_and_mask(temp_dir_path + "*.tsv", args.nb_files)
+
+                degenerate_positions = {
+                    'forward': [site],
+                    'backward': [site]
                 }
-                #alignment = SignalAlignment(**alignment_args)
-                #alignment.run()
-                work_queue.put(alignment_args)
 
-            for w in xrange(workers):
-                p = Process(target=aligner, args=(work_queue, done_queue))
-                p.start()
-                jobs.append(p)
-                work_queue.put('STOP')
+                variant_call_file = temp_folder.add_file_path("variants.{site}.calls".format(site=site))
 
-            for p in jobs:
-                p.join()
+                for aln, forward_bool in zip(alns, forward_mask):
+                    call_methyl_args = {
+                        "sequence": None,
+                        "alignment_file": aln,
+                        "forward": forward_bool,
+                        "out_file": variant_call_file,
+                        "positions": degenerate_positions,
+                        "degenerate_type": degenerate_enum(args.degenerate),
+                    }
+                    #c = CallMethylation(**call_methyl_args)
+                    #c.write()
+                    work_queue.put(call_methyl_args)
 
-            done_queue.put('STOP')
+                for w in xrange(workers):
+                    p = Process(target=run_methyl_caller, args=(work_queue, done_queue))
+                    p.start()
+                    jobs.append(p)
+                    work_queue.put('STOP')
 
-            temp_folder.remove_file(forward_Dreference)
-            temp_folder.remove_file(backward_Dreference)
+                for p in jobs:
+                    p.join()
 
-            print("\n#  Starting variant calling\n", file=sys.stdout)
-            print("\n#  Starting variant calling\n", file=sys.stderr)
+                done_queue.put('STOP')
 
-            # cull the alignment files
-            alns, forward_mask = get_alignments_labels_and_mask(temp_dir_path + "*.tsv", args.nb_files)
+                print("\n#  Finished variant calling\n", file=sys.stdout)
+                print("\n#  Finished variant calling\n", file=sys.stderr)
+                print("\n#  Updating reference\n", file=sys.stdout)
+                print("\n#  Updating reference\n", file=sys.stderr)
 
-            degenerate_positions = {
-                'forward': [site],
-                'backward': [site]
-            }
+                new_ref = update_reference(variant_call_file, reference_sequence)
 
-            variant_call_file = temp_folder.add_file_path("variants.{site}.calls".format(site=site))
+                temp_folder.remove_file(variant_call_file)  # remove variant call file
 
-            for aln, forward_bool in zip(alns, forward_mask):
-                call_methyl_args = {
-                    "sequence": None,
-                    "alignment_file": aln,
-                    "forward": forward_bool,
-                    "out_file": variant_call_file,
-                    "positions": degenerate_positions,
-                    "degenerate_type": degenerate_enum(args.degenerate),
-                }
-                #c = CallMethylation(**call_methyl_args)
-                #c.write()
-                work_queue.put(call_methyl_args)
+                temp_folder.remove_file(reference_sequence)  # remove old reference
 
-            for w in xrange(workers):
-                p = Process(target=run_methyl_caller, args=(work_queue, done_queue))
-                p.start()
-                jobs.append(p)
-                work_queue.put('STOP')
+                ref_path = temp_folder.add_file_path("iteration.{site}.fa".format(site=site))
 
-            for p in jobs:
-                p.join()
+                write_fasta("iteration.{site}.fa".format(site=site), new_ref, open(ref_path, 'w'))
 
-            done_queue.put('STOP')
+                reference_sequence = ref_path
 
-            print("\n#  Finished variant calling\n", file=sys.stdout)
-            print("\n#  Finished variant calling\n", file=sys.stderr)
-            print("\n#  Updating reference\n", file=sys.stdout)
-            print("\n#  Updating reference\n", file=sys.stderr)
+                # remove old alignments
+                for f in glob.glob(temp_dir_path + "*.tsv"):
+                    os.remove(f)
 
-            new_ref = update_reference(variant_call_file, reference_sequence)
-
-            temp_folder.remove_file(variant_call_file)  # remove variant call file
-
-            temp_folder.remove_file(reference_sequence)  # remove old reference
-
-            ref_path = temp_folder.add_file_path("iteration.{site}.fa".format(site=site))
-
-            write_fasta("iteration.{site}.fa".format(site=site), new_ref, open(ref_path, 'w'))
-
-            reference_sequence = ref_path
-
-            # remove old alignments
-            for f in glob.glob(temp_dir_path + "*.tsv"):
-                os.remove(f)
-
-        # keep track of how we're doing
-        cycle_snapshot = temp_folder.add_file_path("cycle_snapshot.{cycle}.fa".format(cycle=cycle))
-        copyfile(reference_sequence, cycle_snapshot)
+            # keep track of how we're doing
+            cycle_snapshot = temp_folder.add_file_path("cycle_snapshot.{cycle}.{sweep}.fa".format(cycle=cycle,
+                                                                                                  sweep=sweep))
+            copyfile(reference_sequence, cycle_snapshot)
 
     # copy final file
     copyfile(reference_sequence, temp_dir_path + args.corrected)

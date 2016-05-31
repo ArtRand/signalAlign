@@ -21,8 +21,8 @@ def parse_args():
                         help="path to fasta reference file")
     parser.add_argument('--positions', '-p', required=False, action='store', type=str, dest='positions',
                         help='positions file')
-    parser.add_argument('--error_correct', action='store_true', default=False, required=False,
-                        dest='error_correct', help="Enable error correction")
+    parser.add_argument('--error_correct', action='store', default=None, required=False, type=int,
+                        dest='error_correct', help="Enable error correction, provide error correction position")
     parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
                         help="Specify degenerate nucleotide options: "
                              "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
@@ -56,14 +56,14 @@ def main(args):
 
     out_file = args.out
 
-    if args.positions is not None and args.error_correct is False:
+    if args.positions is not None and args.error_correct is not None:
         positions = {}
         f, b = parse_substitution_file(args.positions)
         positions['forward'] = f[1]
         positions['backward'] = b[1]
-    elif args.error_correct is True:
-        positions = {'forward': range(0, len(reference_sequence)),
-                     'backward': range(0, len(reference_sequence))
+    elif args.error_correct is not None:
+        positions = {'forward': range(args.error_correct, len(reference_sequence)),
+                     'backward': range(args.error_correct, len(reference_sequence))
                      }
     else:
         positions = None
