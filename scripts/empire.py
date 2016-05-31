@@ -14,7 +14,6 @@ from random import shuffle
 
 STEP = 6
 
-
 def parse_args():
     parser = ArgumentParser(description=__doc__)
 
@@ -70,7 +69,7 @@ def get_first_sequence(input_fasta):
     return input_sequence
 
 
-def make_degenerate_reference_iterator(input_sequence, block_size=1, step=6):
+def make_degenerate_reference_iterator(input_sequence, step, block_size=1):
     """
     input_sequence: string, input nucleotide sequence
     out_path: string, path to directory to put new sequences with substituted degenerate characters
@@ -90,20 +89,22 @@ def make_degenerate_reference_iterator(input_sequence, block_size=1, step=6):
         yield ''.join(t_seq), ''.join(c_seq)
 
 
-def write_degenerate_reference_set(input_fasta, out_path):
+def write_degenerate_reference_set(input_fasta, out_path, step):
     # get the first sequence from the FASTA
     seq = ""
     for header, comment, sequence in read_fasta(input_fasta):
         seq += sequence
         break
 
-    for i, s in enumerate(make_degenerate_reference_iterator(input_sequence=seq)):
+    length = len(seq)
+
+    for i, s in enumerate(make_degenerate_reference_iterator(input_sequence=seq, step=step)):
         with open(out_path + "forward_sub{i}.txt".format(i=i), 'w') as f:
             f.write("{seq}".format(seq=s[0]))
         with open(out_path + "backward_sub{i}.txt".format(i=i), 'w') as f:
             f.write("{seq}".format(seq=s[1]))
 
-    return True
+    return True, length
 
 
 def aligner(work_queue, done_queue):
@@ -146,11 +147,10 @@ def rc_probs(probs):
     return [probs[3], probs[2], probs[1], probs[0]]
 
 
-def update_reference(data, reference_sequence, min_depth=0, get_sites=False):
+def update_reference(data, reference_sequence, register, min_depth=0, get_sites=False):
     d = load_data(data)
-
     ref = list(reference_sequence)
-
+    # todo remove this
     candidate_sites = []
     add_to_candidates = candidate_sites.append
 
@@ -164,8 +164,8 @@ def update_reference(data, reference_sequence, min_depth=0, get_sites=False):
             continue
 
         for i, read in x.iterrows():
-            if ((read['read'].endswith(".forward.tsv") and read['strand'] == 't') or
-                    (read['read'].endswith(".backward.tsv") and read['strand'] == 'c')):
+            if ((read['read'].endswith(".forward.tsv.{}".format(register)) and read['strand'] == 't') or
+                    (read['read'].endswith(".backward.tsv".format(register)) and read['strand'] == 'c')):
                 direction = True
             else:
                 direction = False
@@ -177,7 +177,7 @@ def update_reference(data, reference_sequence, min_depth=0, get_sites=False):
 
         marginal_prob = marginal_forward_p + rc_probs(marginal_backward_p)
 
-        called_base = marginal_prob.map(lambda x: x / sum(marginal_prob)).argmax()[1]
+        called_base = marginal_prob.map(lambda p: p / sum(marginal_prob)).argmax()[1]
 
         if called_base != ref[site]:
             print("Changing {orig} to {new} at {site}".format(orig=ref[site], new=called_base, site=site))
@@ -224,12 +224,13 @@ def main(args):
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_errorCorrection")
 
-    check = write_degenerate_reference_set(input_fasta=args.ref, out_path=temp_dir_path)
-    assert check, "Problem making degenerate reference sequence set"
-
     reference_sequence = args.ref
 
     for cycle in range(0, args.cycles):
+        check, reference_sequence_length = write_degenerate_reference_set(input_fasta=reference_sequence,
+                                                                          out_path=temp_dir_path, step=STEP)
+        assert check, "Problem making degenerate reference sequence set"
+
         # index the reference for bwa
         print("signalAlign - indexing reference", file=sys.stderr)
         bwa_ref_index = get_bwa_index(reference_sequence, temp_dir_path)
@@ -295,15 +296,16 @@ def main(args):
         # ACGTAGACAATA --> NCGTAGNCAATA = register 0
         # ACGTAGACAATA --> ANGTAGANAATA = register 1 ...
         for register in range(0, STEP):
-            print("#  Starting Variant Calling, register: {}...".format(register), file=sys.stdout, end='')
+            print("#  Starting Variant Calling, register: {}...".format(register), file=sys.stdout, end='\n')
             print("#  Starting Variant Calling, register: {}...".format(register), file=sys.stderr, end='')
             # cull the alignment files for this register
             alns, forward_mask = get_alignments_labels_and_mask(temp_dir_path + "*.tsv.{}".format(register),
                                                                 args.nb_files)
             # this is the list of positions that we're going to look at, based on this register
-            degenerate_positions = {'forward': range(register, len(working_sequence), STEP),
-                                    'backward': range(register, len(working_sequence), STEP)
+            degenerate_positions = {'forward': range(register, reference_sequence_length, STEP),
+                                    'backward': range(register, reference_sequence_length, STEP)
                                     }
+
             # place to put the marginal probs
             variant_call_file = temp_folder.add_file_path("variants.{cycle}.{reg}.calls".format(cycle=cycle,
                                                                                                 reg=register))
@@ -333,7 +335,8 @@ def main(args):
             done_queue.put('STOP')
 
             # this is where the per-register update happens
-            working_sequence = update_reference(variant_call_file, working_sequence, min_depth=0, get_sites=False)
+            working_sequence = update_reference(variant_call_file, working_sequence, register,
+                                                min_depth=0, get_sites=False)
 
             # remove alignments for this register
             for f in glob.glob(temp_dir_path + "*.tsv.{}".format(register)):

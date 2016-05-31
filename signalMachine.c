@@ -648,6 +648,8 @@ int main(int argc, char *argv[]) {
                                     templateAlignedPairs, template);
             }
 
+            fprintf(stderr, "signalAlign - starting complement alignment round %lld\n", i);
+
             stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
                                                                     npRead->complementEventMap, pA->start2,
                                                                     R->getComplementTargetSequence(R),

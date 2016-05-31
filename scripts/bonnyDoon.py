@@ -14,7 +14,7 @@ from random import shuffle
 from shutil import copyfile
 
 
-STEP = 4
+STEP = 6
 
 
 def parse_args():
@@ -209,7 +209,7 @@ def main(args):
     print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
     start_message = """
-#   Starting Zayante Error-Correction
+#   Starting BonnyDoon Error-Correction
 #   Aligning files from: {fileDir}
 #   Aligning to reference: {reference}
 #   Aligning maximum of {nbFiles} files
