@@ -9,7 +9,8 @@ signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
 all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
-      ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py \
+      ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
+	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon ${signalAlignBin}/empire \
       ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
 	#cd externalTools && make all
@@ -73,10 +74,13 @@ ${signalAlignBin}/empire : ${rootPath}scripts/empire.py
 	cp ${rootPath}scripts/empire.py ${signalAlignBin}/empire
 	chmod +x ${signalAlignBin}/empire
 
-
 ${signalAlignBin}/signalAlignLib.py : ${rootPath}scripts/signalAlignLib.py
 	cp ${rootPath}scripts/signalAlignLib.py ${signalAlignBin}/signalAlignLib.py
+
+${signalAlignBin}/variantCallingLib.py : ${rootPath}scripts/variantCallingLib.py
 	cp ${rootPath}scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.py
+
+${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}scripts/alignmentAnalysisLib.py
 	cp ${rootPath}scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
