@@ -12,7 +12,7 @@ from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
 from random import shuffle
 
-STEP = 6
+STEP = 12
 
 def parse_args():
     parser = ArgumentParser(description=__doc__)

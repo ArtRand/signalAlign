@@ -598,13 +598,17 @@ int main(int argc, char *argv[]) {
     stList *anchorPairs = guideAlignmentToRebasedAnchorPairs(pA, p);  // pA gets modified here, no turning back
 
     if (errorCorrectPath != NULL) {
-        StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams, sMtype,
-                                                        template, nHdpT, templateHmmFile);
-        StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
-                                                        sMtype, complement, nHdpC, complementHmmFile);
-        //stList *aP = stList_construct3(0, &free);
+        st_uglyf("Starting error correcting routine\n");
 
+        //stList *aP = stList_construct3(0, &free);
+        //char *fR, *bR, *perIterationOutputFile;
+        //stList *templateAlignedPairs, *complementAlignedPairs;
+        #pragma omp parallel for
         for (int64_t i = 0; i < STEP; i++) {
+            StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams, sMtype,
+                                                            template, nHdpT, templateHmmFile);
+            StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
+                                                            sMtype, complement, nHdpC, complementHmmFile);
             if (posteriorProbsFile == NULL) {
                 st_errAbort("SignalAlign - didn't find output file path\n");
             }
@@ -623,9 +627,9 @@ int main(int argc, char *argv[]) {
 
             // get aligned pairs
             stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
-                                                                  pA->start2, R->getTemplateTargetSequence(R),
-                                                                  p, anchorPairs,
-                                                                  degenerate);
+                                                          pA->start2, R->getTemplateTargetSequence(R),
+                                                          p, anchorPairs,
+                                                          degenerate);
 
             double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
@@ -651,9 +655,9 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "signalAlign - starting complement alignment round %lld\n", i);
 
             stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
-                                                                    npRead->complementEventMap, pA->start2,
-                                                                    R->getComplementTargetSequence(R),
-                                                                    p, anchorPairs, degenerate);
+                                                            npRead->complementEventMap, pA->start2,
+                                                            R->getComplementTargetSequence(R),
+                                                            p, anchorPairs, degenerate);
 
             double complementPosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(complementAlignedPairs);
 
@@ -674,21 +678,21 @@ int main(int argc, char *argv[]) {
                                     sMc->type, cCoordinateShift, rCoordinateShift_c,
                                     complementAlignedPairs, complement);
             }
-
-            //stList_appendAll(aP, templateAlignedPairs);
-            // per-loop cleanup
             stList_destruct(templateAlignedPairs);
             stList_destruct(complementAlignedPairs);
+            stateMachine_destruct(sMt);
+            stateMachine_destruct(sMc);
             free(perIterationOutputFile);
             free(fR);
             free(bR);
         }
-        stateMachine_destruct(sMt);
-        stateMachine_destruct(sMc);
-        signalUtils_ReferenceSequenceDestruct(R);
-        sequence_sequenceDestroy(tEventSequence);
-        sequence_sequenceDestroy(cEventSequence);
-        destructPairwiseAlignment(pA);
+        #pragma omp critical
+        {
+            signalUtils_ReferenceSequenceDestruct(R);
+            sequence_sequenceDestroy(tEventSequence);
+            sequence_sequenceDestroy(cEventSequence);
+            destructPairwiseAlignment(pA);
+        }
         return 0;
     } else if ((templateExpectationsFile != NULL) && (complementExpectationsFile != NULL)) {
         // Expectation Routine //

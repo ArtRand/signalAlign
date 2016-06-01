@@ -112,9 +112,9 @@ ReferenceSequence *signalUtils_ReferenceSequenceConstructEmpty(struct PairwiseAl
 
 void signalUtils_ReferenceSequenceSet(ReferenceSequence *self,
                                       char *forwardReferencePath, char *backwardReferencePath) {
-    if (self->initialized) {
-        referenceSequence_reset(self);
-    }
+    //if (self->initialized) {
+    //    referenceSequence_reset(self);
+    //}
 
     referenceSequence_loadReference(self, forwardReferencePath, backwardReferencePath);
     referenceSequence_setTrimmedSeqeuences(self);

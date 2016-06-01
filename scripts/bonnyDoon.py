@@ -373,7 +373,7 @@ def main(args):
             print("\n#  Finished Scan {}\n".format(it), file=sys.stderr)
             print("\n#  Finished Scan {}\n".format(it), file=sys.stdout)
 
-        for sweep in xrange(0, 10):
+        for sweep in xrange(0, args.sweeps):
             print("Beginning sweep {sweep}\nGot {nb} sites to check: {sites}".format(nb=len(candidate_sites),
                                                                                      sites=candidate_sites,
                                                                                      sweep=sweep))
