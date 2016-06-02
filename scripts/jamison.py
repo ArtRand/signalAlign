@@ -57,6 +57,7 @@ def parse_args():
                         default=500, type=int, help="maximum number of reads to align")
     # todo help string
     parser.add_argument('--cycles', dest='cycles', default=1, required=False, type=int)
+    parser.add_argument('--sweeps', dest='sweeps', default=1, required=False, type=int)
 
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
@@ -66,6 +67,62 @@ def parse_args():
 
     args = parser.parse_args()
     return args
+
+
+def group_sites_in_window(sites, window=6):
+    def collect_group(array, start):
+        i = start
+        g = [array[start]]
+        while array[i + 1][0] - array[i][0] < window:
+            g.append(array[i + 1])
+            i += 1
+            if len(array) <= i + 1:
+                break
+        return g, i + 1
+    groups = []
+    i = 0
+    while i + 1 < len(sites):
+        g, i = collect_group(sites, i)
+        groups.append(g)
+    return [max(x, key=itemgetter(1))[0] for x in groups]
+
+
+def make_degenerate_reference_iterator(input_sequence, block_size=1, step=6):
+    """
+    input_sequence: string, input nucleotide sequence
+    out_path: string, path to directory to put new sequences with substituted degenerate characters
+    block_size: not implemented
+    step: number of bases between degenerate characters
+    :return (subbed sequence, complement subbed sequence)
+    """
+    complement_sequence = reverse_complement(dna=input_sequence, reverse=False, complement=True)
+
+    for s in xrange(0, step):
+        positions = xrange(s, len(input_sequence), step)
+        t_seq = list(input_sequence)
+        c_seq = list(complement_sequence)
+        for position in positions:
+            t_seq[position] = "X"
+            c_seq[position] = "X"
+        yield ''.join(t_seq), ''.join(c_seq)
+
+
+def write_degenerate_reference_set(input_fasta, out_path, step):
+    # get the first sequence from the FASTA
+    seq = ""
+    for header, comment, sequence in read_fasta(input_fasta):
+        seq += sequence
+        break
+
+    length = len(seq)
+
+    for i, s in enumerate(make_degenerate_reference_iterator(input_sequence=seq, step=step)):
+        with open(out_path + "forward_sub{i}.txt".format(i=i), 'w') as f:
+            f.write("{seq}".format(seq=s[0]))
+        with open(out_path + "backward_sub{i}.txt".format(i=i), 'w') as f:
+            f.write("{seq}".format(seq=s[1]))
+
+    return True, length
 
 
 def get_first_sequence(input_fasta):
@@ -212,7 +269,7 @@ def main(args):
     print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
     start_message = """
-#   Starting BonnyDoon Error-Correction
+#   Starting Jamison Error-Correction
 #   Aligning files from: {fileDir}
 #   Aligning to reference: {reference}
 #   Aligning maximum of {nbFiles} files
@@ -238,21 +295,18 @@ def main(args):
 
     reference_sequence = args.ref
 
+    # list of alignment files
+    # TODO might want to put this outside the loop
+    fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
+    # take only some
+    if args.nb_files < len(fast5s):
+        shuffle(fast5s)
+        fast5s = fast5s[:args.nb_files]
+
     for cycle in range(0, args.cycles):
-        candidate_sites = []
-
-        # list of alignment files
-        # TODO might want to put this outside the loop
-        fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
-
-        # take only some
-        if args.nb_files < len(fast5s):
-            shuffle(fast5s)
-            fast5s = fast5s[:args.nb_files]
-
         # index the reference for bwa
         print("signalAlign - indexing reference", file=sys.stderr)
-        bwa_ref_index = get_bwa_index(args.ref, temp_dir_path)  # TODO might want to change this to updated ref
+        bwa_ref_index = get_bwa_index(reference_sequence, temp_dir_path)
         print("signalAlign - indexing reference, done", file=sys.stderr)
 
         # setup workers for multiprocessing
@@ -261,6 +315,7 @@ def main(args):
         done_queue = Manager().Queue()
 
         # this loop scans for positions to change to N
+        candidate_sites = []
         for it in range(0, STEP):
             # make paths for working txt files that contain this STEPs Ns
             forward_reference = temp_folder.add_file_path("forward_reference.{cycle}.{iter}.txt".format(cycle=cycle,
@@ -329,7 +384,7 @@ def main(args):
             degenerate_positions = {
                 'forward': range(it, reference_sequence_length, STEP),
                 'backward': range(it, reference_sequence_length, STEP)
-                }
+            }
 
             variant_call_file = temp_folder.add_file_path("proposals.{cycle}.{iter}.calls".format(cycle=cycle,
                                                                                                   iter=it))
@@ -375,6 +430,12 @@ def main(args):
 
             print("\n#  Finished Scan {}\n".format(it), file=sys.stderr)
             print("\n#  Finished Scan {}\n".format(it), file=sys.stdout)
+
+        candidate_sites.sort()
+
+        sites_to_check = group_sites_in_window(candidate_sites, 6)
+
+        candidate_sites = sites_to_check
 
         for sweep in xrange(0, args.sweeps):
             print("Beginning sweep {sweep}\nGot {nb} sites to check: {sites}".format(nb=len(candidate_sites),

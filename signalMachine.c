@@ -603,7 +603,7 @@ int main(int argc, char *argv[]) {
         //stList *aP = stList_construct3(0, &free);
         //char *fR, *bR, *perIterationOutputFile;
         //stList *templateAlignedPairs, *complementAlignedPairs;
-        #pragma omp parallel for
+//        #pragma omp parallel for
         for (int64_t i = 0; i < STEP; i++) {
             StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams, sMtype,
                                                             template, nHdpT, templateHmmFile);
@@ -617,7 +617,7 @@ int main(int argc, char *argv[]) {
             char *fR = stString_print("%sforward_sub%i.txt", errorCorrectPath, i);
             char *bR = stString_print("%sbackward_sub%i.txt", errorCorrectPath, i);
 
-            if (!stFile_exists(fR) && !stFile_exists(bR)) {
+            if (!stFile_exists(fR) || !stFile_exists(bR)) {
                 st_errAbort("Error finding error correct references %s %s\n", fR, bR);
             }
             // set referenceSequence to this iteration's sequence
@@ -686,7 +686,7 @@ int main(int argc, char *argv[]) {
             free(fR);
             free(bR);
         }
-        #pragma omp critical
+//        #pragma omp critical
         {
             signalUtils_ReferenceSequenceDestruct(R);
             sequence_sequenceDestroy(tEventSequence);
