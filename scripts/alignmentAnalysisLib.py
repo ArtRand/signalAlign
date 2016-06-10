@@ -108,9 +108,10 @@ class KmerHistogram(object):
 
 
 class CallMethylation(object):
-    def __init__(self, sequence, alignment_file, forward, degenerate_type, label=None, positions=None, out_file=None):
+    def __init__(self, sequence, alignment_file, degenerate_type, label=None, positions=None, out_file=None):
         self.sequence = sequence
-        self.forward = forward
+        #self.forward = forward
+        self.forward = ".forward." in alignment_file
         self.alignment_file = alignment_file
         self.data = None
         self.probs = []
@@ -223,4 +224,8 @@ class CallMethylation(object):
                                      read=file_name))
             else:
                 sys.exit(1)
+        return
+
+    def run(self):
+        self.write()
         return

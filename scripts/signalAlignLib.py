@@ -10,6 +10,7 @@ import subprocess
 import re
 import numpy as np
 from itertools import islice, izip
+from random import shuffle
 from serviceCourse.sequenceTools import reverse_complement
 from serviceCourse.parsers import read_fasta
 from serviceCourse.file_handlers import FolderHandler
@@ -25,28 +26,28 @@ def kmer_iterator(dna, k):
             yield kmer
 
 
-#def list_twoD_event_map(self):
-#        """Print out tab separated mapping of the strand events to the 2D kmers
-#        """
-#        for te, ce, kmer in izip(self.template_event_map, self.complement_event_map,
-#                                 kmer_iterator(self.twoD_read_sequence, self.kmer_length)):
-#            print(te, ce, kmer, sep="\t")
-
-
-#def orient_read_with_bwa(bwa_index, query):
-#    # align with bwa
-#    command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
-#    # this is a small SAM file that comes from bwa
-#    aln = subprocess.check_output(command.split())
-#    aln = aln.split("\t") # split
-
-#    return int(aln[7])
-
-
 def write_fasta(id, sequence, destination):
     print(">", id, sep="", end="\n", file=destination)
     print(sequence, end="\n", file=destination)
+    destination.close()
+    return
 
+
+def cull_fast5_files(path_to_files, maximum_files):
+    # list of alignment files
+    fast5s = [x for x in os.listdir(path_to_files) if x.endswith(".fast5")]
+    fast5s = [path_to_files + x for x in fast5s]
+
+    if len(fast5s) == 0 or fast5s is None:
+        print("[cull_fast5_files] : error culling .fast5 files")
+        sys.exit(1)
+
+    # take only some
+    if maximum_files < len(fast5s):
+        shuffle(fast5s)
+        fast5s = fast5s[:maximum_files]
+
+    return fast5s
 
 def get_bwa_index(reference, dest):
     bwa = Bwa(reference)
