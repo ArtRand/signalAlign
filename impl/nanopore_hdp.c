@@ -1283,7 +1283,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
                                                         samplingGridStart, samplingGridEnd, samplingGridLength);
         update_nhdp_from_alignment_with_filter(nHdpT, alignments, FALSE, "t");
 
-        fprintf(stderr, "Running Gibbs for template doing %lld samples, %lld burn in, %lld thinning.\n",
+        fprintf(stderr, "Running Gibbs for template doing %"PRId64"samples, %"PRId64"burn in, %"PRId64"thinning.\n",
                 nbSamples, burnIn, thinning);
 
         execute_nhdp_gibbs_sampling(nHdpT, nbSamples, burnIn, thinning, verbose);
@@ -1304,7 +1304,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
                                                         samplingGridStart, samplingGridEnd, samplingGridLength);
         update_nhdp_from_alignment_with_filter(nHdpC, alignments, FALSE, "c");
 
-        fprintf(stderr, "Running Gibbs for complement doing %lld samples, %lld burn in, %lld thinning.\n",
+        fprintf(stderr, "Running Gibbs for complement doing %"PRId64"samples, %"PRId64"burn in, %"PRId64"thinning.\n",
                 nbSamples, burnIn, thinning);
         execute_nhdp_gibbs_sampling(nHdpC, nbSamples, burnIn, thinning, verbose);
         finalize_nhdp_distributions(nHdpC);

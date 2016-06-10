@@ -28,6 +28,8 @@ typedef struct _nanoporeRead {
     bool scaled;
 } NanoporeRead;
 
+// loads a nanopore read (.npRead) from a file
+// TODO refactor format so that it can handle 1D reads also
 NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile);
 
 stList *nanopore_remapAnchorPairs(stList *anchorPairs, int64_t *eventMap);

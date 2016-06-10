@@ -2,13 +2,15 @@
 """Run signal-to-reference alignments
 """
 from __future__ import print_function
-import sys
-sys.path.append("../")
 from signalAlignLib import *
-from multiprocessing import Process, Queue, current_process, Manager
+from variantCallingLib import scan_for_proposals, update_reference_with_marginal_probs
 from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
 from random import shuffle
+from shutil import copyfile
+from operator import itemgetter
+
+STEP = 6
 
 
 def parse_args():
@@ -49,61 +51,44 @@ def parse_args():
                         default=4, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
-    parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
-                        dest='substitution_file', help="Ambiguity positions")
-    parser.add_argument('--sparse_output', '-s', action='store_true', default=False, dest='sparse',
-                        help="flag, sparse output")
-    parser.add_argument('--error_correct', action='store_true', default=False, required=False,
-                        dest='error_correct', help="Enable error correction")
+
+    parser.add_argument('--cycles', dest='cycles', default=1, required=False, type=int)  # todo help string
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
+
+    parser.add_argument('--corrected', dest='corrected', required=False, default='corrected.fa')  # todo help string
 
     args = parser.parse_args()
     return args
 
 
-def make_degenerate_reference_iterator(input_sequence, block_size=1, step=6):
-    """
-    input_sequence: string, input nucleotide sequence
-    out_path: string, path to directory to put new sequences with substituted degenerate characters
-    block_size: not implemented
-    step: number of bases between degenerate characters
-    :return (subbed sequence, complement subbed sequence)
-    """
-    complement_sequence = reverse_complement(dna=input_sequence, reverse=False, complement=True)
+def group_sites_in_window(sites, window=6):
+    def collect_group(start):
+        i = start
+        g = [sites[start]]
+        while sites[i + 1][0] - sites[i][0] < window:
+            g.append(sites[i + 1])
+            i += 1
+            if len(sites) <= i + 1:
+                break
+        return g, i + 1
 
-    for s in xrange(0, step):
-        positions = xrange(s, len(input_sequence), step)
-        t_seq = list(input_sequence)
-        c_seq = list(complement_sequence)
-        for position in positions:
-            t_seq[position] = "X"
-            c_seq[position] = "X"
-        yield ''.join(t_seq), ''.join(c_seq)
+    sites.sort()
+    groups = []
+    i = 0
+    while i + 1 < len(sites):
+        g, i = collect_group(i)
+        groups.append(g)
+    return [max(x, key=itemgetter(1))[0] for x in groups]
 
 
-def write_degenerate_reference_set(input_fasta, out_path):
-    # get the first sequence from the FASTA
-    seq = ""
+def get_first_sequence(input_fasta):
+    input_sequence = ""
     for header, comment, sequence in read_fasta(input_fasta):
-        seq += sequence
+        input_sequence += sequence
         break
-
-    for i, s in enumerate(make_degenerate_reference_iterator(input_sequence=seq)):
-        with open(out_path + "forward_sub{i}.txt".format(i=i), 'w') as f:
-            f.write("{seq}".format(seq=s[0]))
-        with open(out_path + "backward_sub{i}.txt".format(i=i), 'w') as f:
-            f.write("{seq}".format(seq=s[1]))
-
-
-def aligner(work_queue, done_queue):
-    try:
-        for f in iter(work_queue.get, 'STOP'):
-            alignment = SignalAlignment(**f)
-            alignment.run()
-    except Exception, e:
-        done_queue.put("%s failed with %s" % (current_process().name, e.message))
+    return input_sequence
 
 
 def main(args):
@@ -114,7 +99,7 @@ def main(args):
     print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
     start_message = """
-#   Starting Signal Align
+#   Starting Jamison Error-Correction
 #   Aligning files from: {fileDir}
 #   Aligning to reference: {reference}
 #   Aligning maximum of {nbFiles} files
@@ -125,9 +110,10 @@ def main(args):
 #   Non-default complement HMM: {inChmm}
 #   Template HDP: {tHdp}
 #   Complement HDP: {cHdp}
+#   Performing {cycles} cycles
     """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files, banding=args.banded,
                inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType, regions=args.target_regions,
-               tHdp=args.templateHDP, cHdp=args.complementHDP)
+               tHdp=args.templateHDP, cHdp=args.complementHDP, cycles=args.cycles)
 
     print(start_message, file=sys.stdout)
 
@@ -135,60 +121,24 @@ def main(args):
         print("Did not find valid reference file", file=sys.stderr)
         sys.exit(1)
 
-    # make directory to put temporary files
     temp_folder = FolderHandler()
-    temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
+    temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_errorCorrection")
 
-    if args.error_correct is True:
-        write_degenerate_reference_set(input_fasta=args.ref, out_path=temp_dir_path)
-        plus_strand_sequence = None
-        minus_strand_sequence = None
-    else:
-        # parse the substitution file, if given
-        plus_strand_sequence = temp_folder.add_file_path("forward_reference.txt")
-        minus_strand_sequence = temp_folder.add_file_path("backward_reference.txt")
-        if args.substitution_file is not None:
-            add_ambiguity_chars_to_reference(input_fasta=args.ref,
-                                             substitution_file=args.substitution_file,
-                                             sequence_outfile=plus_strand_sequence,
-                                             rc_sequence_outfile=minus_strand_sequence,
-                                             degenerate_type=args.degenerate)
-        else:
-            make_temp_sequence(fasta=args.ref,
-                               sequence_outfile=plus_strand_sequence,
-                               rc_sequence_outfile=minus_strand_sequence)
-
-    # index the reference for bwa
-    print("signalAlign - indexing reference", file=sys.stderr)
-    bwa_ref_index = get_bwa_index(args.ref, temp_dir_path)
-    print("signalAlign - indexing reference, done", file=sys.stderr)
-
-    # parse the target regions, if provided
-    # TODO make this the same as the 'labels' file
-    if args.target_regions is not None:
-        target_regions = TargetRegions(args.target_regions)
-    else:
-        target_regions = None
-
-    # setup workers for multiprocessing
-    workers = args.nb_jobs
-    work_queue = Manager().Queue()
-    done_queue = Manager().Queue()
-    jobs = []
+    # initialize to input fasta
+    reference_sequence_path = args.ref
 
     # list of alignment files
-    fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
+    fast5s = cull_fast5_files(args.files_dir, args.nb_files)
 
-    nb_files = args.nb_files
-    if nb_files < len(fast5s):
-        shuffle(fast5s)
-        fast5s = fast5s[:nb_files]
+    for cycle in range(0, args.cycles):
+        # index the reference for bwa this is a string with the path to the index
+        bwa_ref_index = get_bwa_index(reference_sequence_path, temp_dir_path)
 
-    for fast5 in fast5s:
+        # unpack the reference sequence
+        reference_sequence_string = get_first_sequence(reference_sequence_path)
+
         alignment_args = {
-            "forward_reference": plus_strand_sequence,
-            "backward_reference": minus_strand_sequence,
-            "path_to_EC_refs": (temp_dir_path if args.error_correct else None),
+            "path_to_EC_refs": None,
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,
@@ -197,31 +147,37 @@ def main(args):
             "in_templateHdp": args.templateHDP,
             "in_complementHdp": args.complementHDP,
             "banded": args.banded,
-            "sparse_output": args.sparse,
-            "in_fast5": args.files_dir + fast5,
+            "sparse_output": True,
             "threshold": args.threshold,
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim,
-            "target_regions": target_regions,
+            "target_regions": None,
             "degenerate": degenerate_enum(args.degenerate),
         }
-        alignment = SignalAlignment(**alignment_args)
-        alignment.run()
-        #work_queue.put(alignment_args)
 
-    for w in xrange(workers):
-        p = Process(target=aligner, args=(work_queue, done_queue))
-        p.start()
-        jobs.append(p)
-        work_queue.put('STOP')
+        proposals = scan_for_proposals(temp_folder, STEP, reference_sequence_string, fast5s, alignment_args,
+                                       args.nb_jobs)
 
-    for p in jobs:
-        p.join()
+        proposals = group_sites_in_window(proposals, 6)
 
-    done_queue.put('STOP')
-    print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
-    print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
+        print("Cycle {cycle} - Got {nb} sites to check: {sites}".format(nb=len(proposals),
+                                                                        sites=proposals,
+                                                                        cycle=cycle))
 
+        updated_reference_string = update_reference_with_marginal_probs(temp_folder, proposals,
+                                                                        reference_sequence_string, fast5s,
+                                                                        alignment_args, args.nb_jobs)
+
+        updated_reference_path = temp_folder.add_file_path("cycle_snapshot.{cycle}.fa".format(cycle=cycle))
+
+        write_fasta("jamison{}".format(cycle), updated_reference_string, open(updated_reference_path, 'w'))
+
+        reference_sequence_path = updated_reference_path
+
+    # copy final file
+    copyfile(reference_sequence_path, temp_dir_path + args.corrected)
+
+    return
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

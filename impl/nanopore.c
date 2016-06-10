@@ -47,15 +47,15 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     int64_t npRead_readLength, npRead_nbTemplateEvents, npRead_nbComplementEvents;
     assert(stList_length(tokens) == 12);
 
-    int64_t j = sscanf(stList_get(tokens, 0), "%lld", &npRead_readLength);
+    int64_t j = sscanf(stList_get(tokens, 0), "%"SCNd64, &npRead_readLength);
     if (j != 1) {
         st_errAbort("error parsing nanopore read length\n");
     }
-    j = sscanf(stList_get(tokens, 1), "%lld", &npRead_nbTemplateEvents);
+    j = sscanf(stList_get(tokens, 1), "%"SCNd64, &npRead_nbTemplateEvents);
     if (j != 1) {
         st_errAbort("error parsing nanopore template event lengths\n");
     }
-    j = sscanf(stList_get(tokens, 2), "%lld", &npRead_nbComplementEvents);
+    j = sscanf(stList_get(tokens, 2), "%"SCNd64, &npRead_nbComplementEvents);
     if (j != 1) {
         st_errAbort("error parsing nanopore complement event lengths\n");
     }
@@ -129,7 +129,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
                 stList_length(tokens));
     }
     for (int64_t i = 0; i < npRead->readLength; i++) {
-        j = sscanf(stList_get(tokens, i), "%lld", &(npRead->templateEventMap[i]));
+        j = sscanf(stList_get(tokens, i), "%"SCNd64, &(npRead->templateEventMap[i]));
         if (j != 1) {
             st_errAbort("error loading in template eventMap\n");
         }
@@ -167,7 +167,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
                 stList_length(tokens));
     }
     for (int64_t i = 0; i < npRead->readLength; i++) {
-        j = sscanf(stList_get(tokens, i), "%lld", &(npRead->complementEventMap[i]));
+        j = sscanf(stList_get(tokens, i), "%"SCNd64, &(npRead->complementEventMap[i]));
         if (j != 1) {
             st_errAbort("error loading in complement eventMap\n");
         }

@@ -9,7 +9,9 @@ signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
 all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
-      ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign ${signalAlignBin}/signalAlignLib.py \
+      ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
+	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
+	  ${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon ${signalAlignBin}/empire ${signalAlignBin}/jamison \
       ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
 	cd externalTools && make all
 
@@ -27,9 +29,10 @@ sL :
 bD :
 	mkdir -v -p ${rootPath}bin
 
-test : 
-	cd ${signalAlignBin} && ./signalAlignLibTests
-	cd ${binPath} && ./sonLibTests
+test :
+	#cd ${signalAlignBin} && ./signalAlignLibTests
+	cd ${signalAlignBin} && ./testSignalAlign
+	#cd ${binPath} && ./sonLibTests
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
@@ -38,7 +41,7 @@ ${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalA
 	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}
+	${cxx} ${cflags} -I inc -I${libPath} signalMachineUtils.h -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib} signalMachineUtils.c
 
 ${signalAlignBin}/buildHdpUtil : buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib}
@@ -59,9 +62,30 @@ ${signalAlignBin}/testSignalAlign : ${rootPath}scripts/testSignalAlign.py
 	cp ${rootPath}scripts/testSignalAlign.py ${signalAlignBin}/testSignalAlign
 	chmod +x ${signalAlignBin}/testSignalAlign
 
+${signalAlignBin}/zayante : ${rootPath}scripts/zayante.py
+	cp ${rootPath}scripts/zayante.py ${signalAlignBin}/zayante
+	chmod +x ${signalAlignBin}/zayante
+
+${signalAlignBin}/bonnyDoon : ${rootPath}scripts/bonnyDoon.py
+	cp ${rootPath}scripts/bonnyDoon.py ${signalAlignBin}/bonnyDoon
+	chmod +x ${signalAlignBin}/bonnyDoon
+
+${signalAlignBin}/empire : ${rootPath}scripts/empire.py
+	cp ${rootPath}scripts/empire.py ${signalAlignBin}/empire
+	chmod +x ${signalAlignBin}/empire
+
+${signalAlignBin}/jamison : ${rootPath}scripts/jamison.py
+	cp ${rootPath}scripts/jamison.py ${signalAlignBin}/jamison
+	chmod +x ${signalAlignBin}/jamison
 
 ${signalAlignBin}/signalAlignLib.py : ${rootPath}scripts/signalAlignLib.py
 	cp ${rootPath}scripts/signalAlignLib.py ${signalAlignBin}/signalAlignLib.py
+
+${signalAlignBin}/variantCallingLib.py : ${rootPath}scripts/variantCallingLib.py
+	cp ${rootPath}scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.py
+
+${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}scripts/alignmentAnalysisLib.py
+	cp ${rootPath}scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 	${cxx} ${cflags} -I inc -I ${libPath}/ -c ${libSources}

@@ -42,6 +42,10 @@ def parse_args():
     parser.add_argument('--transitions', action='store_true', default=False, dest='transitions',
                         help='Flag to train transitions, False by default')
 
+    parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
+                        help="Specify degenerate nucleotide options: "
+                             "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
+
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -59,8 +63,9 @@ def parse_args():
                         help="path to template HDP model to use")
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
                         help="path to complement HDP model to use")
+
     # TODO build support for ambiguity characters in training
-    parser.add_argument('-ambiguity_positions', '-x', action='store', required=False, default=None,
+    parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
     # gibbs
     parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
@@ -236,7 +241,8 @@ def main(args):
         add_ambiguity_chars_to_reference(input_fasta=args.ref,
                                          substitution_file=args.substitution_file,
                                          sequence_outfile=plus_strand_sequence,
-                                         rc_sequence_outfile=minus_strand_sequence)
+                                         rc_sequence_outfile=minus_strand_sequence,
+                                         degenerate_type=None)  # TODO update to use degenerate type
     else:
         make_temp_sequence(fasta=args.ref,
                            sequence_outfile=plus_strand_sequence,

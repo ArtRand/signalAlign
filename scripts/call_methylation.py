@@ -1,15 +1,12 @@
 #!/usr/bin/env python
 """Takes alignments from signalAlign and calls methylation status"""
 from __future__ import print_function, division
-import glob
-import os
 import sys
 sys.path.append("../")
 from argparse import ArgumentParser
 from alignmentAnalysisLib import CallMethylation
-from signalAlignLib import parse_substitution_file
-from serviceCourse.parsers import read_fasta
-from random import shuffle
+from signalAlignLib import parse_substitution_file, degenerate_enum
+from variantCallingLib import get_alignments_labels_and_mask, get_reference_sequence
 from multiprocessing import Process, current_process, Manager
 
 
@@ -24,6 +21,11 @@ def parse_args():
                         help="path to fasta reference file")
     parser.add_argument('--positions', '-p', required=False, action='store', type=str, dest='positions',
                         help='positions file')
+    parser.add_argument('--error_correct', action='store', default=None, required=False, type=int,
+                        dest='error_correct', help="Enable error correction, provide error correction position")
+    parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
+                        help="Specify degenerate nucleotide options: "
+                             "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
     parser.add_argument('-n', required=False, action='store', type=int, dest='n', default=100,
                         help='Max number of alignments from each category to look at')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
@@ -31,50 +33,6 @@ def parse_args():
     parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out')
 
     return parser.parse_args()
-
-
-def randomly_select_alignments(path_to_alignments, max):
-    alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
-    if len(alignments) == 0:
-        print("[error] Didn't find any alignment files here {}".format(path_to_alignments))
-        sys.exit(1)
-
-    shuffle(alignments)
-
-    if len(alignments) < max:
-        return alignments
-    else:
-        return alignments[:max]
-
-
-def get_forward_mask(list_of_alignments):
-    mask = []
-    for alignment in list_of_alignments:
-        if alignment.endswith(".backward.tsv"):
-            mask.append(False)
-        else:
-            mask.append(True)
-    return mask
-
-
-def get_reference_sequence(path_to_fasta):
-    seqs = []
-
-    for header, comment, sequence in read_fasta(path_to_fasta):
-        seqs.append(sequence)
-
-    assert len(seqs) > 0, "Didn't find any sequences in the reference file"
-
-    if len(seqs) > 1:
-        print("[NOTICE] Found more than one sequence in the reference file, using the first one")
-
-    return seqs[0]
-
-
-def get_alignments_labels_and_mask(path_to_alignments, max):
-    alignments = randomly_select_alignments(path_to_alignments, max)
-    mask = get_forward_mask(alignments)
-    return alignments, mask
 
 
 def run_methyl_caller(work_queue, done_queue):
@@ -98,11 +56,15 @@ def main(args):
 
     out_file = args.out
 
-    if args.positions is not None:
+    if args.positions is not None and args.error_correct is not None:
         positions = {}
         f, b = parse_substitution_file(args.positions)
         positions['forward'] = f[1]
         positions['backward'] = b[1]
+    elif args.error_correct is not None:
+        positions = {'forward': range(args.error_correct, len(reference_sequence)),
+                     'backward': range(args.error_correct, len(reference_sequence))
+                     }
     else:
         positions = None
 
@@ -118,15 +80,11 @@ def main(args):
             "forward": forward_bool,
             "out_file": out_file,
             "positions": positions,
+            "degenerate_type": degenerate_enum(args.degenerate),
         }
-        work_queue.put(call_methyl_args)
         #c = CallMethylation(**call_methyl_args)
-        #correct_calls = c.test()
-        #c.write(out_file=out_file)
-        #correct_template_calls += correct_calls["template"]
-        #correct_complement_calls += correct_calls["complement"]
-        #total_template_calls += len(c.template_calls)
-        #total_complement_calls += len(c.complement_calls)
+        #c.write()
+        work_queue.put(call_methyl_args)
 
     for w in xrange(workers):
         p = Process(target=run_methyl_caller, args=(work_queue, done_queue))

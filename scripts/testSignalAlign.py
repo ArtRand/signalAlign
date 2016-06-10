@@ -35,7 +35,9 @@ class signalAlign_alignment_test(unittest.TestCase):
 
         for alignment in test_alignments:
             alignment_file = alignment.split("/")[-1]
-            self.assertTrue(filecmp.cmp(alignment, true_alignments + alignment_file))
+            print "Checking alignment: {}".format(alignment_file)
+            self.assertTrue(filecmp.cmp(alignment, true_alignments + alignment_file), msg="file: {}"
+                                                                                          "".format(alignment_file))
         shutil.rmtree(test_directory)
 
     def test_zymo_reads(self):
@@ -59,9 +61,9 @@ class signalAlign_alignment_test(unittest.TestCase):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
+    #testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(signalAlign_alignment_test('test_zymo_reads'))
-    testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
+    #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
 
     testRunner = unittest.TextTestRunner(verbosity=1)
     testRunner.run(testSuite)

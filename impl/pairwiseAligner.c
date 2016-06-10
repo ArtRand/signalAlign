@@ -261,8 +261,8 @@ Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(voi
     self->length = length;
     self->elements = elements;
     self->get = getFcn;
-    self->cytosines = NULL;
-    self->nbCytosineOptions = 0;
+    self->degenerateBases = NULL;
+    self->nbDegenerateBases = 0;
     return self;
 }
 
@@ -274,8 +274,8 @@ Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(vo
     self->elements = elements;
     self->get = getFcn;
     self->sliceFcn = sliceFcn;
-    self->cytosines = NULL;
-    self->nbCytosineOptions = 0;
+    self->degenerateBases = NULL;
+    self->nbDegenerateBases = 0;
     return self;
 }
 
@@ -290,8 +290,8 @@ Sequence *sequence_constructReferenceSequence(int64_t length, void *elements,
     char *cytosineArray = (char *)st_malloc(sizeof(char) * nbCytosines);
     memcpy(cytosineArray, cytosines, sizeof(char) * nbCytosines + 1);
     self->sliceFcn = sliceFcn;
-    self->cytosines = cytosineArray;
-    self->nbCytosineOptions = nbCytosines;
+    self->degenerateBases = cytosineArray;
+    self->nbDegenerateBases = nbCytosines;
     return self;
 }
 
@@ -307,8 +307,8 @@ Sequence *sequence_sliceNucleotideSequence2(Sequence *inputSequence, int64_t sta
     Sequence *newSequence = sequence_constructReferenceSequence(sliceLength, elementSlice,
                                                                 inputSequence->get,
                                                                 inputSequence->sliceFcn,
-                                                                inputSequence->cytosines,
-                                                                inputSequence->nbCytosineOptions,
+                                                                inputSequence->degenerateBases,
+                                                                inputSequence->nbDegenerateBases,
                                                                 inputSequence->type);
     return newSequence;
 }
@@ -322,8 +322,8 @@ Sequence *sequence_sliceEventSequence2(Sequence *inputSequence, int64_t start, i
 }
 
 void sequence_sequenceDestroy(Sequence *seq) {
-    if ((seq->type == kmer) && (seq->cytosines != NULL)) {
-        free(seq->cytosines);
+    if ((seq->type == kmer) && (seq->degenerateBases != NULL)) {
+        free(seq->degenerateBases);
     }
     free(seq);
 }
@@ -718,11 +718,11 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
     if (nucleotideSequence->type != kmer) {
         st_errAbort("dpDiagonal_construct: got illegal sequence type %i", nucleotideSequence->type);
     }
-    if (nucleotideSequence->cytosines == NULL) {
-        st_errAbort("dpDiagonal_construct: got NULL cytosine array got %s nbcytos %lld type %lld\n", nucleotideSequence->cytosines, nucleotideSequence->nbCytosineOptions, nucleotideSequence->type);
+    if (nucleotideSequence->degenerateBases == NULL) {
+        st_errAbort("dpDiagonal_construct: got NULL cytosine array got %s nbcytos %lld type %lld\n", nucleotideSequence->degenerateBases, nucleotideSequence->nbDegenerateBases, nucleotideSequence->type);
     }
-    if (nucleotideSequence->nbCytosineOptions < 1) {
-        st_errAbort("dpDiagonal_construct: got less than 1 cytosine option, got %lld\n", nucleotideSequence->nbCytosineOptions);
+    if (nucleotideSequence->nbDegenerateBases < 1) {
+        st_errAbort("dpDiagonal_construct: got less than 1 cytosine option, got %lld\n", nucleotideSequence->nbDegenerateBases);
     }
 
     DpDiagonal *dpDiagonal = st_malloc(sizeof(DpDiagonal));
@@ -744,8 +744,8 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
 
         void *k = sequence_getKmer4(nucleotideSequence, (x -1));
 
-        HDCell *hdCell = hdCell_construct(k, stateNumber, nucleotideSequence->nbCytosineOptions,
-                                          nucleotideSequence->cytosines);
+        HDCell *hdCell = hdCell_construct(k, stateNumber, nucleotideSequence->nbDegenerateBases,
+                                          nucleotideSequence->degenerateBases);
 
         dpDiagonal->totalPaths += hdCell->numberOfPaths;
         dpDiagonal_assignCell(dpDiagonal, hdCell, xmy);
@@ -806,7 +806,7 @@ bool dpDiagonal_equals(DpDiagonal *diagonal1, DpDiagonal *diagonal2) {
             Path *path1 = hdCell_getPath(hdCell1, p);
             Path *path2 = hdCell_getPath(hdCell2, p);
             if (path1->stateNumber != path2->stateNumber) {
-                fprintf(stderr, "dpDiagonal_equals: different stateNumber in paths %lld\n", p);
+                fprintf(stderr, "dpDiagonal_equals: different stateNumber in paths %"PRId64"\n", p);
                 return 0;
             }
             for (int64_t s = 0; s < path1->stateNumber; s++) {

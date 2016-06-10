@@ -324,8 +324,8 @@ void continuousPairHmm_dump(Hmm *hmm, FILE *fileHandle) {
 
     // write the basic stuff to disk (positions are line:item#, not line:col)
     fprintf(fileHandle, "%i\t", cpHmm->baseHmm.type); // type 0:0
-    fprintf(fileHandle, "%lld\t", cpHmm->baseHmm.stateNumber); // stateNumber 0:1
-    fprintf(fileHandle, "%lld\t", cpHmm->baseHmm.symbolSetSize); // symbolSetSize 0:2
+    fprintf(fileHandle, "%"PRId64"\t", cpHmm->baseHmm.stateNumber); // stateNumber 0:1
+    fprintf(fileHandle, "%"PRId64"\t", cpHmm->baseHmm.symbolSetSize); // symbolSetSize 0:2
     fprintf(fileHandle, "%i\n", cpHmm->hasModel);
 
     int64_t nb_transitions = (cpHmm->baseHmm.stateNumber * cpHmm->baseHmm.stateNumber);
@@ -386,11 +386,11 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName, double transitionPseud
     if (j != 1) {
         st_errAbort("Failed to parse type (int) from string: %s\n", string);
     }
-    j = sscanf(stList_get(tokens, 1), "%lld", &stateNumber); // stateNumber
+    j = sscanf(stList_get(tokens, 1), "%"SCNd64, &stateNumber); // stateNumber
     if (j != 1) {
         st_errAbort("Failed to parse state number (int) from string: %s\n", string);
     }
-    j = sscanf(stList_get(tokens, 2), "%lld", &symbolSetSize); // symbolSetSize
+    j = sscanf(stList_get(tokens, 2), "%"SCNd64, &symbolSetSize); // symbolSetSize
     if (j != 1) {
         st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
     }
@@ -560,9 +560,9 @@ void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     HdpHmm *hdpHmm = (HdpHmm *)hmm;
     // write the basic stuff to disk (positions are line:item#, not line:col)
     fprintf(fileHandle, "%i\t", hdpHmm->baseHmm.type); // type 0:0
-    fprintf(fileHandle, "%lld\t", hdpHmm->baseHmm.stateNumber); // stateNumber 0:1
+    fprintf(fileHandle, "%"PRId64"\t", hdpHmm->baseHmm.stateNumber); // stateNumber 0:1
     fprintf(fileHandle, "%lf\t", hdpHmm->threshold); // threshold 0:2
-    fprintf(fileHandle, "%lld\t", hdpHmm->numberOfAssignments); // number of assignments 0:3
+    fprintf(fileHandle, "%"PRId64"\t", hdpHmm->numberOfAssignments); // number of assignments 0:3
     fprintf(fileHandle, "\n"); // newLine
 
     // write the transitions to disk
@@ -624,7 +624,7 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
         st_errAbort("Failed to parse type (int) from string: %s\n", string);
     }
 
-    j = sscanf(stList_get(tokens, 1), "%lld", &stateNumber); // stateNumber
+    j = sscanf(stList_get(tokens, 1), "%"SCNd64, &stateNumber); // stateNumber
     if (j != 1) {
         st_errAbort("Failed to parse state number (int) from string: %s\n", string);
     }
@@ -634,7 +634,7 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
         st_errAbort("Failed to parse threshold (double) from string: %s\n", string);
     }
 
-    j = sscanf(stList_get(tokens, 3), "%lld", &numberOfAssignments); // number of assignments
+    j = sscanf(stList_get(tokens, 3), "%"SCNd64, &numberOfAssignments); // number of assignments
     if (j != 1) {
         st_errAbort("Failed to parse number of assignments (int) from string: %s\n", string);
     }
