@@ -11,25 +11,27 @@
 #include "CuTest.h"
 #include "sonLibCommon.h"
 
-//CuSuite *pairwiseAlignmentTestSuite(void);
-CuSuite *signalPairwiseTestSuite(void);
 CuSuite *NanoporeHdpTestSuite(void);
 CuSuite *HdpTestSuite(void);
-CuSuite *highOrderPairwiseAlignerTestSuite(void);
+CuSuite *variableOrderPairwiseAlignerTestSuite(void);
+CuSuite *signalPairwiseTestSuite(void);
+// multiple alignment not implemented, yet
 //CuSuite* multipleAlignerTestSuite(void);
-//CuSuite* pairwiseAlignmentLongTestSuite(void);
+//CuSuite* pairwiseAlignmentLongTestSuite(void);  // legacy to remind myself
 
 
 int stBaseAlignerRunAllTests(void) {
     CuString *output = CuStringNew();
     CuSuite *suite = CuSuiteNew();
-    //CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
-    //CuSuiteAddSuite(suite, signalPairwiseTestSuite());
     CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
     CuSuiteAddSuite(suite, HdpTestSuite());
-    CuSuiteAddSuite(suite, highOrderPairwiseAlignerTestSuite());
+    CuSuiteAddSuite(suite, signalPairwiseTestSuite());
+    CuSuiteAddSuite(suite, variableOrderPairwiseAlignerTestSuite());
+
+    // coming soon..
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());
     //CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
+
     CuSuiteRun(suite);
     CuSuiteSummary(suite, output);
     CuSuiteDetails(suite, output);

@@ -3,6 +3,7 @@
  *
  *  Created on: 1 Mar 2012
  *      Author: benedictpaten
+ *  Modified for MinION data by Art Rand
  */
 //This is being included to make popen work!
 #define _XOPEN_SOURCE 500
@@ -24,10 +25,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Diagonal
 //Structure for working with x-y diagonal of dp matrix
+// Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID = "PAIRWISE_ALIGNMENT_EXCEPTION";
 
+// test: pass
 Diagonal diagonal_construct(int64_t xay, int64_t xmyL, int64_t xmyR) {
     if ((xay + xmyL) % 2 != 0 || (xay + xmyR) % 2 != 0 || xmyL > xmyR) {
         stThrowNew(PAIRWISE_ALIGNMENT_EXCEPTION_ID,
@@ -83,6 +86,7 @@ inline char *diagonal_getString(Diagonal diagonal) {
 //Band Iterator
 //Iterator for walking along x+y diagonals in banded fashion
 //(using a set of anchor constraints)
+// Test: pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct _band {
@@ -151,7 +155,7 @@ Band *band_construct(stList *anchorPairs, int64_t lX, int64_t lY, int64_t expans
             int64_t x = lX, y = lY;
             if (anchorPairIndex < stList_length(anchorPairs)) {
                 stIntTuple *anchorPair = stList_get(anchorPairs, anchorPairIndex++);
-                x = stIntTuple_get(anchorPair, 0) + 1; //Plus ones, because matrix coordinates are +1 the sequence ones
+                x = stIntTuple_get(anchorPair, 0) + 1; // Plus ones, because matrix coordinates are +1 the sequence ones
                 y = stIntTuple_get(anchorPair, 1) + 1;
 
                 //Check the anchor pairs
@@ -224,6 +228,7 @@ Diagonal bandIterator_getPrevious(BandIterator *bandIterator) {
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Log Add functions
 //Interpolation function for doing log add
+// test: pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #define logUnderflowThreshold 7.5
@@ -250,6 +255,7 @@ double logAdd(double x, double y) {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Sequence Object generalized way to represent a sequence of symbols or measurements (events)
+// Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static double _NULLEVENT[] = {LOG_ZERO, 0};
@@ -268,52 +274,29 @@ Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(voi
 
 Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
                               Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t), SequenceType type) {
-    Sequence *self = malloc(sizeof(Sequence));
-    self->type = type;
-    self->length = length;
-    self->elements = elements;
-    self->get = getFcn;
+    Sequence *self = sequence_construct(length, elements, getFcn, type);
     self->sliceFcn = sliceFcn;
-    self->degenerateBases = NULL;
-    self->nbDegenerateBases = 0;
     return self;
 }
-
-Sequence *sequence_constructReferenceSequence(int64_t length, void *elements,
-                                              void *(*getFcn)(void *, int64_t),
-                                              Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                              char *cytosines, int64_t nbCytosines, SequenceType type) {
-    if (type != kmer) {
-        st_errAbort("sequence_constructReferenceSequence: can only make reference sequence from kmer sequence\n");
-    }
-    Sequence *self = sequence_construct2(length, elements, getFcn, sliceFcn, type);
-    char *cytosineArray = (char *)st_malloc(sizeof(char) * nbCytosines);
-    memcpy(cytosineArray, cytosines, sizeof(char) * nbCytosines + 1);
-    self->sliceFcn = sliceFcn;
-    self->degenerateBases = cytosineArray;
-    self->nbDegenerateBases = nbCytosines;
-    return self;
-}
-
 
 void sequence_padSequence(Sequence *sequence) {
     char *endPadding = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn";
     sequence->elements = stString_print("%s%s", sequence->elements, endPadding);
 }
 
-Sequence *sequence_sliceNucleotideSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength) {
+Sequence *sequence_sliceNucleotideSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength) {
     size_t elementSize = sizeof(char);
     void *elementSlice = (char *)inputSequence->elements + (start * elementSize);
-    Sequence *newSequence = sequence_constructReferenceSequence(sliceLength, elementSlice,
-                                                                inputSequence->get,
-                                                                inputSequence->sliceFcn,
-                                                                inputSequence->degenerateBases,
-                                                                inputSequence->nbDegenerateBases,
-                                                                inputSequence->type);
+    Sequence *newSequence = sequence_constructKmerSequence(sliceLength, elementSlice,
+                                                           inputSequence->get,
+                                                           inputSequence->sliceFcn,
+                                                           inputSequence->degenerateBases,
+                                                           inputSequence->nbDegenerateBases,
+                                                           inputSequence->type);
     return newSequence;
 }
 
-Sequence *sequence_sliceEventSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength) {
+Sequence *sequence_sliceEventSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength) {
     size_t elementSize = sizeof(double);
     void *elementSlice = (char *)inputSequence->elements + ((start * NB_EVENT_PARAMS) * elementSize);
     Sequence *newSequence = sequence_construct2(sliceLength, elementSlice,
@@ -321,48 +304,83 @@ Sequence *sequence_sliceEventSequence2(Sequence *inputSequence, int64_t start, i
     return newSequence;
 }
 
-void sequence_sequenceDestroy(Sequence *seq) {
-    if ((seq->type == kmer) && (seq->degenerateBases != NULL)) {
-        free(seq->degenerateBases);
+Sequence *sequence_constructKmerSequence(int64_t length, void *elements,
+                                         void *(*getFcn)(void *, int64_t),
+                                         Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                                         char *nucleotideOptions, int64_t nbOptions, SequenceType type) {
+    if (type != kmer) {
+        st_errAbort("sequence_constructKmerSequence: can only make reference sequence from kmer sequence\n");
     }
+    Sequence *self = sequence_construct2(length, elements, getFcn, sliceFcn, type);
+    char *degenerateBases = (char *)st_malloc(sizeof(char) * nbOptions);
+    memcpy(degenerateBases, nucleotideOptions, sizeof(char) * nbOptions + 1);
+    self->sliceFcn = sliceFcn;
+    self->degenerateBases = degenerateBases;
+    self->nbDegenerateBases = nbOptions;
+    return self;
+}
+
+Sequence *sequence_deepCopyNucleotideSequence(const Sequence *toCopy) {
+    char *elementsCopy = stString_copy(toCopy->elements);
+    char *degenerateBasesCopy = stString_copy(toCopy->degenerateBases);
+    Sequence *copy = sequence_constructKmerSequence(toCopy->length, elementsCopy,
+                                                    toCopy->get, toCopy->sliceFcn,
+                                                    degenerateBasesCopy, toCopy->nbDegenerateBases,
+                                                    toCopy->type);
+    return copy;
+}
+
+Sequence *sequence_constructEventSequence(int64_t length, void *events) {
+    Sequence *s = sequence_construct2(length, events, sequence_getEventSafe, sequence_sliceEventSequence, event);
+    return s;
+}
+
+void sequence_destruct(Sequence *seq) {
     free(seq);
 }
 
-void *sequence_getBase(void *elements, int64_t index) {
-    char* n;
-    n = "n";
-    return index >= 0 ? &(((char *)elements)[index]) : n;
+void sequence_deepDestruct(Sequence *seq) {
+    free(seq->elements);
+    free(seq);
 }
 
-void *sequence_getKmer(void *elements, int64_t index) {
-    char *n = "n";
-    //int64_t i = index;
-    return index >= 0 ? &(((char *) elements)[index]) : n;
+static void *sequence_getNucleotidePtr(void *elements, int64_t index) {
+    return &(((char *) elements)[index]);
 }
 
-void *sequence_getKmer2(void *elements, int64_t index) {
+void *sequence_getKmerMinusOne(void *elements, int64_t index) {
     if (index < 0){
         return &(((char *) elements)[0]);
     }
     return index > 0 ? &(((char *) elements)[index - 1]) : &(((char *) elements)[index]);
 }
 
-void *sequence_getKmer3(void *elements, int64_t index) {
-    return index >= 0 ? &(((char *) elements)[index]) : &(((char *) elements)[0]);
+void *sequence_getKmer(void *elements, int64_t index) {
+    //return index >= 0 ? &(((char *) elements)[index]) : &(((char *) elements)[0]);
+    return index >= 0 ? sequence_getNucleotidePtr(elements, index) : sequence_getNucleotidePtr(elements, 0);
 }
 
-void *sequence_getKmer4(Sequence *sequence, int64_t index) {
+void *sequence_getKmerWithBoundsCheck(Sequence *sequence, int64_t index) {
     if ((index >= sequence->length) || (index < 0)) {
         return NULL;
     } else {
-        return &(((char *) sequence->elements)[index]);
+        //return &(((char *) sequence->elements)[index]);
+        return sequence_getNucleotidePtr(sequence->elements, index);
     }
 }
 
 void *sequence_getEvent(void *elements, int64_t index) {
     index = index * NB_EVENT_PARAMS;
-    //return index >= 0 ? &(((double *)elements)[index]) : NULL;
     return index >= 0 ? &(((double *)elements)[index]) : NULLEVENT;
+}
+
+void *sequence_getEventSafe(void *s, int64_t index) {
+    Sequence *seq = (Sequence *)s;
+    if ((index >= seq->length) || (index < 0)) {
+        return NULLEVENT;
+    } else {
+        return sequence_getEvent(seq->elements, index);
+    }
 }
 
 int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
@@ -381,7 +399,10 @@ int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
     }
     return 0;
 }
-// Path
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Path for variable order HMM
+//  Test: Pass
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 // from SO: http://stackoverflow.com/questions/213042/how-do-you-do-exponentiation-in-c
 int64_t intPow(int64_t base, int64_t exp) {
     if (exp == 0) {
@@ -402,14 +423,14 @@ Path *path_construct(char *kmer, int64_t stateNumber) {
     return path;
 }
 
-stList *path_findPotentialMethylation(char *kmer) {
+stList *path_findDegeneratePositions(char *kmer) {
     stList *methyls = stList_construct3(0, &free);
     if (kmer == NULL) {
         return methyls;
     }
-    for (int64_t i = 0; i < KMER_LENGTH; i++) {
+    for (int64_t i = 0; i < KMER_LENGTH; i++) { // could make KMERLENGTH strlen here
         char n = *(kmer + i);
-        if (strchr(CYTOSINE_METHYL_AMBIG, n)) {
+        if (strchr(AMBIG_BASE, n)) {
             int64_t *methylPosition = (int64_t *)st_malloc(sizeof(int64_t));
             *methylPosition = i;
             stList_append(methyls, methylPosition);
@@ -436,10 +457,39 @@ static bool path_checkKmerLegalTransition(char *kmerOne, char *kmerTwo) {
 bool path_checkLegal(Path *path1, Path *path2) {
     if (path1->stateNumber != path2->stateNumber) {
         return FALSE;
-    } else if (path1->kmer == NULL) {
+    } else if (path1->kmer == NULL || path2->kmer == NULL) { // todo make sure this is logical
         return TRUE;
     } else {
         return path_checkKmerLegalTransition(path1->kmer, path2->kmer);
+    }
+}
+
+// adapted from SO:
+// http://stackoverflow.com/questions/17506848/print-all-possible-strings-of-length-p-that-can-be-formed-from-the-given-set
+static void path_permutePattern(stList *listOfPositions, int64_t currentLength, int64_t nbPositions, char *arr,
+                                int64_t nbOptions, char *baseOptions) {
+    if (currentLength == nbPositions) {
+        arr[nbPositions] = '\0';
+        char *kmer = stString_copy(arr);
+        stList_append(listOfPositions, kmer);
+        return;
+    } else {
+        for(int64_t i = 0; i < nbOptions; i++) {
+            arr[currentLength] = baseOptions[i];
+            path_permutePattern(listOfPositions, currentLength + 1, nbPositions, arr, nbOptions, baseOptions);
+        }
+    }
+}
+
+stList *path_listPotentialKmers(int64_t nbDegeneratePositions, int64_t nbBaseOptions, char *baseOptions) {
+    if (nbDegeneratePositions == 0) {
+        return NULL;
+    } else {
+        stList *methylPatterns = stList_construct3(0, &free);
+        char *arr = (char *) malloc(sizeof(char) * nbDegeneratePositions);
+        path_permutePattern(methylPatterns, 0, nbDegeneratePositions, arr, nbBaseOptions, baseOptions);
+        free(arr);
+        return methylPatterns;
     }
 }
 
@@ -456,43 +506,17 @@ void path_copyCells(Path *master, Path *copy) {
     }
 }
 
-
 void path_destruct(Path *path) {
     free(path->cells);
     free(path);
 }
 
-// adapted from SO:
-// http://stackoverflow.com/questions/17506848/print-all-possible-strings-of-length-p-that-can-be-formed-from-the-given-set
-static void path_permutePattern(stList *methylList, int64_t currentLength, int64_t methylPositions, char *arr,
-                                int64_t nbCytosines, char *cytosines) {
-    if (currentLength == methylPositions) {
-        arr[methylPositions] = '\0';
-        char *kmer = stString_copy(arr);
-        stList_append(methylList, kmer);
-        return;
-    } else {
-        for(int64_t i = 0; i < nbCytosines; i++) {
-            arr[currentLength] = cytosines[i];
-            path_permutePattern(methylList, currentLength + 1, methylPositions, arr, nbCytosines, cytosines);
-        }
-    }
-}
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  hdCell (High-dimension cell) for variable order HMM
+//  Test: Pass
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-stList *path_getMehtylPermutations(int64_t methylPositions, int64_t nbCytosines, char *cytosines) {
-    if (methylPositions == 0) {
-        return NULL;
-    } else {
-        stList *methylPatterns = stList_construct3(0, &free);
-        char *arr = (char *) malloc(sizeof(char) * methylPositions);
-        path_permutePattern(methylPatterns, 0, methylPositions, arr, nbCytosines, cytosines);
-        free(arr);
-        return methylPatterns;
-    }
-}
-
-// TODO comment
-HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbCytosines, char *cytosines) {
+HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbBaseOptions, char *baseOptions) {
     char *kmer_i;
     if (nucleotideSequence != NULL) {
         kmer_i = (char *)st_malloc((KMER_LENGTH) * sizeof(char));
@@ -506,22 +530,22 @@ HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t 
 
     HDCell *cell = st_malloc(sizeof(HDCell));
 
-    stList *methylPositions = path_findPotentialMethylation(kmer_i);  // will return empty list for NULL kmer
-    int64_t nbMethylPositions = stList_length(methylPositions);  // NULL kmer will be 0
+    stList *degeneratePositions = path_findDegeneratePositions(kmer_i);  // will return empty list for NULL kmer
+    int64_t nbDegeneratePositions = stList_length(degeneratePositions);  // NULL kmer will be 0
 
-    cell->numberOfPaths = intPow(nbCytosines, nbMethylPositions);
+    cell->numberOfPaths = intPow(nbBaseOptions, nbDegeneratePositions);
 
-    if (cell->numberOfPaths < 1) {
+    if ((cell->numberOfPaths < 1) || (cell->numberOfPaths > intPow(nbBaseOptions, KMER_LENGTH))) {
         st_errAbort("hdCell_construct: got illegal number of paths: %lld", cell->numberOfPaths);
     }
 
     cell->paths = (Path **)st_malloc(sizeof(Path *) * cell->numberOfPaths);
 
     if (cell->numberOfPaths > 1) {
-        stList *methylationPatterns = path_getMehtylPermutations(nbMethylPositions, nbCytosines, cytosines);
+        stList *patterns = path_listPotentialKmers(nbDegeneratePositions, nbBaseOptions, baseOptions);
         for (int64_t i = 0; i < cell->numberOfPaths; i++) {
-            char *pattern = stList_get(methylationPatterns, i);
-            Path *path = path_construct(hdCell_getSubstitutedKmer(methylPositions, nbMethylPositions, pattern,
+            char *pattern = stList_get(patterns, i);
+            Path *path = path_construct(hdCell_getSubstitutedKmer(degeneratePositions, nbDegeneratePositions, pattern,
                                                                   kmer_i), stateNumber);
             cell->paths[i] = path;
         }
@@ -650,7 +674,7 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
 
 void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
                                     double eP, double tP, void *extraArgs) {
-    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };  // to remind myself
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     ContinuousPairHmm *hmmExpectations = ((void **) extraArgs)[1];
     if (!hmmExpectations->hasModel) {
@@ -711,18 +735,22 @@ static void cell_calculateUpdateExpectation(StateMachine *sM,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-//DpDiagonal
+//  DpDiagonal
+//  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequence *nucleotideSequence) {
-    if (nucleotideSequence->type != kmer) {
+    if (nucleotideSequence->type != kmer) {  // todo will need to change this for nuc/nuc alignments
         st_errAbort("dpDiagonal_construct: got illegal sequence type %i", nucleotideSequence->type);
     }
     if (nucleotideSequence->degenerateBases == NULL) {
-        st_errAbort("dpDiagonal_construct: got NULL cytosine array got %s nbcytos %lld type %lld\n", nucleotideSequence->degenerateBases, nucleotideSequence->nbDegenerateBases, nucleotideSequence->type);
+        st_errAbort("dpDiagonal_construct: got NULL nucleotide option array got %s nbBaseOptions %lld type %lld\n",
+                    nucleotideSequence->degenerateBases, nucleotideSequence->nbDegenerateBases,
+                    nucleotideSequence->type);
     }
     if (nucleotideSequence->nbDegenerateBases < 1) {
-        st_errAbort("dpDiagonal_construct: got less than 1 cytosine option, got %lld\n", nucleotideSequence->nbDegenerateBases);
+        st_errAbort("dpDiagonal_construct: got less than 1 cytosine option, got %lld\n",
+                    nucleotideSequence->nbDegenerateBases);
     }
 
     DpDiagonal *dpDiagonal = st_malloc(sizeof(DpDiagonal));
@@ -742,7 +770,7 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
     while (xmy <= maxXmy) {
         int64_t x = diagonal_getXCoordinate(xay, xmy);
 
-        void *k = sequence_getKmer4(nucleotideSequence, (x -1));
+        void *k = sequence_getKmerWithBoundsCheck(nucleotideSequence, (x - 1));
 
         HDCell *hdCell = hdCell_construct(k, stateNumber, nucleotideSequence->nbDegenerateBases,
                                           nucleotideSequence->degenerateBases);
@@ -755,7 +783,7 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
     return dpDiagonal;
 }
 
-DpDiagonal *dpDiagonal_clone(DpDiagonal *diagonal) { // TODO make a function that clones without needing the sequence?
+DpDiagonal *dpDiagonal_clone(DpDiagonal *diagonal) {
     // make empty dpDiagonal
     DpDiagonal *diagonal2 = dpDiagonal_construct(diagonal->diagonal, diagonal->stateNumber, diagonal->sequence);
 
@@ -852,7 +880,7 @@ void dpDiagonal_zeroValues(DpDiagonal *diagonal) {
     }
 }
 
-void dpDoagonal_setValues(DpDiagonal *diagonal, StateMachine *sM,
+void dpDiagonal_setValues(DpDiagonal *diagonal, StateMachine *sM,
                           double (*getStateValue)(StateMachine *, int64_t)) {
     for (int64_t i = 0; i < diagonal_getWidth(diagonal->diagonal); i++) {
         HDCell *hdCell = diagonal->cells[i];
@@ -909,19 +937,14 @@ void dpDiagonal_destruct(DpDiagonal *dpDiagonal) {
         hdCell_destruct(hdCell);
         xmy +=2;
     }
-    //for (int64_t i = 0; i < diagonal_getWidth(dpDiagonal->diagonal); i++) {
-    //    HDCell *cell = dpDiagonal->cells[i];
-    //    hdCell_destruct(cell);
-    //}
 
     free(dpDiagonal->cells);
     free(dpDiagonal);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-//DpMatrix
-//
-//Structure for storing dp-matrix
+//  DpMatrix Structure for storing dp-matrix
+//  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct _dpMatrix {
@@ -985,10 +1008,9 @@ void dpMatrix_deleteDiagonal(DpMatrix *dpMatrix, int64_t xay) {
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Diagonal DP Calculations
-//
-//Functions which do forward/backward/posterior calculations
-//between diagonal rows of a dp-matrix
+//  Diagonal DP Calculations Functions which do forward/backward/posterior calculations
+//  between diagonal rows of a dp-matrix
+//  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy) {
@@ -1020,10 +1042,9 @@ static void diagonalCalculation(StateMachine *sM,
         int64_t indexX = getXposition(sX, diagonal_getXay(diagonal), xmy) - 1;
         int64_t indexY = getYposition(sY, diagonal_getXay(diagonal), xmy) - 1;
 
-        // get the element from the sequence at that position. At this point the element is still a void, so
-        // it could be anything (base, kmer, event, etc.)
         void* x = sX->get(sX->elements, indexX);
         void* y = sY->get(sY->elements, indexY);
+        //void *y = sequence_getEventSafe(sY, indexY);
 
         // do the calculations
 
@@ -1137,9 +1158,6 @@ void diagonalCalculation_Expectations(StateMachine *sM, int64_t xay,
                                       Sequence *sX, Sequence *sY,
                                       double totalProbability,
                                       PairwiseAlignmentParameters *p, void *extraArgs) {
-    /*
-     * Updates the expectations of the transitions/emissions for the given diagonal.
-     */
     Hmm *hmmExpectations = extraArgs;
     void *extraArgs2[2] = { &totalProbability, hmmExpectations }; // this is where you pack in totalprob
 
@@ -1158,7 +1176,8 @@ void diagonalCalculation_Expectations(StateMachine *sM, int64_t xay,
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Banded alignment routine to calculate posterior match probs
+//  Banded alignment routine to calculate posterior match probs
+//  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void getPosteriorProbsWithBanding(StateMachine *sM,
@@ -1302,8 +1321,9 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Blast anchoring functions
-//Use lastz to get sets of anchors
+//  Blast anchoring functions
+//  Use lastz to get sets of anchors
+//  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int sortByXPlusYCoordinate(const void *i, const void *j) {
@@ -1578,8 +1598,9 @@ stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, Pairwise
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Split large gap functions
-//Functions to split up alignment around gaps in the anchors that are too large.
+//  Split large gap functions
+//  Functions to split up alignment around gaps in the anchors that are too large.
+//  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -1709,8 +1730,8 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
 
         //Clean up
         stList_destruct(subListOfAnchorPoints);
-        sequence_sequenceDestroy(sX3);
-        sequence_sequenceDestroy(sY3);
+        sequence_destruct(sX3);
+        sequence_destruct(sY3);
     }
     assert(j == stList_length(anchorPairs));
     stList_destruct(splitPoints);
@@ -1786,16 +1807,16 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
                         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     stList *anchorPairs = getAnchorPairFcn(cX, cY, p);
 
-    Sequence *SsX = sequence_construct2(lX, cX, getXFcn, sequence_sliceNucleotideSequence2, nucleotide);
-    Sequence *SsY = sequence_construct2(lY, cY, getYFcn, sequence_sliceNucleotideSequence2, nucleotide);
+    Sequence *SsX = sequence_construct2(lX, cX, getXFcn, sequence_sliceNucleotideSequence, nucleotide);
+    Sequence *SsY = sequence_construct2(lY, cY, getYFcn, sequence_sliceNucleotideSequence, nucleotide);
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,
                                                        anchorPairs, p,
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        alignmentHasRaggedLeftEnd,
                                                        alignmentHasRaggedRightEnd);
-    sequence_sequenceDestroy(SsX);
-    sequence_sequenceDestroy(SsY);
+    sequence_destruct(SsX);
+    sequence_destruct(SsY);
     stList_destruct(anchorPairs);
     return alignedPairs;
 }
@@ -1810,7 +1831,7 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
                                       bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     // make sequence objects
     //Sequence *ScX = sequence_construct(lX, cX, getXFcn, kmer);
-    Sequence *ScX = sequence_constructReferenceSequence(lX, cX, getXFcn, NULL, THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
+    Sequence *ScX = sequence_constructKmerSequence(lX, cX, getXFcn, NULL, THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
     if (sM->type == echelon) {
         sequence_padSequence(ScX);
     }
@@ -1854,8 +1875,8 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
     }
 
     // cleanup
-    sequence_sequenceDestroy(ScX);
-    sequence_sequenceDestroy(ScY);
+    sequence_destruct(ScX);
+    sequence_destruct(ScY);
 
     return alignedPairs;
 }
@@ -1890,8 +1911,8 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
     // get anchors
     stList *anchorPairs = getAnchorPairFcn(sX, sY, p);
     // make Sequence objects
-    Sequence *SsX = sequence_construct2(lX, sX, getFcn, sequence_sliceNucleotideSequence2, nucleotide);
-    Sequence *SsY = sequence_construct2(lY, sY, getFcn, sequence_sliceNucleotideSequence2, nucleotide);
+    Sequence *SsX = sequence_construct2(lX, sX, getFcn, sequence_sliceNucleotideSequence, nucleotide);
+    Sequence *SsY = sequence_construct2(lY, sY, getFcn, sequence_sliceNucleotideSequence, nucleotide);
 
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,
@@ -1899,8 +1920,8 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
                                 alignmentHasRaggedLeftEnd,
                                 alignmentHasRaggedRightEnd);
 
-    sequence_sequenceDestroy(SsX);
-    sequence_sequenceDestroy(SsY);
+    sequence_destruct(SsX);
+    sequence_destruct(SsY);
     stList_destruct(anchorPairs);
 }
 

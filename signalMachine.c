@@ -248,8 +248,8 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
     // make sequences
-    Sequence *sX = sequence_constructReferenceSequence(
-            lX, target, sequence_getKmer3, sequence_sliceNucleotideSequence2,
+    Sequence *sX = sequence_constructKmerSequence(
+            lX, target, sequence_getKmer, sequence_sliceNucleotideSequence,
             (degenerate == canonicalVariants ? CANONICAL_NUCLEOTIDES :
              (degenerate == cytosineMethylation2 ? TWO_CYTOSINES : THREE_CYTOSINES)),
             (degenerate == canonicalVariants ? NB_CANONICAL_BASES :
@@ -309,8 +309,7 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
     void *elements = (char *)events + ((startIdx * NB_EVENT_PARAMS) * elementSize);
 
     // make the eventSequence
-    Sequence *eventS = sequence_construct2(endIdx - startIdx, elements, sequence_getEvent,
-                                           sequence_sliceEventSequence2, event);
+    Sequence *eventS = sequence_constructEventSequence(endIdx - startIdx, elements);
 
     return eventS;
 }
@@ -337,8 +336,8 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
     // remap the anchors
     stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
-    Sequence *target = sequence_constructReferenceSequence(
-            lX, trainingTarget, sequence_getKmer3, sequence_sliceNucleotideSequence2,
+    Sequence *target = sequence_constructKmerSequence(
+            lX, trainingTarget, sequence_getKmer, sequence_sliceNucleotideSequence,
             (degenerate == canonicalVariants ? CANONICAL_NUCLEOTIDES :
              (degenerate == cytosineMethylation2 ? TWO_CYTOSINES : THREE_CYTOSINES)),
             (degenerate == canonicalVariants ? NB_CANONICAL_BASES :
@@ -689,8 +688,8 @@ int main(int argc, char *argv[]) {
 //        #pragma omp critical
         {
             signalUtils_ReferenceSequenceDestruct(R);
-            sequence_sequenceDestroy(tEventSequence);
-            sequence_sequenceDestroy(cEventSequence);
+            sequence_destruct(tEventSequence);
+            sequence_destruct(cEventSequence);
             destructPairwiseAlignment(pA);
         }
         return 0;
@@ -753,8 +752,8 @@ int main(int argc, char *argv[]) {
         hmmContinuous_destruct(templateExpectations, sMtype);
         hmmContinuous_destruct(complementExpectations, sMtype);
         nanopore_nanoporeReadDestruct(npRead);
-        sequence_sequenceDestroy(tEventSequence);
-        sequence_sequenceDestroy(cEventSequence);
+        sequence_destruct(tEventSequence);
+        sequence_destruct(cEventSequence);
         pairwiseAlignmentBandingParameters_destruct(p);
         destructPairwiseAlignment(pA);
         stList_destruct(anchorPairs);
@@ -868,10 +867,10 @@ int main(int argc, char *argv[]) {
         destructPairwiseAlignment(pA);
         signalUtils_ReferenceSequenceDestruct(R);
         stateMachine_destruct(sMt);
-        sequence_sequenceDestroy(tEventSequence);
+        sequence_destruct(tEventSequence);
         stList_destruct(templateAlignedPairs);
         stateMachine_destruct(sMc);
-        sequence_sequenceDestroy(cEventSequence);
+        sequence_destruct(cEventSequence);
         stList_destruct(complementAlignedPairs);
         fprintf(stderr, "signalAlign - SUCCESS: finished alignment of query %s, exiting\n", readLabel);
     }

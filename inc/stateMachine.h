@@ -314,6 +314,6 @@ StateMachine *getStateMachineEchelon(const char *modelFile);
 // EM
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);
 
-void stateMachine_destruct(StateMachine *stateMachine);
+void stateMachine_destruct(StateMachine *sM);
 
 #endif /* STATEMACHINE_H_ */

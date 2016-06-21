@@ -23,11 +23,11 @@
 #include <string.h>
 #include <inttypes.h>
 #include "pairwiseAligner.h"
-#include "hdp.h"
-#include "hdp_math_utils.h"`
-#include "nanopore_hdp.h"
-#include "fastCMaths.h"
-#include "sonLib.h"
+//#include "hdp.h"
+#include "hdp_math_utils.h"
+//#include "nanopore_hdp.h"
+//#include "fastCMaths.h"
+//#include "sonLib.h"
 
 NanoporeHDP* package_nanopore_hdp(HierarchicalDirichletProcess* hdp, const char* alphabet, int64_t alphabet_size,
                                   int64_t kmer_length) {

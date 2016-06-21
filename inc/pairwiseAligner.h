@@ -26,10 +26,9 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 #define PAIR_ALIGNMENT_PROB_1 10000000
 
 #define NB_CYTOSINE_OPTIONS 3
-//#define TWO_WAY_CYTOSINE_OPTIONS 2
 #define NB_CANONICAL_BASES 4
 
-#define CYTOSINE_METHYL_AMBIG "X"
+#define AMBIG_BASE "X"  // internal ambigious base
 #define THREE_CYTOSINES "CEO"
 #define TWO_CYTOSINES "CE"
 #define CANONICAL_NUCLEOTIDES "ACGT"
@@ -68,32 +67,40 @@ Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(voi
 Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
                               Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t), SequenceType type);
 
-Sequence *sequence_constructReferenceSequence(int64_t length, void *elements,
-                                              void *(*getFcn)(void *, int64_t),
-                                              Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                              char *cytosines, int64_t nbCytosines, SequenceType type);
+Sequence *sequence_constructKmerSequence(int64_t length, void *elements,
+                                         void *(*getFcn)(void *, int64_t),
+                                         Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                                         char *nucleotideOptions, int64_t nbOptions, SequenceType type);
+
+Sequence *sequence_deepCopyNucleotideSequence(const Sequence *toCopy);
 
 void sequence_padSequence(Sequence *sequence);
 
 //slice a sequence object
-Sequence *sequence_sliceNucleotideSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength);
+Sequence *sequence_sliceNucleotideSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength);
 
-Sequence *sequence_sliceEventSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength);
+Sequence *sequence_sliceEventSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength);
 
-void sequence_sequenceDestroy(Sequence *seq);
+void sequence_destruct(Sequence *seq);
 
-void *sequence_getBase(void *elements, int64_t index);
+void sequence_deepDestruct(Sequence *seq);
 
-void *sequence_getKmer(void *elements, int64_t index);
+//void *sequence_getBase(void *elements, int64_t index);
+
+//void *sequence_getKmer(void *elements, int64_t index);
 
 // get the kmer at index and the previous kmer
-void *sequence_getKmer2(void *elements, int64_t index);
+void *sequence_getKmerMinusOne(void *elements, int64_t index);
 
-void *sequence_getKmer3(void *elements, int64_t index);
+void *sequence_getKmer(void *elements, int64_t index);
 // for HDP, different 'NULL'
-void *sequence_getKmer4(Sequence *sequence, int64_t index);
+void *sequence_getKmerWithBoundsCheck(Sequence *sequence, int64_t index);
 
 void *sequence_getEvent(void *elements, int64_t index);
+
+void *sequence_getEventSafe(void *s, int64_t index);
+
+Sequence *sequence_constructEventSequence(int64_t length, void *events);
 
 int64_t sequence_correctSeqLength(int64_t length, SequenceType type);
 
@@ -224,9 +231,9 @@ Path *path_construct(char *kmer, int64_t stateNumber);
 
 bool path_checkLegal(Path *path1, Path *path2);
 
-stList *path_findPotentialMethylation(char *kmer);
+stList *path_findDegeneratePositions(char *kmer);
 
-stList *path_getMehtylPermutations(int64_t methylPositions, int64_t nbCytosines, char *cytosines);
+stList *path_listPotentialKmers(int64_t nbDegeneratePositions, int64_t nbBaseOptions, char *baseOptions);
 
 double *path_getCell(Path *path);
 
@@ -243,7 +250,7 @@ typedef struct _hdcell {
     bool init;
 } HDCell;
 
-HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbCytosines, char *cytosines);
+HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbBaseOptions, char *baseOptions);
 
 double hdCell_totalProbability(HDCell *cell1, HDCell *cell2);
 
@@ -291,7 +298,7 @@ double dpDiagonal_dotProduct(DpDiagonal *diagonal1, DpDiagonal *diagonal2);
 
 void dpDiagonal_zeroValues(DpDiagonal *diagonal);
 
-void dpDoagonal_setValues(DpDiagonal *diagonal, StateMachine *sM,
+void dpDiagonal_setValues(DpDiagonal *diagonal, StateMachine *sM,
                           double (*getStateValue)(StateMachine *, int64_t));
 
 void dpDiagonal_initialiseValues(DpDiagonal *diagonal, StateMachine *sM,

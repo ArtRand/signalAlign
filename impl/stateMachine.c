@@ -279,7 +279,7 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
 
 static inline double emissions_signal_logInvGaussPdf(double eventNoise, double modelNoiseMean,
                                                      double modelNoiseLambda) {
-    double l_twoPi = 1.8378770664093453;// log(2*pi)
+    double l_twoPi = 1.8378770664093453;  // log(2*pi)
     double l_eventNoise = log(eventNoise);
     double a = (eventNoise - modelNoiseMean) / modelNoiseMean;
     double l_modelNoseLambda = log(modelNoiseLambda);
@@ -1128,12 +1128,11 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
     HDCell *hdUpper = upper == NULL ? NULL : (HDCell *)upper;
 
     if (hdLower != NULL) {
-        for (int64_t p = 0; p < hdCurrent->numberOfPaths; p ++) {
+        for (int64_t p = 0; p < hdCurrent->numberOfPaths; p++) {
             Path *pathC = hdCell_getPath(hdCurrent, p);
             for (int64_t q = 0; q < hdLower->numberOfPaths; q++) {
                 Path *pathL = hdCell_getPath(hdLower, q);
                 if (path_checkLegal(pathL, pathC)) {
-                    //st_uglyf("SENTINAL - legal LOWER : pathC kmer %s\n", pathC->kmer);
                     double *lowerCells = path_getCell(pathL);
                     double *currentCells = path_getCell(pathC);
                     double eP = sM3->getXGapProbFcn(sM3->model.EMISSION_GAP_X_PROBS, pathC->kmer);
@@ -1150,7 +1149,6 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
             for (int64_t q = 0; q < hdMiddle->numberOfPaths; q++) {
                 Path *pathM = hdCell_getPath(hdMiddle, q);
                 if (path_checkLegal(pathM, pathC)) {
-                    //st_uglyf("SENTINAL - legal MIDDLE : pathC kmer %s\n", pathC->kmer);
                     double *middleCells = path_getCell(pathM);
                     double *currentCells = path_getCell(pathC);
                     double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY, TRUE);
@@ -1167,7 +1165,6 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
             for (int64_t q = 0; q < hdUpper->numberOfPaths; q++) {
                 Path *pathU = hdCell_getPath(hdUpper, q);
                 if (stString_eq(pathC->kmer, pathU->kmer)) {
-                    //st_uglyf("SENTINAL - legal UPPER : pathC kmer %s\n", pathC->kmer);
                     double *upperCells = path_getCell(pathU);
                     double *currentCells = path_getCell(pathC);
                     double eP = sM3->getYGapProbFcn(sM3, pathC->kmer, cY, FALSE);
@@ -1470,11 +1467,11 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
 
 StateMachine *getHdpMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp) {
     StateMachine *sM = stateMachine3Hdp_construct(threeStateHdp, NUM_OF_KMERS,
-                                                      stateMachine3_setTransitionsToNanoporeDefaults,
-                                                      emissions_signal_initEmissionsToZero,
-                                                      hdp,
-                                                      emissions_signal_getHdpKmerDensity,
-                                                      cell_signal_updateTransAndKmerSkipExpectations2);
+                                                  stateMachine3_setTransitionsToNanoporeDefaults,
+                                                  emissions_signal_initEmissionsToZero,
+                                                  hdp,
+                                                  emissions_signal_getHdpKmerDensity,
+                                                  cell_signal_updateTransAndKmerSkipExpectations2);
     StateMachine3_HDP *sM3Hdp = (StateMachine3_HDP *)sM;
     sM3Hdp->scale = npp.scale;
     sM3Hdp->shift = npp.shift;
@@ -1497,6 +1494,19 @@ StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile) {
     return sM3Hdp;
 }
 
-void stateMachine_destruct(StateMachine *stateMachine) {
-    free(stateMachine);
+static void stateMachine_destructHdpModel(StateMachine *sM) {
+    StateMachine3_HDP *sMHdp = (StateMachine3_HDP *)sM;
+    destroy_nanopore_hdp(sMHdp->hdpModel);
 }
+
+void stateMachine_destruct(StateMachine *sM) {
+    if (sM->type == threeStateHdp) {
+        stateMachine_destructHdpModel(sM);
+    }
+    free(sM->EMISSION_GAP_X_PROBS);
+    free(sM->EMISSION_GAP_Y_MATRIX);
+    free(sM->EMISSION_MATCH_MATRIX);
+    free(sM);
+}
+
+

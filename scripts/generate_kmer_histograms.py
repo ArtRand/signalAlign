@@ -2,9 +2,9 @@
 
 import os
 import sys
-from alignmentAnalysisLib import KmerHistogram, parse_substitution_file
+from alignmentAnalysisLib import KmerHistogram
 from serviceCourse.parsers import read_fasta
-from signalAlignLib import kmer_iterator
+from signalAlignLib import kmer_iterator, parse_substitution_file
 from argparse import ArgumentParser
 from multiprocessing import Process, current_process, Manager
 
