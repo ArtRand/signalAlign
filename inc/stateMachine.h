@@ -242,11 +242,11 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
 
 // indexing functions //
 void stateMachine_index_check(int64_t c);
-//Returns the index for a base, for use with matrices and emissions_discrete_getKmerIndex
+//Returns the index for a base, for use with matrices and emissions_discrete_getKmerIndexFromPtr
 int64_t emissions_discrete_getBaseIndex(void *base);
 
 //Returns the index for a kmer from pointer to kmer string
-int64_t emissions_discrete_getKmerIndex(void *kmer);
+int64_t emissions_discrete_getKmerIndexFromPtr(void *kmer);
 
 // Returns index of kmer from pointer to array
 int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer);
@@ -294,6 +294,8 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
 
 double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, void *kmer, void *event);
 
+double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x_i, void *e_j, bool match);
+
 void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, double var,
                                  double scale_sd, double var_sd);
 
@@ -301,11 +303,11 @@ void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shif
 
 double emissions_signal_getDurationProb(void *event, int64_t n);
 
-StateMachine *getSM3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp);
+StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp);
 
-StateMachine *getHdpMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp);
+StateMachine *getHdpStateMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp);
 
-StateMachine *getStrawManStateMachine3(const char *modelFile);
+StateMachine *getStateMachine3(const char *modelFile);
 
 StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile);
 

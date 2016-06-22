@@ -35,23 +35,6 @@ static inline char *homopolymer(char base, int64_t repeat) {
     return homopolymer;
 }
 
-Sequence *makeTestKmerSequence() {
-    char *s = "ATGXAXA"; // has 2 6mers
-    int64_t lX = sequence_correctSeqLength(strlen(s), kmer);
-    Sequence *seq = sequence_construct(lX, s, sequence_getKmer, kmer);
-    seq->degenerateBases = "CEO";
-    seq->nbDegenerateBases = 3;
-    return seq;
-}
-
-Sequence *makeKmerSequence(char *nucleotides) {
-    int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer);
-    Sequence *seq = sequence_constructKmerSequence(lX, nucleotides,
-                                                   sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                   THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
-    return seq;
-}
-
 Sequence *getTestReferenceSequence() {
     char *ZymoReferenceFilePath = stString_print("../../signalAlign/tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(ZymoReferenceFilePath, "r");
@@ -82,7 +65,7 @@ NanoporeRead *loadTestNanoporeRead() {
 
 StateMachine *loadScaledStateMachine3(NanoporeRead *npRead) {
     char *templateModelFile = stString_print("../../signalAlign/models/testModel_template.model");
-    StateMachine *sMt = getStrawManStateMachine3(templateModelFile);
+    StateMachine *sMt = getStateMachine3(templateModelFile);
 
     // scale model
     emissions_signal_scaleModel(sMt, npRead->templateParams.scale, npRead->templateParams.shift,
@@ -95,7 +78,7 @@ StateMachine *loadScaledStateMachine3(NanoporeRead *npRead) {
 StateMachine *loadDescaledStateMachine3(NanoporeRead *npRead) {
     // load stateMachine from model file
     char *templateModelFile = stString_print("../../signalAlign/models/testModel_template.model");
-    StateMachine *sM = getSM3_descaled(templateModelFile, npRead->templateParams);
+    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams);
     free(templateModelFile);
     return sM;
 }
@@ -103,7 +86,7 @@ StateMachine *loadDescaledStateMachine3(NanoporeRead *npRead) {
 StateMachine *loadStateMachineHdp(NanoporeRead *npRead) {
     char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
-    StateMachine *sM = getHdpMachine(nHdp, modelFile, npRead->templateParams);
+    StateMachine *sM = getHdpStateMachine(nHdp, modelFile, npRead->templateParams);
     free(modelFile);
     return sM;
 }
@@ -190,11 +173,12 @@ void implantModelFromStateMachineIntoHmm(StateMachine *sM, ContinuousPairHmm *hm
 //}
 
 
-// TESTS
-
+//////////////////////////////////////////////Function Tests/////////////////////////////////////////////////////////
 static void test_getKmerWithBoundsCheck(CuTest *testCase) {
     char *nucleotides = stString_print("ATGCATAGC");
-    Sequence *sX = makeKmerSequence(nucleotides);
+    Sequence *sX = sequence_constructKmerSequence(sequence_correctSeqLength(strlen(nucleotides), kmer),nucleotides,
+                                                  sequence_getKmer, sequence_sliceNucleotideSequence,
+                                                  THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
     //ATGCAT
     // TGCATA
     //  GCATAG
@@ -301,6 +285,15 @@ static void test_Permutations(CuTest *testCase) {
     test_checkPermutationsP(testCase, CANONICAL_NUCLEOTIDES);
 }
 
+static void test_getKmerIndex(CuTest *testCase) {
+    stList *kmers = path_listPotentialKmers(KMER_LENGTH, strlen(ALL_BASES), ALL_BASES);
+    for (int64_t i = 0; i < stList_length(kmers); i++) {
+        char *kmer = stList_get(kmers, i);
+        int64_t index = emissions_discrete_getKmerIndexFromPtr(kmer);
+        CuAssertIntEquals(testCase, index, i);
+    }
+}
+
 static void test_substitutedKmers(CuTest *testCase) {
     char *ambigKmer = "ATGXAX";
     stList *positions = path_findDegeneratePositions(ambigKmer);
@@ -312,115 +305,36 @@ static void test_substitutedKmers(CuTest *testCase) {
     free(kmer);
 }
 
-static void test_hdCellConstruct(CuTest *testCase) {
-    char *ambigKmer = "ATGXAXAAAAAA";
-    int64_t nbCytosines = 3;
-    char *cytosines = "CEO";
-    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines);
-    Path *path2 = hdCell_getPath(cell, 8);
-    Path *path = hdCell_getPath(cell, 0);
-    CuAssertTrue(testCase, hdCell_getPath(cell, 9) == NULL);
-    CuAssertIntEquals(testCase, 9, (int )cell->numberOfPaths);
-    CuAssertStrEquals(testCase, path->kmer, "ATGCAC");
-    CuAssertStrEquals(testCase, path2->kmer, "ATGOAO");
-    hdCell_destruct(cell);
-}
+static void test_loadPoreModel(CuTest *testCase) {
+    char *tempFile = stString_print("./tempModel.model");
+    CuAssertTrue(testCase, !stFile_exists(tempFile));
+    FILE *fH = fopen(tempFile, "w");
 
-static void test_hdCellConstructWorstCase(CuTest *testCase) {
-    char *ambigKmer = "XXXXXX";
-    int64_t nbCytosines = 3;
-    char *cytosines = "CEO";
-    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines);
-    Path *path = hdCell_getPath(cell, 0);
-    Path *path2 = hdCell_getPath(cell, 728);
-    CuAssertIntEquals(testCase, 729, (int )cell->numberOfPaths);
-    CuAssertStrEquals(testCase, path->kmer, "CCCCCC");
-    CuAssertStrEquals(testCase, path2->kmer, "OOOOOO");
-    hdCell_destruct(cell);
-}
+    int64_t matrixSize = (1 + NUM_OF_KMERS * MODEL_PARAMS);
 
-static void test_dpDiagonal(CuTest *testCase) {
-    // load model and make stateMachine
-    char *testModel = stString_print("../../signalAlign/models/testModel_template.model");
-    StateMachine *sM = getStrawManStateMachine3(testModel);
+    for (int64_t i = 0; i < matrixSize; i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+    //for (int64_t i = matrixSize; i > -1; i--) {
+    for (int64_t i = 0; i < matrixSize; i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+    fclose(fH);
 
-    Diagonal diagonal = diagonal_construct(3, -1, 1); // makes a diagonal with 2 cells
+    StateMachine *sM = getStateMachine3(tempFile);
 
-    Sequence *seq = makeTestKmerSequence();  // ATGXAXA
-
-    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber, seq);
-
-    //Get cell
-    HDCell *c1 = dpDiagonal_getCell(dpDiagonal, -1);
-    CuAssertTrue(testCase, c1 != NULL);
-
-    HDCell *c2 = dpDiagonal_getCell(dpDiagonal, 1); // gets cell 1
-    CuAssertTrue(testCase, c2 != NULL);
-
-    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, 3) == NULL);
-    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, -3) == NULL);
-
-    dpDiagonal_initialiseValues(dpDiagonal, sM, sM->endStateProb); //Test initialise values
-    double totalProb = LOG_ZERO;
-
-    for (int64_t p = 0; p < c1->numberOfPaths; p++) {
-        Path *path1 = hdCell_getPath(c1, p);
-        Path *path2 = hdCell_getPath(c2, p);
-        for (int64_t s = 0; s < path1->stateNumber; s++) {
-            CuAssertDblEquals(testCase, path1->cells[s], sM->endStateProb(sM, s), 0.0);
-            CuAssertDblEquals(testCase, path2->cells[s], sM->endStateProb(sM, s), 0.0);
-            totalProb = logAdd(totalProb, 2 * path1->cells[s]);
-            totalProb = logAdd(totalProb, 2 * path2->cells[s]);
-        }
+    for (int64_t i = 0; i < matrixSize; i++) {
+        double x = sM->EMISSION_MATCH_MATRIX[i];
+        double y = sM->EMISSION_GAP_Y_MATRIX[i];
+        CuAssertDblEquals(testCase, x, (double )i, 0.0);
+        CuAssertDblEquals(testCase, y, (double )i, 0.0);
     }
 
-    DpDiagonal *dpDiagonal2 = dpDiagonal_clone(dpDiagonal);
-    CuAssertTrue(testCase, dpDiagonal_equals(dpDiagonal, dpDiagonal2));
-    //Check it runs
-    CuAssertDblEquals(testCase, totalProb, dpDiagonal_dotProduct(dpDiagonal, dpDiagonal2), 0.001);
-
-    dpDiagonal_destruct(dpDiagonal);
-    dpDiagonal_destruct(dpDiagonal2);
-
-}
-
-static void test_dpMatrix(CuTest *testCase) {
-    int64_t lX = 3, lY = 2;
-    char *s = "ATGXAATT";
-    //         ATGCAA   0
-    //          TGCAAT  1
-    //           GCAATT 2
-    Sequence *sX = makeKmerSequence(s);
-
-    DpMatrix *dpMatrix = dpMatrix_construct(lX + lY, 5);
-
-    // check initialization
-    CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), 0);
-
-    // make sure there aren't any fantom diagonals
-    for (int64_t i = -1; i <= lX + lY + 10; i++) {
-        CuAssertTrue(testCase, dpMatrix_getDiagonal(dpMatrix, i) == NULL);
-    }
-
-    // make some diagonals in the dpMatrix, and check them, then make sure that
-    // the number of active diagonals is correct.
-    for (int64_t i = 0; i <= lX + lY; i++) {
-        DpDiagonal *dpDiagonal = dpMatrix_createDiagonal(dpMatrix, diagonal_construct(i, -i, i), sX);
-        CuAssertTrue(testCase, dpDiagonal == dpMatrix_getDiagonal(dpMatrix, i));
-        CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), i + 1);
-    }
-
-    // test for destroying diagonals
-    for (int64_t i = lX + lY; i >= 0; i--) {
-        dpMatrix_deleteDiagonal(dpMatrix, i);
-        CuAssertTrue(testCase, dpMatrix_getDiagonal(dpMatrix, i) == NULL);
-        CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), i);
-    }
-
-    // double check that they are gone
-    CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), 0);
-
-    dpMatrix_destruct(dpMatrix);
+    stFile_rmrf(tempFile);
+    free(tempFile);
+    stateMachine_destruct(sM);
 }
 
 static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
@@ -438,16 +352,18 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     };
 
     // make variables for the (corrected) length of the sequences
-    int64_t lX = sequence_correctSeqLength(strlen(sX), event);
+    int64_t lX = sequence_correctSeqLength(strlen(sX), kmer);
     int64_t lY = 7;
 
     // make Sequence objects
-    Sequence *SsX = makeKmerSequence(sX);
+    //Sequence *SsX = makeKmerSequence(sX);
+    Sequence *SsX = sequence_constructKmerSequence(lX, sX, sequence_getKmer, sequence_sliceNucleotideSequence,
+                                                   THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
     Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
 
     // make stateMachine, forward and reverse DP matrices and banding stuff
     char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
-    StateMachine *sM = getStrawManStateMachine3(modelFile);
+    StateMachine *sM = getStateMachine3(modelFile);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
@@ -735,7 +651,7 @@ static void test_makeAndCheckModels(CuTest *testCase) {
     }
 
     // make a stateMachine based on the same table
-    StateMachine *sM = getStrawManStateMachine3(templateLookupTableFile);
+    StateMachine *sM = getStateMachine3(templateLookupTableFile);
 
     // check that the emissions are correct
     test_cpHmmEmissionsAgainstStateMachine(testCase, sM, cpHmm);
@@ -771,7 +687,7 @@ static void test_continuousPairHmm(CuTest *testCase) {
     CuAssertTrue(testCase, cpHmm->hasModel);
 
     // test that it loaded correctly
-    StateMachine *sM = getStrawManStateMachine3(model);
+    StateMachine *sM = getStateMachine3(model);
     test_cpHmmEmissionsAgainstStateMachine(testCase, sM, cpHmm);
 
     // dump to file
@@ -1055,16 +971,13 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *variableOrderPairwiseAlignerTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-
     SUITE_ADD_TEST(suite, test_findDegeneratePositions);
     SUITE_ADD_TEST(suite, test_checkPathConstruct);
     SUITE_ADD_TEST(suite, test_pathLegalTransitions);
     SUITE_ADD_TEST(suite, test_Permutations);
     SUITE_ADD_TEST(suite, test_substitutedKmers);
-    SUITE_ADD_TEST(suite, test_hdCellConstruct);
-    SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);
-    SUITE_ADD_TEST(suite, test_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_dpMatrix);
+    SUITE_ADD_TEST(suite, test_getKmerIndex);
+    SUITE_ADD_TEST(suite, test_loadPoreModel);
     SUITE_ADD_TEST(suite, test_getKmerWithBoundsCheck);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_stateMachine3_getAlignedPairsWithBanding);
@@ -1074,6 +987,5 @@ CuSuite *variableOrderPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
-
     return suite;
 }

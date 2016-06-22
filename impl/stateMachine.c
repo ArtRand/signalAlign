@@ -102,7 +102,7 @@ int64_t emissions_discrete_getBaseIndex(void *base) {
     }
 }
 
-int64_t emissions_discrete_getKmerIndex(void *kmer) {
+int64_t emissions_discrete_getKmerIndexFromPtr(void *kmer) {
     int64_t kmerLen = strlen((char*) kmer);
     if (kmerLen == 0) {
         return NUM_OF_KMERS + 1;
@@ -130,7 +130,7 @@ int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer) {
     }
     kmer_i[KMER_LENGTH] = '\0';
 
-    int64_t i = emissions_discrete_getKmerIndex(kmer_i);
+    int64_t i = emissions_discrete_getKmerIndexFromPtr(kmer_i);
     //index_check(i);
     free(kmer_i);
     return i;
@@ -164,7 +164,7 @@ double emissions_kmer_getGapProb(const double *emissionGapProbs, void *x_i) {
         kmer_i[x] = *((char *) x_i + x);
     }
     kmer_i[KMER_LENGTH] = '\0';
-    int64_t i = emissions_discrete_getKmerIndex(kmer_i);
+    int64_t i = emissions_discrete_getKmerIndexFromPtr(kmer_i);
     //index_check(i);
     free(kmer_i);
     double p = i > NUM_OF_KMERS ? LOG_ZERO : emissionGapProbs[i];
@@ -172,8 +172,8 @@ double emissions_kmer_getGapProb(const double *emissionGapProbs, void *x_i) {
 }
 
 double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, void *y) {
-    int64_t iX = emissions_discrete_getKmerIndex(x);
-    int64_t iY = emissions_discrete_getKmerIndex(y);
+    int64_t iX = emissions_discrete_getKmerIndexFromPtr(x);
+    int64_t iY = emissions_discrete_getKmerIndexFromPtr(y);
     int64_t tableIndex = iX * NUM_OF_KMERS + iY;
     return emissionMatchProbs[tableIndex];
 }
@@ -260,7 +260,8 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     tokens = stString_split(string);
     // check to make sure that the model will fit in the stateMachine
     if (stList_length(tokens) != 1 + (sM->parameterSetSize * MODEL_PARAMS)) {
-        st_errAbort("This stateMachine is not correct for signal model (dupeEvent - Y emissions)\n");
+        st_errAbort("This stateMachine is not correct for signal model (dupeEvent - Y emissions) got %lld should be %lld\n",
+                    stList_length(tokens), 1 + (sM->parameterSetSize * MODEL_PARAMS));
     }
     // load the model into the state machine emissions
     for (int64_t i = 0; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i++) {
@@ -363,8 +364,8 @@ int64_t emissions_signal_getKmerSkipBin(double *matchModel, void *kmers) {
     kmer_i[KMER_LENGTH] = '\0';
 
     // get indices
-    int64_t k_i= emissions_discrete_getKmerIndex(kmer_i);
-    int64_t k_im1 = emissions_discrete_getKmerIndex(kmer_im1);
+    int64_t k_i= emissions_discrete_getKmerIndexFromPtr(kmer_i);
+    int64_t k_im1 = emissions_discrete_getKmerIndexFromPtr(kmer_im1);
 
     // get the expected mean current for each one
     double u_ki = emissions_signal_getModelLevelMean(matchModel, k_i);
@@ -399,7 +400,7 @@ double emissions_signal_logGaussMatchProb(const double *eventModel, void *kmer, 
 
     // get event mean, and kmer index
     double eventMean = *(double *) event;
-    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
     double l_inv_sqrt_2pi = log(0.3989422804014327); // constant
     double modelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
     double modelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
@@ -428,7 +429,7 @@ double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, 
     double eventNoise = *(double *) ((char *)event + sizeof(double));
 
     // get the kmer index
-    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
 
     // first calculate the prob of the level mean
     double expectedLevelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
@@ -489,7 +490,7 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
     }
     kmer_i[KMER_LENGTH] = '\0';
 
-    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
 
     // get the µ and σ for the level and noise for the model
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
@@ -526,7 +527,7 @@ double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, vo
     // wrangle e_j data
     double eventMean = *(double *) e_j;
 
-    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
 
     double levelMean = emissions_signal_getModelLevelMean(self->model.EMISSION_MATCH_MATRIX, kmerIndex);
     double *normedMean = (double *)st_malloc(sizeof(double));
@@ -558,7 +559,7 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3
     kmer_i[KMER_LENGTH] = '\0';
 
     // get index
-    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
     double *eventModel = match ? sM->model.EMISSION_MATCH_MATRIX : sM->model.EMISSION_GAP_Y_MATRIX;
     // get the µ and σ for the level and noise for the model
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
@@ -599,7 +600,7 @@ double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x
     kmer_i[KMER_LENGTH] = '\0';
 
     // get index
-    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
     double *eventModel = match ? sM->model.EMISSION_MATCH_MATRIX : sM->model.EMISSION_GAP_Y_MATRIX;
     // get the µ and σ for the level and noise for the model
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
@@ -702,7 +703,6 @@ void emissions_signal_scaleModel(StateMachine *sM,
 ////////////////////////////
 // EM emissions functions //
 ////////////////////////////
-// TODO depreciate or update this
 static void emissions_em_loadMatchProbs(double *emissionMatchProbs, Hmm *hmm, int64_t matchState) {
     //Load the matches
     HmmDiscrete *hmmD = (HmmDiscrete *)hmm;
@@ -874,6 +874,7 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
      * including N). It's 25 if len(kmer) = 2, it's 4096 in the 6-mer model.
      *
      */
+    st_errAbort("5-state stateMachine not implemented");
     StateMachine5 *sM5 = st_malloc(sizeof(StateMachine5));
     if(type != fiveState && type != fiveStateAsymmetric) {
         st_errAbort("Wrong type for five state %i", type);
@@ -1399,6 +1400,7 @@ static void stateMachine3_loadSymmetric(StateMachine3 *sM3, Hmm *hmm) {
 ///////////////////////////////////
 
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
+    st_errAbort("5-state stateMachine not implemented\n");
     if (hmmD->type == fiveState) {
         StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState, hmmD->symbolSetSize,
                                                                        emissions_discrete_initEmissionsToZero,
@@ -1425,9 +1427,9 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
     }
 }
 
-StateMachine *getSM3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp) {
+StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp) {
     if (!stFile_exists(modelFile)) {
-        st_errAbort("getStrawManStateMachine3: Cannot find model file %s\n", modelFile);
+        st_errAbort("getStateMachine3: Cannot find model file %s\n", modelFile);
     };
 
     StateMachine *sM = stateMachine3_construct(threeState, NUM_OF_KMERS,
@@ -1450,9 +1452,9 @@ StateMachine *getSM3_descaled(const char *modelFile, NanoporeReadAdjustmentParam
 }
 
 
-StateMachine *getStrawManStateMachine3(const char *modelFile) {
+StateMachine *getStateMachine3(const char *modelFile) {
     if (!stFile_exists(modelFile)) {
-        st_errAbort("getStrawManStateMachine3: Cannot find model file %s\n", modelFile);
+        st_errAbort("getStateMachine3: Cannot find model file %s\n", modelFile);
     };
     StateMachine *sM3 = stateMachine3_construct(threeState, NUM_OF_KMERS,
                                                 stateMachine3_setTransitionsToNanoporeDefaults,
@@ -1465,7 +1467,7 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
     return sM3;
 }
 
-StateMachine *getHdpMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp) {
+StateMachine *getHdpStateMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp) {
     StateMachine *sM = stateMachine3Hdp_construct(threeStateHdp, NUM_OF_KMERS,
                                                   stateMachine3_setTransitionsToNanoporeDefaults,
                                                   emissions_signal_initEmissionsToZero,
@@ -1481,6 +1483,7 @@ StateMachine *getHdpMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeRea
     return (StateMachine *)sM3Hdp;
 }
 
+/*
 StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile) {
     StateMachine *sM3Hdp = stateMachine3Hdp_construct(threeStateHdp, NUM_OF_KMERS,
                                                       stateMachine3_setTransitionsToNanoporeDefaults,
@@ -1493,6 +1496,7 @@ StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile) {
     emissions_signal_loadPoreModel(sM3Hdp, modelFile, sM3Hdp->type);
     return sM3Hdp;
 }
+*/
 
 static void stateMachine_destructHdpModel(StateMachine *sM) {
     StateMachine3_HDP *sMHdp = (StateMachine3_HDP *)sM;

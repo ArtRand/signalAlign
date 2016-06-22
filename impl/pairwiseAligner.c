@@ -356,7 +356,6 @@ void *sequence_getKmerMinusOne(void *elements, int64_t index) {
 }
 
 void *sequence_getKmer(void *elements, int64_t index) {
-    //return index >= 0 ? &(((char *) elements)[index]) : &(((char *) elements)[0]);
     return index >= 0 ? sequence_getNucleotidePtr(elements, index) : sequence_getNucleotidePtr(elements, 0);
 }
 
@@ -364,7 +363,6 @@ void *sequence_getKmerWithBoundsCheck(Sequence *sequence, int64_t index) {
     if ((index >= sequence->length) || (index < 0)) {
         return NULL;
     } else {
-        //return &(((char *) sequence->elements)[index]);
         return sequence_getNucleotidePtr(sequence->elements, index);
     }
 }
@@ -515,7 +513,6 @@ void path_destruct(Path *path) {
 //  hdCell (High-dimension cell) for variable order HMM
 //  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbBaseOptions, char *baseOptions) {
     char *kmer_i;
     if (nucleotideSequence != NULL) {

@@ -175,11 +175,11 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
     }
 
     if (type == threeState) {
-        StateMachine *sM = getSM3_descaled(modelFile, npp);
+        StateMachine *sM = getStateMachine3_descaled(modelFile, npp);
         return sM;
     }
     if (type == threeStateHdp) {
-        StateMachine *sM = getHdpMachine(nHdp, modelFile, npp);
+        StateMachine *sM = getHdpStateMachine(nHdp, modelFile, npp);
         return sM;
     }
     else {

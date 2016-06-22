@@ -32,6 +32,7 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 #define THREE_CYTOSINES "CEO"
 #define TWO_CYTOSINES "CE"
 #define CANONICAL_NUCLEOTIDES "ACGT"
+#define ALL_BASES "ACEGOT"
 
 #define KMER_LENGTH 6
 #define NUM_OF_KMERS 46656
@@ -85,15 +86,11 @@ void sequence_destruct(Sequence *seq);
 
 void sequence_deepDestruct(Sequence *seq);
 
-//void *sequence_getBase(void *elements, int64_t index);
-
-//void *sequence_getKmer(void *elements, int64_t index);
-
 // get the kmer at index and the previous kmer
 void *sequence_getKmerMinusOne(void *elements, int64_t index);
 
 void *sequence_getKmer(void *elements, int64_t index);
-// for HDP, different 'NULL'
+
 void *sequence_getKmerWithBoundsCheck(Sequence *sequence, int64_t index);
 
 void *sequence_getEvent(void *elements, int64_t index);
