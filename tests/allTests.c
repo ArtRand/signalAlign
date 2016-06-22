@@ -27,8 +27,8 @@ int stBaseAlignerRunAllTests(void) {
     //CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
     //CuSuiteAddSuite(suite, HdpTestSuite());
     CuSuiteAddSuite(suite, signalPairwiseAlignerTestSuite());
-    //CuSuiteAddSuite(suite, variableOrderPairwiseAlignerTestSuite());
-    //CuSuiteAddSuite(suite, stateMachineAlignmentTestSuite());
+    CuSuiteAddSuite(suite, variableOrderPairwiseAlignerTestSuite());
+    CuSuiteAddSuite(suite, stateMachineAlignmentTestSuite());
 
     // coming soon..
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());

@@ -319,6 +319,7 @@ static void test_loadNanoporeRead(CuTest *testCase) {
 
     nanopore_nanoporeReadDestruct(npRead);
     stFile_rmrf(tempFile);
+    free(read);
     free(tempFile);
 }
 

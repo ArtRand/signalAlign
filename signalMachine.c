@@ -865,6 +865,7 @@ int main(int argc, char *argv[]) {
 
         // final alignment clean up
         destructPairwiseAlignment(pA);
+        nanopore_nanoporeReadDestruct(npRead);
         signalUtils_ReferenceSequenceDestruct(R);
         stateMachine_destruct(sMt);
         sequence_destruct(tEventSequence);
