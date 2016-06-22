@@ -252,6 +252,77 @@ static void test_eventSequence(CuTest *testCase) {
 
 }
 
+static void test_loadNanoporeRead(CuTest *testCase) {
+    int64_t length = 1000;
+    char *read = getRandomSequence(length);
+    double param = 0.0;
+    char *tempFile = stString_print("./tempRead.npread");
+    CuAssertTrue(testCase, !stFile_exists(tempFile));
+    FILE *fH = fopen(tempFile, "w");
+
+    // write line 1
+    fprintf(fH, "%"PRId64"\t""%"PRId64"\t""%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t\n",
+            length, length, length, param, param, param, param, param, param, param, param, param, param);
+
+    // write line 2 2D read
+    fprintf(fH, "%s\n", read);
+
+    // write line 3 template event map
+    for (int64_t i = 0; i < length; i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // write line 4 template events
+    for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // write line 5 complement event map
+    for (int64_t i = 0; i < length; i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // write line 6 complement events
+    for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    fclose(fH);
+
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile);
+    CuAssertTrue(testCase, npRead->readLength == length);
+    CuAssertTrue(testCase, npRead->templateParams.scale == param);
+    CuAssertTrue(testCase, npRead->templateParams.shift == param);
+    CuAssertTrue(testCase, npRead->templateParams.var == param);
+    CuAssertTrue(testCase, npRead->templateParams.scale_sd == param);
+    CuAssertTrue(testCase, npRead->templateParams.var_sd == param);
+    CuAssertTrue(testCase, npRead->complementParams.scale == param);
+    CuAssertTrue(testCase, npRead->complementParams.shift == param);
+    CuAssertTrue(testCase, npRead->complementParams.var == param);
+    CuAssertTrue(testCase, npRead->complementParams.scale_sd == param);
+    CuAssertTrue(testCase, npRead->complementParams.var_sd == param);
+    CuAssertTrue(testCase, npRead->nbTemplateEvents == length);
+    CuAssertTrue(testCase, npRead->nbComplementEvents == length);
+    CuAssertStrEquals(testCase, npRead->twoDread, read);
+
+    for (int64_t i = 0; i < length; i++) {
+        CuAssertTrue(testCase, npRead->templateEventMap[i] == i);
+        CuAssertTrue(testCase, npRead->complementEventMap[i] == i);
+    }
+    for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
+        CuAssertTrue(testCase, npRead->templateEvents[i] == i);
+        CuAssertTrue(testCase, npRead->complementEvents[i] == i);
+    }
+
+    nanopore_nanoporeReadDestruct(npRead);
+    stFile_rmrf(tempFile);
+    free(tempFile);
+}
+
 static void test_getSplitPoints(CuTest *testCase) {
     int64_t matrixSize = 2000 * 2000;
 
@@ -670,7 +741,7 @@ static void test_getBlastPairsWithRecursion(CuTest *testCase) {
     }
 }
 
-CuSuite *signalPairwiseTestSuite(void) {
+CuSuite *signalPairwiseAlignerTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_diagonal);
@@ -678,13 +749,14 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_Sequence);
     SUITE_ADD_TEST(suite, test_referenceSequence);
     SUITE_ADD_TEST(suite, test_eventSequence);
+    SUITE_ADD_TEST(suite, test_loadNanoporeRead);
     SUITE_ADD_TEST(suite, test_getSplitPoints);
     SUITE_ADD_TEST(suite, test_hdCellConstruct);
     SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
-    SUITE_ADD_TEST(suite, test_getBlastPairs);
-    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+    //SUITE_ADD_TEST(suite, test_getBlastPairs);
+    //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
 
     //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);  // wonky
 

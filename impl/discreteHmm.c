@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stateMachine.h>
-#include "bioioC.h"
-#include "pairwiseAligner.h"
-#include "stateMachine.h"
+//#include "bioioC.h"
+//#include "pairwiseAligner.h"
+//#include "stateMachine.h"
 #include "discreteHmm.h"
 
 // Construct

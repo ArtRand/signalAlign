@@ -5,7 +5,7 @@
 #include "pairwiseAligner.h"
 
 
-static NanoporeRead *nanopore_nanoporeReadConstruct(int64_t readLength,
+static NanoporeRead *nanopore_NanoporeReadConstruct(int64_t readLength,
                                                     int64_t nbTemplateEvents,
                                                     int64_t nbComplementEvents) {
     NanoporeRead *npRead = st_malloc(sizeof(NanoporeRead));
@@ -45,7 +45,12 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
     int64_t npRead_readLength, npRead_nbTemplateEvents, npRead_nbComplementEvents;
-    assert(stList_length(tokens) == 12);
+
+    if (stList_length(tokens) != 13) {
+        st_errAbort("nanopore_loadNanoporeReadFromFile: incorrect line 1 for file %s got %"PRId64"tokens should get 12",
+                    nanoporeReadFile, stList_length(tokens));
+
+    }
 
     int64_t j = sscanf(stList_get(tokens, 0), "%"SCNd64, &npRead_readLength);
     if (j != 1) {
@@ -59,7 +64,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     if (j != 1) {
         st_errAbort("error parsing nanopore complement event lengths\n");
     }
-    NanoporeRead *npRead = nanopore_nanoporeReadConstruct(npRead_readLength,
+    NanoporeRead *npRead = nanopore_NanoporeReadConstruct(npRead_readLength,
                                                           npRead_nbTemplateEvents,
                                                           npRead_nbComplementEvents);
     // template params

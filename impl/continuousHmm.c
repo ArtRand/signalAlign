@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <inttypes.h>
-#include <stdint.h>
+//#include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
 #include <stateMachine.h>
 #include "hdp_math_utils.h"
 #include "discreteHmm.h"
-#include "stateMachine.h"
+//#include "stateMachine.h"
 #include "pairwiseAligner.h"
 #include "continuousHmm.h"
 
