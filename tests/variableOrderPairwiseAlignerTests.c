@@ -28,10 +28,11 @@ static void print_stateMachine_transitions(StateMachine *sM) {
 }
 
 static inline char *homopolymer(char base, int64_t repeat) {
-    char *homopolymer = (char *)st_malloc(sizeof(char) * repeat);
+    char *homopolymer = (char *)st_malloc(sizeof(char) * (repeat + 1));
     for (int64_t i = 0; i < repeat; i++) {
         homopolymer[i] = base;
     }
+    homopolymer[repeat] = '\0';
     return homopolymer;
 }
 
