@@ -9,10 +9,9 @@
 #include "CuTest.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
-#include "continuousHmm.h"
-#include "discreteHmm.h"
-#include "emissionMatrix.h"
-#include "multipleAligner.h"
+//#include "continuousHmm.h"
+//#include "discreteHmm.h"
+//#include "multipleAligner.h"
 #include "randomSequences.h"
 
 
