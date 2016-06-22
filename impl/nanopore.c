@@ -14,7 +14,7 @@ static NanoporeRead *nanopore_NanoporeReadConstruct(int64_t readLength,
     npRead->nbTemplateEvents = nbTemplateEvents;
     npRead->nbComplementEvents = nbComplementEvents;
 
-    npRead->twoDread = st_malloc(npRead->readLength * sizeof(char));
+    npRead->twoDread = st_malloc((npRead->readLength + 1) * sizeof(char));
 
     // the map contains the index of the event corresponding to each kmer in the read sequence so
     // the length of the map has to be the same as the read sequence, not the number of events
@@ -121,6 +121,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     if (j != 1) {
         st_errAbort("error parsing read from npRead file\n");
     }
+    npRead->twoDread[npRead->readLength] = '\0';
     free(string);
 
     // line 3 [template event map] \n
