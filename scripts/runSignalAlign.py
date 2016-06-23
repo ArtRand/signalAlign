@@ -205,9 +205,9 @@ def main(args):
             "target_regions": target_regions,
             "degenerate": degenerate_enum(args.degenerate),
         }
-        alignment = SignalAlignment(**alignment_args)
-        alignment.run()
-        #work_queue.put(alignment_args)
+        #alignment = SignalAlignment(**alignment_args)
+        #alignment.run()
+        work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))

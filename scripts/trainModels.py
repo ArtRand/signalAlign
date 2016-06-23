@@ -60,6 +60,8 @@ def parse_args():
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
                         help="path to complement HDP model to use")
 
+    parser.add_argument('--test', action='store_true', default=False, dest='test')
+
     # gibbs
     parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
     parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
@@ -323,9 +325,9 @@ def main(args):
                 "target_regions": None,
                 "degenerate": None,
             }
-            alignment = SignalAlignment(**alignment_args)
-            alignment.run(get_expectations=True)
-            #work_queue.put(alignment_args)
+            #alignment = SignalAlignment(**alignment_args)
+            #alignment.run(get_expectations=True)
+            work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))
@@ -383,6 +385,11 @@ def main(args):
             print("{i}| {t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
                                                                c_likelihood=complement_model.running_likelihoods[-1],
                                                                i=i))
+            if args.test and (len(template_model.running_likelihoods) >= 2) and \
+                    (len(complement_model.running_likelihoods) >= 2):
+                assert (template_model.running_likelihoods[-2] < template_model.running_likelihoods[-1]) and \
+                       (complement_model.running_likelihoods[-2] < complement_model.running_likelihoods[-1]), \
+                    "Testing: Likelihood error, went up"
         i += 1
 
     # if we're using HDP, trim the final Hmm (remove assignments)
