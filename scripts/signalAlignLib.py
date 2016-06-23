@@ -866,7 +866,7 @@ class SignalAlignment(object):
         else:
             assert self.forward_reference is None and self.backward_reference is None, \
                 "Erroneously gave forward and backward references when trying to do error correction"
-            assert self.path_to_EC_refs is not None, "Need to provide path to ambigous reference sequences"
+            assert self.path_to_EC_refs is not None, "Need to provide path to ambiguous reference sequences"
             forward_ref_flag = ""
             backward_ref_flag = ""
             error_correct_ref_path = "-p {path}".format(path=self.path_to_EC_refs)
@@ -919,26 +919,29 @@ class SignalAlignment(object):
             sparse_flag = ""
 
         # degenerate nucleotide information
-        degenerate_flag = "-o {} ".format(self.degenerate)
-
+        if self.degenerate is not None:
+            degenerate_flag = "-o {} ".format(self.degenerate)
+        else:
+            degenerate_flag = ""
         # commands
         if get_expectations:
             template_expectations_file_path = self.destination + read_name + ".template.expectations"
             complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
 
             command = \
-                "echo {cigar} | {vA} {model}-f {f_ref} -b {b_ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
-                "{expansion}{trim} {hdp}-L {readLabel} -t {templateExpectations} -c {complementExpectations}"\
+                "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref}{eC} -q {npRead} " \
+                "{t_model}{c_model}{t_hmm}{c_hmm}{thresh} {expansion}{trim} {hdp}-L {readLabel} " \
+                "-t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag,
                         f_ref=forward_ref_flag, b_ref=backward_ref_flag,
                         npRead=temp_np_read, t_hmm=template_hmm_flag, readLabel=read_label,
                         c_hmm=complement_hmm_flag, templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag)
+                        trim=trim_flag, degen=degenerate_flag, sparse=sparse_flag, eC=error_correct_ref_path)
         else:
             command = \
-                "echo {cigar} | {vA} {twoWay}{sparse}{model}{f_ref}{b_ref}{eC} -q {npRead} " \
+                "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref}{eC} -q {npRead} " \
                 "{t_model}{c_model}{t_hmm}{c_hmm}{thresh}{expansion}{trim} " \
                 "-u {posteriors} {hdp}-L {readLabel}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=sparse_flag,
@@ -946,7 +949,7 @@ class SignalAlignment(object):
                         readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
                         t_model=template_model_flag, c_model=complement_model_flag, c_hmm=complement_hmm_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag, hdp=hdp_flags, twoWay=degenerate_flag)
+                        trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag)
 
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)

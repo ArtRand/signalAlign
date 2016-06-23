@@ -233,7 +233,7 @@ static void test_eventSequence(CuTest *testCase) {
     Sequence *eventSequence = sequence_constructEventSequence(8, sY);
     for (int64_t i = 0; i < eventSequence->length; i++) {
         int64_t index = i * NB_EVENT_PARAMS;
-        double actual = *(double *)eventSequence->get(eventSequence, i);
+        double actual = *(double *)eventSequence->get(eventSequence->elements, i);
         CuAssertDblEquals(testCase, sY[index], actual, 0.0);
     }
 
@@ -242,7 +242,7 @@ static void test_eventSequence(CuTest *testCase) {
     Sequence *slice = eventSequence->sliceFcn(eventSequence, newStart, sliceLength);
     for (int64_t i = 0; i < slice->length; i++) {
         int64_t index = (i + newStart) * NB_EVENT_PARAMS;
-        double actual = *(double *)slice->get(slice, i);
+        double actual = *(double *)slice->get(slice->elements, i);
         CuAssertDblEquals(testCase, sY[index], actual, 0.0);
     }
 

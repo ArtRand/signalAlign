@@ -331,7 +331,7 @@ Sequence *sequence_deepCopyNucleotideSequence(const Sequence *toCopy) {
 }
 
 Sequence *sequence_constructEventSequence(int64_t length, void *events) {
-    Sequence *s = sequence_construct2(length, events, sequence_getEventSafe, sequence_sliceEventSequence, event);
+    Sequence *s = sequence_construct2(length, events, sequence_getEvent, sequence_sliceEventSequence, event);
     return s;
 }
 

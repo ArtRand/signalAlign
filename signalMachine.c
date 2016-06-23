@@ -259,7 +259,7 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, eventSequence, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs, 1, 1);
-    
+
     return alignedPairs;
 }
 
@@ -346,7 +346,6 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
 
     getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
                                 diagonalCalculation_Expectations, 1, 1);
-
     stateMachine_destruct(sM);
 }
 

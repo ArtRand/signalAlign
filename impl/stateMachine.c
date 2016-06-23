@@ -240,7 +240,6 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     stList *tokens = stString_split(string);
     // check to make sure that the model will fit in the stateMachine
     if (stList_length(tokens) != 1 + (sM->parameterSetSize * MODEL_PARAMS)) {
-        st_uglyf("%lld %lld\n", sM->parameterSetSize, MODEL_PARAMS);
         st_errAbort("This stateMachine is not correct for signal model (match emissions) got %lld, should be %lld\n",
                     stList_length(tokens), 1 + (sM->parameterSetSize * MODEL_PARAMS));
     }

@@ -32,6 +32,7 @@ class signalAlign_alignment_test(unittest.TestCase):
                                      "".format(alignment_command))
 
         test_alignments = glob.glob(test_directory + "tempFiles_alignment/*.tsv")
+        self.assertTrue(len(test_alignments) == 6, "Didn't make alignments")
 
         for alignment in test_alignments:
             alignment_file = alignment.split("/")[-1]
@@ -63,7 +64,7 @@ def main():
     testSuite = unittest.TestSuite()
     testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(signalAlign_alignment_test('test_zymo_reads'))
-    #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
+    testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
 
     testRunner = unittest.TextTestRunner(verbosity=1)
     testRunner.run(testSuite)

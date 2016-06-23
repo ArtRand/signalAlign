@@ -42,10 +42,6 @@ def parse_args():
     parser.add_argument('--transitions', action='store_true', default=False, dest='transitions',
                         help='Flag to train transitions, False by default')
 
-    parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
-                        help="Specify degenerate nucleotide options: "
-                             "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
-
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -64,15 +60,17 @@ def parse_args():
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
                         help="path to complement HDP model to use")
 
-    # TODO build support for ambiguity characters in training
-    parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
-                        dest='substitution_file', help="Ambiguity positions")
     # gibbs
     parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
     parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
     parser.add_argument('--min_assignments', action='store', type=int, default=30000, dest='min_assignments',
                         help="Do not initiate Gibbs sampling unless this many assignments have been accumulated")
-
+    # only supervised training enabled right now
+    #parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
+    #                    help="Specify degenerate nucleotide options: "
+    #                         "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
+    #parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
+    #                    dest='substitution_file', help="Ambiguity positions")
     args = parser.parse_args()
     return args
 
@@ -236,17 +234,9 @@ def main(args):
     plus_strand_sequence = working_folder.add_file_path("forward_reference.txt")
     minus_strand_sequence = working_folder.add_file_path("backward_reference.txt")
 
-    # parse the substitution file, if given
-    if args.substitution_file is not None:
-        add_ambiguity_chars_to_reference(input_fasta=args.ref,
-                                         substitution_file=args.substitution_file,
-                                         sequence_outfile=plus_strand_sequence,
-                                         rc_sequence_outfile=minus_strand_sequence,
-                                         degenerate_type=None)  # TODO update to use degenerate type
-    else:
-        make_temp_sequence(fasta=args.ref,
-                           sequence_outfile=plus_strand_sequence,
-                           rc_sequence_outfile=minus_strand_sequence)
+    make_temp_sequence(fasta=args.ref,
+                       sequence_outfile=plus_strand_sequence,
+                       rc_sequence_outfile=minus_strand_sequence)
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -316,23 +306,26 @@ def main(args):
             alignment_args = {
                 "forward_reference": plus_strand_sequence,
                 "backward_reference": minus_strand_sequence,
-                "in_fast5": fast5,
+                "path_to_EC_refs": None,
                 "destination": working_directory_path,
                 "stateMachineType": args.stateMachineType,
-                "banded": args.banded,
                 "bwa_index": bwa_ref_index,
                 "in_templateHmm": template_hmm,
                 "in_complementHmm": complement_hmm,
                 "in_templateHdp": template_hdp,
                 "in_complementHdp": complement_hdp,
+                "banded": args.banded,
+                "sparse_output": False,
+                "in_fast5": fast5,
                 "threshold": args.threshold,
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
-                "twoWay": False,
+                "target_regions": None,
+                "degenerate": None,
             }
-            #alignment = SignalAlignment(**alignment_args)
-            #alignment.run(get_expectations=True)
-            work_queue.put(alignment_args)
+            alignment = SignalAlignment(**alignment_args)
+            alignment.run(get_expectations=True)
+            #work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))
