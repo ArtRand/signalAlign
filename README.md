@@ -1,4 +1,5 @@
 ## SignalAlign
+_R9 refactor in progress_
 #### MinION signal-level alignment and methylation detection using hidden Markov Models with hierarchical Dirichlet process kmer learning.
 
 ### Introduction
