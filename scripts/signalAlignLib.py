@@ -129,7 +129,7 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
         # make the 2d read
         write_fasta(id=fast5, sequence=npRead.alignment_table_sequence, destination=temp_fasta)
 
-        # handle models
+        # models
         # template model
         if npRead.template_model_id == "template_median68pA.model":
             print("signalAlign - found default template model", file=sys.stderr)
@@ -297,14 +297,6 @@ def exonerated_bwa(bwa_index, query, target_regions=None):
             pass
 
     return completeCigarString, strand
-
-
-#def get_proceding_kmers(kmer, alphabet="ACGT"):
-#    proceding_kmers = []
-#    suffix = kmer[1:]
-#    for n in alphabet:
-#        proceding_kmers.append(n + suffix)
-#    return proceding_kmers
 
 
 def degenerate_enum(degenerate_request_string):

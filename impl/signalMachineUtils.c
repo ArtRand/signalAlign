@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include "signalMachineUtils.h"
+#include "pairwiseAligner.h"
+
 
 // Borrowed from Bob Stout http://stjarnhimlen.se/snippets/strrev.c
 static char *strrev(char *str) {
@@ -32,7 +34,7 @@ static inline void referenceSequence_loadReference(ReferenceSequence *self,
     }
 
     self->reference = stFile_getLineFromFile(fopen(forwardReferencePath, "r"));
-    self->reverseComplementOfReference = stFile_getLineFromFile(fopen(backwardReferencePath, "r"));
+    self->complementOfReference = stFile_getLineFromFile(fopen(backwardReferencePath, "r"));
 }
 
 static inline struct PairwiseAlignment *referenceSequence_copyPairwiseAlignment(struct PairwiseAlignment *pA) {
@@ -45,7 +47,7 @@ static inline struct PairwiseAlignment *referenceSequence_copyPairwiseAlignment(
 static inline void referenceSequence_setTrimmedSeqeuences(ReferenceSequence *self) {
     self->trimmedForwardSequence = signalUtils_getSubSequence(self->reference, self->A->start1,
                                                               self->A->end1, self->A->strand1);
-    self->trimmedBackwardSequence = strrev(signalUtils_getSubSequence(self->reverseComplementOfReference,
+    self->trimmedBackwardSequence = strrev(signalUtils_getSubSequence(self->complementOfReference,
                                                                       self->A->start1, self->A->end1,
                                                                       self->A->strand1));
 
@@ -53,7 +55,7 @@ static inline void referenceSequence_setTrimmedSeqeuences(ReferenceSequence *sel
 
 static inline void referenceSequence_reset(ReferenceSequence *self) {
     free(self->reference);
-    free(self->reverseComplementOfReference);
+    free(self->complementOfReference);
     free(self->trimmedForwardSequence);
     free(self->trimmedBackwardSequence);
     self->initialized = FALSE;
@@ -76,14 +78,7 @@ ReferenceSequence *signalUtils_ReferenceSequenceConstructFull(char *forwardRefer
 
     R->A = referenceSequence_copyPairwiseAlignment(pA);
 
-    //R->trimmedForwardSequence = signalUtils_getSubSequence(R->reference, pA->start1, pA->end1, pA->strand1);
-    //R->trimmedBackwardSequence = strrev(signalUtils_getSubSequence(R->reverseComplementOfReference,
-    //                                                        pA->start1, pA->end1, pA->strand1));
-
     referenceSequence_setTrimmedSeqeuences(R);
-    //R->trimmedForwardSequence = signalUtils_getSubSequence(R->reference, R->A->start1, R->A->end1, R->A->strand1);
-    //R->trimmedBackwardSequence = strrev(signalUtils_getSubSequence(R->reverseComplementOfReference,
-    //                                                               R->A->start1, R->A->end1, R->A->strand1));
 
     R->getTemplateTargetSequence = referenceSequence_getTemplateTarget;
     R->getComplementTargetSequence = referenceSequence_getComplementTarget;
@@ -98,7 +93,7 @@ ReferenceSequence *signalUtils_ReferenceSequenceConstructEmpty(struct PairwiseAl
     R->A = referenceSequence_copyPairwiseAlignment(pA);
 
     R->reference = NULL;
-    R->reverseComplementOfReference = NULL;
+    R->complementOfReference = NULL;
     R->trimmedForwardSequence = NULL;
     R->trimmedBackwardSequence = NULL;
 
@@ -128,10 +123,52 @@ void signalUtils_ReferenceSequenceDestruct(ReferenceSequence *self) {
     free(self->A->contig2);
     free(self->A);
     free(self->reference);
-    free(self->reverseComplementOfReference);
+    free(self->complementOfReference);
     free(self->trimmedForwardSequence);
     free(self->trimmedBackwardSequence);
     free(self);
+}
+
+static void signalUtils_rebasePairwiseAlignmentCoordinates(int64_t *start, int64_t *end, int64_t *strand,
+                                                           int64_t coordinateShift, bool flipStrand) {
+    *start += coordinateShift;
+    *end += coordinateShift;
+    if (flipStrand) {
+        *strand = *strand ? 0 : 1;
+        int64_t i = *end;
+        *end = *start;
+        *start = i;
+    }
+}
+
+stList *signalUtils_guideAlignmentToRebasedAnchorPairs(struct PairwiseAlignment *pA, PairwiseAlignmentParameters *p) {
+    // check if we need to flip the reference
+    bool flipStrand1 = !pA->strand1;
+    int64_t refCoordShift = (pA->strand1 ? pA->start1 : pA->end1);
+
+    // rebase the reference alignment to (0), but not the nanopore read, this is corrected when remapping the
+    // anchorPairs
+    signalUtils_rebasePairwiseAlignmentCoordinates(&(pA->start1), &(pA->end1), &(pA->strand1), -refCoordShift,
+                                                   flipStrand1);
+    checkPairwiseAlignment(pA);
+
+    //Convert input alignment into anchor pairs
+    stList *unfilteredAnchorPairs = convertPairwiseForwardStrandAlignmentToAnchorPairs(
+            pA, p->constraintDiagonalTrim);
+
+    // sort
+    stList_sort(unfilteredAnchorPairs, (int (*)(const void *, const void *)) stIntTuple_cmpFn);
+
+    // filter
+    stList *anchorPairs = filterToRemoveOverlap(unfilteredAnchorPairs);
+
+    return anchorPairs;
+}
+
+stList *signalUtils_getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap, int64_t mapOffset) {
+    stList *remapedAnchors = nanopore_remapAnchorPairsWithOffset(unmappedAnchors, eventMap, mapOffset);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(remapedAnchors);
+    return filteredRemappedAnchors;
 }
 
 void printFoo() {

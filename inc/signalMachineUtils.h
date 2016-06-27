@@ -2,11 +2,12 @@
 #define SIGNAL_H_
 
 #include "pairwiseAlignment.h"
+#include "pairwiseAligner.h"
 
 typedef struct _referenceSequence ReferenceSequence;
 struct _referenceSequence {
     char *reference;
-    char *reverseComplementOfReference;
+    char *complementOfReference;
 
     char *trimmedForwardSequence;
     char *trimmedBackwardSequence;
@@ -29,6 +30,10 @@ void signalUtils_ReferenceSequenceSet(ReferenceSequence *self, char *forwardRefe
 char *signalUtils_getSubSequence(char *seq, int64_t start, int64_t end, bool strand);
 
 //void referenceSequence_loadReference(ReferenceSequence *R, char *forwardReferencePath, char *backwardReferencePath);
+
+stList *signalUtils_guideAlignmentToRebasedAnchorPairs(struct PairwiseAlignment *pA, PairwiseAlignmentParameters *p);
+
+stList *signalUtils_getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap, int64_t mapOffset);
 
 void signalUtils_ReferenceSequenceDestruct(ReferenceSequence *self);
 

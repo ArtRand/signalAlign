@@ -99,7 +99,7 @@ Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPs
         cpHmm->baseHmm.transitions[i] = transitionPseudocount;
     }
 
-    cpHmm->getElementIndexFcn = emissions_discrete_getKmerIndexFromKmer;
+    cpHmm->getElementIndexFcn = emissions_discrete_getKmerIndexFromPtr;
 
     // scaling factors
     cpHmm->scale = scale;

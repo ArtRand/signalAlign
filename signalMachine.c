@@ -1,9 +1,8 @@
 #include <getopt.h>
 #include <string.h>
 #include "signalMachineUtils.h"
-#include "pairwiseAlignment.h"
 #include "pairwiseAligner.h"
-#include "continuousHmm.h"
+//#include "continuousHmm.h"
 
 #define STEP 6  // space between degenerate nucleotides in for error correction
 
@@ -73,7 +72,7 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         }
 
         // get the kmer index
-        int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromKmer(pathKmer);
+        int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromPtr(pathKmer);
 
         // get the expected event mean amplitude and noise
         double E_mean = matchModel[1 + (targetKmerIndex * MODEL_PARAMS)];
@@ -162,11 +161,11 @@ void writePosteriorProbsSparse(char *posteriorProbsFile, char *readFile, char *t
     fclose(fH);
 }
 
-stList *getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap, int64_t mapOffset) {
-    stList *remapedAnchors = nanopore_remapAnchorPairsWithOffset(unmappedAnchors, eventMap, mapOffset);
-    stList *filteredRemappedAnchors = filterToRemoveOverlap(remapedAnchors);
-    return filteredRemappedAnchors;
-}
+//stList *getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap, int64_t mapOffset) {
+//    stList *remapedAnchors = nanopore_remapAnchorPairsWithOffset(unmappedAnchors, eventMap, mapOffset);
+//    stList *filteredRemappedAnchors = filterToRemoveOverlap(remapedAnchors);
+//    return filteredRemappedAnchors;
+//}
 
 StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentParameters npp, StateMachineType type,
                                 Strand strand, NanoporeHDP *nHdp) {
@@ -245,7 +244,7 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     int64_t lX = sequence_correctSeqLength(strlen(target), kmer);
 
     // remap anchor pairs
-    stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
+    stList *filteredRemappedAnchors = signalUtils_getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
     // make sequences
     Sequence *sX = sequence_constructKmerSequence(
@@ -263,6 +262,7 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     return alignedPairs;
 }
 
+/*
 void rebasePairwiseAlignmentCoordinates(int64_t *start, int64_t *end, int64_t *strand,
                                         int64_t coordinateShift, bool flipStrand) {
     *start += coordinateShift;
@@ -275,14 +275,14 @@ void rebasePairwiseAlignmentCoordinates(int64_t *start, int64_t *end, int64_t *s
     }
 }
 
-stList *guideAlignmentToRebasedAnchorPairs(struct PairwiseAlignment *pA, PairwiseAlignmentParameters *p) {
+stList *signalUtils_guideAlignmentToRebasedAnchorPairs(struct PairwiseAlignment *pA, PairwiseAlignmentParameters *p) {
     // check if we need to flip the reference
     bool flipStrand1 = !pA->strand1;
     int64_t refCoordShift = (pA->strand1 ? pA->start1 : pA->end1);
 
     // rebase the reference alignment to (0), but not the nanopore read, this is corrected when remapping the
     // anchorPairs
-    rebasePairwiseAlignmentCoordinates(&(pA->start1), &(pA->end1), &(pA->strand1), -refCoordShift, flipStrand1);
+    signalUtils_rebasePairwiseAlignmentCoordinates(&(pA->start1), &(pA->end1), &(pA->strand1), -refCoordShift, flipStrand1);
     checkPairwiseAlignment(pA);
 
     //Convert input alignment into anchor pairs
@@ -297,6 +297,7 @@ stList *guideAlignmentToRebasedAnchorPairs(struct PairwiseAlignment *pA, Pairwis
 
     return anchorPairs;
 }
+ */
 
 Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t queryStart, int64_t queryEnd,
                                                  int64_t *eventMap) {
@@ -334,7 +335,7 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
     int64_t lX = sequence_correctSeqLength(strlen(trainingTarget), event);
 
     // remap the anchors
-    stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
+    stList *filteredRemappedAnchors = signalUtils_getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
     Sequence *target = sequence_constructKmerSequence(
             lX, trainingTarget, sequence_getKmer, sequence_sliceNucleotideSequence,
@@ -499,14 +500,6 @@ int main(int argc, char *argv[]) {
     struct PairwiseAlignment *pA;
     pA = cigarRead(fileHandleIn);
 
-    // log stateMachine type
-    //if (sMtype == threeState) {
-    //    fprintf(stderr, "signalAlign - using three-state HMM model\n");
-    //}
-    //if (sMtype == threeStateHdp) {
-    //    fprintf(stderr, "signalAlign - using three-state HMM-HDP model\n");
-    //}
-
     // Alignment Parameters //
     // make the pairwise alignment parameters
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -540,14 +533,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // load reference sequence
-    //FILE *reference = fopen(forwardReference, "r");
-    //FILE *rc_reference = fopen(backwardReference, "r");
-    //char *referenceSequence = stFile_getLineFromFile(reference);
-    //char *rc_referenceSequence = stFile_getLineFromFile(rc_reference);
-
     ReferenceSequence *R;
-    if (errorCorrectPath == NULL) {
+    if (errorCorrectPath == NULL) { // not doing error correction
         if ((forwardReference == NULL) || (backwardReference == NULL)) {
             st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
                         forwardReference, backwardReference);
@@ -556,18 +543,6 @@ int main(int argc, char *argv[]) {
     } else {
         R = signalUtils_ReferenceSequenceConstructEmpty(pA);
     }
-
-    //printPairwiseAlignmentSummary(pA);
-
-    // slice out the section of the reference we're aligning to
-    //char *trimmedForwardSeq = signalUtils_getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);
-    //char *trimmedBackwardSeq = signalUtils_getSubSequence(rc_referenceSequence, pA->start1, pA->end1, pA->strand1);
-
-    // flip around complement (minus) strand
-    //strrev(trimmedBackwardSeq);
-
-    //char *templateTargetSeq = pA->strand1 ? trimmedForwardSeq : trimmedBackwardSeq;
-    //char *complementTargetSeq = pA->strand1 ? trimmedBackwardSeq : trimmedForwardSeq;
 
     // Nanopore Read //
     // load nanopore read
@@ -593,7 +568,7 @@ int main(int argc, char *argv[]) {
     int64_t rCoordinateShift_c = pA->end1;
     bool forward = pA->strand1;  // keep track of whether this is a forward mapped read or not
 
-    stList *anchorPairs = guideAlignmentToRebasedAnchorPairs(pA, p);  // pA gets modified here, no turning back
+    stList *anchorPairs = signalUtils_guideAlignmentToRebasedAnchorPairs(pA, p);  // pA gets modified here, no turning back
 
     if (errorCorrectPath != NULL) {
         st_uglyf("Starting error correcting routine\n");
@@ -706,10 +681,6 @@ int main(int argc, char *argv[]) {
 
         // get expectations for template
         fprintf(stderr, "signalAlign - getting expectations for template\n");
-        //getSignalExpectations(templateModelFile, templateHmmFile, nHdpT,
-        //                      templateExpectations, sMtype, npRead->templateParams,
-        //                      tEventSequence, npRead->templateEventMap, pA->start2, templateTargetSeq, p,
-        //                      anchorPairs, template, degenerate);
 
         getSignalExpectations(templateModelFile, templateHmmFile, nHdpT,
                               templateExpectations, sMtype, npRead->templateParams,
@@ -729,10 +700,7 @@ int main(int argc, char *argv[]) {
 
         // get expectations for the complement
         fprintf(stderr, "signalAlign - getting expectations for complement\n");
-        //getSignalExpectations(complementModelFile, complementHmmFile, nHdpC,
-        //                      complementExpectations, sMtype,
-        //                      npRead->complementParams, cEventSequence, npRead->complementEventMap, pA->start2,
-        //                      complementTargetSeq, p, anchorPairs, complement, degenerate);
+
         getSignalExpectations(complementModelFile, complementHmmFile, nHdpC,
                               complementExpectations, sMtype,
                               npRead->complementParams, cEventSequence, npRead->complementEventMap, pA->start2,
@@ -772,17 +740,6 @@ int main(int argc, char *argv[]) {
         // make template stateMachine
         StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams,
                                                         sMtype, template, nHdpT, templateHmmFile);
-        //StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, template, nHdpT);
-        // load HMM, if given
-        //if (templateHmmFile != NULL) {
-        //    fprintf(stderr, "loading HMM from file, %s\n", templateHmmFile);
-        //    loadHmmRoutine(templateHmmFile, sMt, sMt->type, NULL);
-        //}
-
-        // get aligned pairs
-        //stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
-        //                                                      pA->start2, templateTargetSeq, p, anchorPairs,
-        //                                                      degenerate);
 
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
                                                               pA->start2, R->getTemplateTargetSequence(R),
@@ -797,16 +754,10 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             if (sparseOutput) {
-                //writePosteriorProbsSparse(posteriorProbsFile, readLabel, templateTargetSeq, forward, pA->contig1,
-                //                          tCoordinateShift, rCoordinateShift_t, templateAlignedPairs, template);
                 writePosteriorProbsSparse(posteriorProbsFile, readLabel, R->getTemplateTargetSequence(R),
                                           forward, pA->contig1, tCoordinateShift,
                                           rCoordinateShift_t, templateAlignedPairs, template);
             } else {
-                //writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_MATRIX,
-                //                    npRead->templateParams, npRead->templateEvents, templateTargetSeq, forward,
-                //                    pA->contig1, sMt->type, tCoordinateShift, rCoordinateShift_t,
-                //                    templateAlignedPairs, template);
                 writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_MATRIX,
                                     npRead->templateParams, npRead->templateEvents, R->getTemplateTargetSequence(R),
                                     forward, pA->contig1, sMt->type, tCoordinateShift, rCoordinateShift_t,
@@ -818,15 +769,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "signalAlign - starting complement alignment\n");
         StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
                                                         sMtype, complement, nHdpC, complementHmmFile);
-        //StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, complement, nHdpC);
-        //if (complementHmmFile != NULL) {
-        //    fprintf(stderr, "loading HMM from file, %s\n", complementHmmFile);
-        //    loadHmmRoutine(complementHmmFile, sMc, sMc->type, NULL);
-        //}
-        // get aligned pairs
-        //stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
-        //                                                npRead->complementEventMap, pA->start2,
-        //                                                complementTargetSeq, p, anchorPairs, degenerate);
+
         stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
                                                                 npRead->complementEventMap, pA->start2,
                                                                 R->getComplementTargetSequence(R),
@@ -840,16 +783,10 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             if (sparseOutput) {
-                //writePosteriorProbsSparse(posteriorProbsFile, readLabel, complementTargetSeq, forward, pA->contig1,
-                //                          cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complement);
                 writePosteriorProbsSparse(posteriorProbsFile, readLabel, R->getComplementTargetSequence(R),
                                           forward, pA->contig1, cCoordinateShift,
                                           rCoordinateShift_c, complementAlignedPairs, complement);
             } else {
-                //writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_MATRIX,
-                //                    npRead->complementParams, npRead->complementEvents, complementTargetSeq,
-                //                    forward, pA->contig1, sMc->type,cCoordinateShift, rCoordinateShift_c,
-                //                    complementAlignedPairs, complement);
                 writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_MATRIX,
                                     npRead->complementParams, npRead->complementEvents,
                                     R->getComplementTargetSequence(R), forward, pA->contig1,

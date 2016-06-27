@@ -18,6 +18,7 @@
 #include "sonLib.h"
 #include "stateMachine.h"
 #include "sonLibTypes.h"
+#include "continuousHmm.h"
 
 //The exception string
 extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;

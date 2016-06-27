@@ -242,14 +242,14 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
 
 // indexing functions //
 void stateMachine_index_check(int64_t c);
-//Returns the index for a base, for use with matrices and emissions_discrete_getKmerIndexFromPtr
+//Returns the index for a base, for use with matrices and emissions_discrete_getKmerIndexFromKmer
 int64_t emissions_discrete_getBaseIndex(void *base);
 
 //Returns the index for a kmer from pointer to kmer string
-int64_t emissions_discrete_getKmerIndexFromPtr(void *kmer);
+int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer);
 
 // Returns index of kmer from pointer to array
-int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer);
+int64_t emissions_discrete_getKmerIndexFromPtr(void *kmer);
 
 // transition defaults
 void stateMachine3_setTransitionsToNucleotideDefaults(StateMachine *sM);

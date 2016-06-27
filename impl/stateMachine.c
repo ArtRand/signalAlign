@@ -102,7 +102,7 @@ int64_t emissions_discrete_getBaseIndex(void *base) {
     }
 }
 
-int64_t emissions_discrete_getKmerIndexFromPtr(void *kmer) {
+int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer) {
     int64_t kmerLen = strlen((char*) kmer);
     if (kmerLen == 0) {
         return NUM_OF_KMERS + 1;
@@ -122,15 +122,14 @@ int64_t emissions_discrete_getKmerIndexFromPtr(void *kmer) {
     return x;
 }
 
-int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer) {
+int64_t emissions_discrete_getKmerIndexFromPtr(void *kmer) {
     // make temp kmer meant to work with getKmer
     char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
     for (int64_t x = 0; x < KMER_LENGTH; x++) {
         kmer_i[x] = *((char *)kmer+x);
     }
     kmer_i[KMER_LENGTH] = '\0';
-
-    int64_t i = emissions_discrete_getKmerIndexFromPtr(kmer_i);
+    int64_t i = emissions_discrete_getKmerIndexFromKmer(kmer_i);
     //index_check(i);
     free(kmer_i);
     return i;
@@ -164,7 +163,7 @@ double emissions_kmer_getGapProb(const double *emissionGapProbs, void *x_i) {
         kmer_i[x] = *((char *) x_i + x);
     }
     kmer_i[KMER_LENGTH] = '\0';
-    int64_t i = emissions_discrete_getKmerIndexFromPtr(kmer_i);
+    int64_t i = emissions_discrete_getKmerIndexFromKmer(kmer_i);
     //index_check(i);
     free(kmer_i);
     double p = i > NUM_OF_KMERS ? LOG_ZERO : emissionGapProbs[i];
@@ -172,8 +171,8 @@ double emissions_kmer_getGapProb(const double *emissionGapProbs, void *x_i) {
 }
 
 double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, void *y) {
-    int64_t iX = emissions_discrete_getKmerIndexFromPtr(x);
-    int64_t iY = emissions_discrete_getKmerIndexFromPtr(y);
+    int64_t iX = emissions_discrete_getKmerIndexFromKmer(x);
+    int64_t iY = emissions_discrete_getKmerIndexFromKmer(y);
     int64_t tableIndex = iX * NUM_OF_KMERS + iY;
     return emissionMatchProbs[tableIndex];
 }
@@ -363,8 +362,8 @@ int64_t emissions_signal_getKmerSkipBin(double *matchModel, void *kmers) {
     kmer_i[KMER_LENGTH] = '\0';
 
     // get indices
-    int64_t k_i= emissions_discrete_getKmerIndexFromPtr(kmer_i);
-    int64_t k_im1 = emissions_discrete_getKmerIndexFromPtr(kmer_im1);
+    int64_t k_i= emissions_discrete_getKmerIndexFromKmer(kmer_i);
+    int64_t k_im1 = emissions_discrete_getKmerIndexFromKmer(kmer_im1);
 
     // get the expected mean current for each one
     double u_ki = emissions_signal_getModelLevelMean(matchModel, k_i);
@@ -399,7 +398,7 @@ double emissions_signal_logGaussMatchProb(const double *eventModel, void *kmer, 
 
     // get event mean, and kmer index
     double eventMean = *(double *) event;
-    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
     double l_inv_sqrt_2pi = log(0.3989422804014327); // constant
     double modelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
     double modelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
@@ -428,7 +427,7 @@ double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, 
     double eventNoise = *(double *) ((char *)event + sizeof(double));
 
     // get the kmer index
-    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
 
     // first calculate the prob of the level mean
     double expectedLevelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
@@ -489,7 +488,7 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
     }
     kmer_i[KMER_LENGTH] = '\0';
 
-    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
 
     // get the µ and σ for the level and noise for the model
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
@@ -526,7 +525,7 @@ double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, vo
     // wrangle e_j data
     double eventMean = *(double *) e_j;
 
-    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
 
     double levelMean = emissions_signal_getModelLevelMean(self->model.EMISSION_MATCH_MATRIX, kmerIndex);
     double *normedMean = (double *)st_malloc(sizeof(double));
@@ -558,7 +557,7 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3
     kmer_i[KMER_LENGTH] = '\0';
 
     // get index
-    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
     double *eventModel = match ? sM->model.EMISSION_MATCH_MATRIX : sM->model.EMISSION_GAP_Y_MATRIX;
     // get the µ and σ for the level and noise for the model
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
@@ -599,7 +598,7 @@ double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x
     kmer_i[KMER_LENGTH] = '\0';
 
     // get index
-    int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(kmer_i);
+    int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
     double *eventModel = match ? sM->model.EMISSION_MATCH_MATRIX : sM->model.EMISSION_GAP_Y_MATRIX;
     // get the µ and σ for the level and noise for the model
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);

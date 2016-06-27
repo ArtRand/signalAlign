@@ -3,6 +3,7 @@ import h5py
 import sys
 import numpy as np
 
+
 class NanoporeModel(object):
     def __init__(self, fast5File):
         self.fastFive = h5py.File(fast5File, "r")
@@ -47,52 +48,52 @@ class NanoporeModel(object):
                         print("", end="\n", file=out_file)
                         return
 
-                    def get_model_dict(self):
-                        # check
-                        if self.model is None:
-                            print("This method is meant to be used as part of the child class TemplateModel or ComplementModel",
-                                  file=sys.stderr)
-                            # go through the model and build a lookup table
-                            model_dict = {}
-                            for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
-                                model_dict[kmer] = [level_mean, level_stdev, sd_mean, sd_stdev]
-                            return model_dict
+    def get_model_dict(self):
+        # check
+        if self.model is None:
+            print("This method is meant to be used as part of the child class TemplateModel or ComplementModel",
+                  file=sys.stderr)
+            # go through the model and build a lookup table
+            model_dict = {}
+            for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
+                model_dict[kmer] = [level_mean, level_stdev, sd_mean, sd_stdev]
+            return model_dict
 
-                        def close(self):
-                            self.fastFive.close()
-
-
-                    class TemplateModel(NanoporeModel):
-                        def __init__(self, fast5File):
-                            super(TemplateModel, self).__init__(fast5File=fast5File)
-                            self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_template/Model']
-                            self.stay_prob = np.log2(
-                                self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["stay_prob"])
-                            self.skip_prob_bins = [0.487, 0.412, 0.311, 0.229, 0.174, 0.134, 0.115, 0.103, 0.096, 0.092,
-                                                   0.088, 0.087, 0.084, 0.085, 0.083, 0.082, 0.085, 0.083, 0.084, 0.082,
-                                                   0.080, 0.085, 0.088, 0.086, 0.087, 0.089, 0.085, 0.090, 0.087, 0.096]
-                            self.parse_model_name()
-
-                        def parse_model_name(self):
-                            model_name = self.fastFive["/Analyses/Basecall_2D_000/Summary/basecall_1d_template"].attrs["model_file"]
-                            model_name = model_name.split('/')[-1]
-                            self.model_name = model_name
-                            return
+    def close(self):
+        self.fastFive.close()
 
 
-                    class ComplementModel(NanoporeModel):
-                        def __init__(self, fast5File):
-                            super(ComplementModel, self).__init__(fast5File=fast5File)
-                            self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_complement/Model']
-                            self.stay_prob = np.log2(
-                                self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["stay_prob"])
-                            self.skip_prob_bins = [0.531, 0.478, 0.405, 0.327, 0.257, 0.207, 0.172, 0.154, 0.138, 0.132,
-                                                   0.127, 0.123, 0.117, 0.115, 0.113, 0.113, 0.115, 0.109, 0.109, 0.107,
-                                                   0.104, 0.105, 0.108, 0.106, 0.111, 0.114, 0.118, 0.119, 0.110, 0.119]
-                            self.parse_model_name()
+class TemplateModel(NanoporeModel):
+    def __init__(self, fast5File):
+        super(TemplateModel, self).__init__(fast5File=fast5File)
+        self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_template/Model']
+        self.stay_prob = np.log2(
+            self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["stay_prob"])
+        self.skip_prob_bins = [0.487, 0.412, 0.311, 0.229, 0.174, 0.134, 0.115, 0.103, 0.096, 0.092,
+                               0.088, 0.087, 0.084, 0.085, 0.083, 0.082, 0.085, 0.083, 0.084, 0.082,
+                               0.080, 0.085, 0.088, 0.086, 0.087, 0.089, 0.085, 0.090, 0.087, 0.096]
+        self.parse_model_name()
 
-                        def parse_model_name(self):
-                            model_name = self.fastFive["/Analyses/Basecall_2D_000/Summary/basecall_1d_complement"].attrs["model_file"]
-                            model_name = model_name.split('/')[-1]
-                            self.model_name = model_name
-                            return
+    def parse_model_name(self):
+        model_name = self.fastFive["/Analyses/Basecall_2D_000/Summary/basecall_1d_template"].attrs["model_file"]
+        model_name = model_name.split('/')[-1]
+        self.model_name = model_name
+        return
+
+
+class ComplementModel(NanoporeModel):
+    def __init__(self, fast5File):
+        super(ComplementModel, self).__init__(fast5File=fast5File)
+        self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_complement/Model']
+        self.stay_prob = np.log2(
+            self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["stay_prob"])
+        self.skip_prob_bins = [0.531, 0.478, 0.405, 0.327, 0.257, 0.207, 0.172, 0.154, 0.138, 0.132,
+                               0.127, 0.123, 0.117, 0.115, 0.113, 0.113, 0.115, 0.109, 0.109, 0.107,
+                               0.104, 0.105, 0.108, 0.106, 0.111, 0.114, 0.118, 0.119, 0.110, 0.119]
+        self.parse_model_name()
+
+    def parse_model_name(self):
+        model_name = self.fastFive["/Analyses/Basecall_2D_000/Summary/basecall_1d_complement"].attrs["model_file"]
+        model_name = model_name.split('/')[-1]
+        self.model_name = model_name
+        return

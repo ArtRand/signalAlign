@@ -3,6 +3,11 @@
 #include "sonLibTypes.h"
 #define NB_EVENT_PARAMS 3
 
+#ifndef MACHEP
+#define MACHEP 1.11022302462515654042E-16
+#endif
+
+
 typedef struct _nanoporeReadAdjustmentParameters {
     double scale;
     double shift;
@@ -28,9 +33,21 @@ typedef struct _nanoporeRead {
     bool scaled;
 } NanoporeRead;
 
+typedef struct _eventKmerTuple {
+    double eventMean;
+    double eventSd;
+    double eventDuration;
+    int64_t kmerIndex;
+} EventKmerTuple;
+
+
 // loads a nanopore read (.npRead) from a file
 // TODO refactor format so that it can handle 1D reads also
 NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile);
+
+EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double duration, int64_t kmerIndex);
+
+NanoporeReadAdjustmentParameters *nanopore_readAdjustmentParametersConstruct();
 
 stList *nanopore_remapAnchorPairs(stList *anchorPairs, int64_t *eventMap);
 
@@ -38,6 +55,15 @@ stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *even
 
 void nanopore_descaleNanoporeRead(NanoporeRead *npRead);
 
+stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSequence, char *nucleotideSequence);
+
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead);
+
+void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params,
+                                   bool drift_out, bool var_out);
+
+void nanopore_lineq_solve(double *A, double *b, double *x_out, int64_t n);
+
+double rand_uniform2(double a, double b);
 
 #endif

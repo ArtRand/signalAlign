@@ -154,8 +154,7 @@ def main(args):
                                              rc_sequence_outfile=minus_strand_sequence,
                                              degenerate_type=args.degenerate)
         else:
-            make_temp_sequence(fasta=args.ref,
-                               sequence_outfile=plus_strand_sequence,
+            make_temp_sequence(fasta=args.ref, sequence_outfile=plus_strand_sequence,
                                rc_sequence_outfile=minus_strand_sequence)
 
     # index the reference for bwa
@@ -176,7 +175,7 @@ def main(args):
     done_queue = Manager().Queue()
     jobs = []
 
-    # list of alignment files
+    # list of read files
     fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
 
     nb_files = args.nb_files

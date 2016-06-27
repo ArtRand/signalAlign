@@ -24,6 +24,11 @@ Sequence *getTestReferenceSequence() {
     return refSeq;
 }
 
+double absPercentDiff(double obs, double exp) {
+    double percentDiff = ((obs - exp) / exp) * 100;
+    return percentDiff > 0 ? percentDiff : -percentDiff;
+}
+
 NanoporeRead *loadTestNanoporeRead() {
     char *npReadFile = stString_print("../../signalAlign/tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
@@ -175,6 +180,48 @@ static void test_loadPoreModel(CuTest *testCase) {
     stFile_rmrf(tempFile);
     free(tempFile);
     stateMachine_destruct(sM);
+}
+
+static void test_nanoporeScaleParams(CuTest *testCase) {
+    NanoporeRead *npRead = loadTestNanoporeRead();
+    Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
+                                                  sequence_sliceEventSequence, event);
+    Sequence *referenceSequence = getTestReferenceSequence();
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->constraintDiagonalTrim = 18;
+    stList *filteredRemappedAnchors = getRemappedAnchors(referenceSequence, npRead, p);
+    stList *map = nanopore_getAnchorKmersToEventsMap(filteredRemappedAnchors, eventSequence->elements,
+                                                     referenceSequence->elements);
+    st_uglyf("Map has %lld assignments\n", stList_length(map));
+    // test the event/kmer tuples
+    for (int64_t i = 0; i < stList_length(map); i++) {
+        EventKmerTuple *t = stList_get(map, i);
+        stIntTuple *pair = stList_get(filteredRemappedAnchors, i);
+        int64_t checkKmerIndex = emissions_discrete_getKmerIndexFromKmer(
+                referenceSequence->get(referenceSequence->elements, stIntTuple_get(pair, 0)));
+        double *event = eventSequence->get(eventSequence->elements, stIntTuple_get(pair, 1));
+        double eventMean = *event;
+        double eventSd = *(1 + event);
+        double eventDuration = *(2 + event);
+        CuAssertIntEquals(testCase, checkKmerIndex, t->kmerIndex);
+        CuAssertDblEquals(testCase, eventMean, t->eventMean, 0.0);
+        CuAssertDblEquals(testCase, eventSd, t->eventSd, 0.0);
+        CuAssertDblEquals(testCase, eventDuration, t->eventDuration, 0.0);
+    }
+    NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
+    StateMachine *sM = loadDescaledStateMachine3(npRead);
+    nanopore_compute_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
+
+    //CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 50.0);
+    //CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 50.0);
+    //CuAssertTrue(testCase, absPercentDiff(params->var, npRead->templateParams.var) < 50.0);
+
+    st_uglyf("npRead scale: %f, estimated: %f diff %f\n", npRead->templateParams.scale, params->scale,
+             absPercentDiff(params->scale, npRead->templateParams.scale));
+    st_uglyf("npRead shift: %f, estimated: %f diff %f\n", npRead->templateParams.shift, params->shift,
+             absPercentDiff(params->shift, npRead->templateParams.shift));
+    st_uglyf("npRead var: %f, estimated: %f diff %f\n", npRead->templateParams.var, params->var,
+             absPercentDiff(params->var, npRead->templateParams.var));
 }
 
 static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
@@ -811,15 +858,18 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
+    SUITE_ADD_TEST(suite, test_nanoporeScaleParams);
+
     SUITE_ADD_TEST(suite, test_loadPoreModel);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_stateMachine3_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_DegenerateNucleotides);
-    //SUITE_ADD_TEST(suite, test_makeAndCheckModels);
+    SUITE_ADD_TEST(suite, test_makeAndCheckModels);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
+
     return suite;
 }
