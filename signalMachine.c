@@ -2,9 +2,10 @@
 #include <string.h>
 #include "signalMachineUtils.h"
 #include "pairwiseAligner.h"
-//#include "continuousHmm.h"
 
 #define STEP 6  // space between degenerate nucleotides in for error correction
+#define ESTIMATE_PARAMS 1
+#define ASSIGNMENT_THRESHOLD 0.0
 
 void usage() {
     fprintf(stderr, "signalMachine binary, meant to be used through the signalAlign program.\n");
@@ -161,12 +162,6 @@ void writePosteriorProbsSparse(char *posteriorProbsFile, char *readFile, char *t
     fclose(fH);
 }
 
-//stList *getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap, int64_t mapOffset) {
-//    stList *remapedAnchors = nanopore_remapAnchorPairsWithOffset(unmappedAnchors, eventMap, mapOffset);
-//    stList *filteredRemappedAnchors = filterToRemoveOverlap(remapedAnchors);
-//    return filteredRemappedAnchors;
-//}
-
 StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentParameters npp, StateMachineType type,
                                 Strand strand, NanoporeHDP *nHdp) {
     if ((type != threeState) && (type != threeStateHdp)) {
@@ -216,6 +211,25 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
     fprintf(stderr, "signalAlign - Serializing HDP to %s\n", nHdpOutFile);
     serialize_nhdp(nHdp, nHdpOutFile);
     destroy_nanopore_hdp(nHdp);
+}
+
+void estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
+                            NanoporeReadAdjustmentParameters *params,
+                            stList *(*assignmentFunction)(NanoporeRead *, double)) {
+    StateMachine3 *sM3 = (StateMachine3 *)sM;
+    st_uglyf("Re-estimating parameters\n");
+    st_uglyf("Before: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
+    stList *map = assignmentFunction(npRead, ASSIGNMENT_THRESHOLD);
+    nanopore_compute_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
+    st_uglyf("After: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
+    sM3->scale = params->scale;
+    sM3->shift = params->shift;
+    sM3->var = params->var;
+    if ((sM3->scale != params->scale) || (sM3->shift != params->shift) || (sM3->var != params->var)) {
+        st_errAbort("Problem updating statemachine\n");
+    }
+    stList_destruct(map);
+    return;
 }
 
 static double totalScore(stList *alignedPairs) {
@@ -704,6 +718,11 @@ int main(int argc, char *argv[]) {
         StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams,
                                                         sMtype, template, nHdpT, templateHmmFile);
 
+        // re-estimate the nanoporeAdjustment parameters
+        if (ESTIMATE_PARAMS) {
+            estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_getTemplateOneDAssignments);
+        }
+
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
                                                               pA->start2, R->getTemplateTargetSequence(R),
                                                               p, anchorPairs,
@@ -732,6 +751,10 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "signalAlign - starting complement alignment\n");
         StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
                                                         sMtype, complement, nHdpC, complementHmmFile);
+
+        if (ESTIMATE_PARAMS) {
+            estimateNanoporeParams(sMt, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
+        }
 
         stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
                                                                 npRead->complementEventMap, pA->start2,

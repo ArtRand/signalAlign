@@ -123,7 +123,7 @@ def main(args):
     if len(fast5s) > args.nb_files:
         shuffle(fast5s)
         fast5s = fast5s[:args.nb_files]
-    
+
     for fast5 in fast5s:
         #estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder, bwa_index=bwa_ref_index,
         #                forward_reference_path=plus_strand_sequence, backward_reference_path=minus_strand_sequence,
