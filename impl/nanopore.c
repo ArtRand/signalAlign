@@ -25,6 +25,12 @@ static NanoporeRead *nanopore_NanoporeReadConstruct(int64_t readLength,
     npRead->complementEventMap = st_malloc(npRead->readLength * sizeof(int64_t));
     npRead->complementEvents = st_malloc(npRead->nbComplementEvents * NB_EVENT_PARAMS * sizeof(double));
 
+    npRead->templateModelState = st_malloc(npRead->nbTemplateEvents * sizeof(int64_t));
+    npRead->templatePModel = st_malloc(npRead->nbTemplateEvents * sizeof(double));
+
+    npRead->complementModelState = st_malloc(npRead->nbComplementEvents * sizeof(int64_t));
+    npRead->complementPModel = st_malloc(npRead->nbComplementEvents * sizeof(double));
+
     npRead->scaled = TRUE;
     // return
     return npRead;
@@ -234,6 +240,67 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
+    // line 7 model_state (template)
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    char *modelState;
+    // check
+    if (stList_length(tokens) != (npRead->nbTemplateEvents)) {
+        st_errAbort("Got incorrect number of model states (kmers) got %"PRId64"\n");
+    }
+    for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
+        modelState = (char *)stList_get(tokens, i);
+        npRead->templateModelState[i] = emissions_discrete_getKmerIndexFromPtr(modelState);
+    }
+    free(string);
+    stList_destruct(tokens);
+
+    // line 8 pModel (template)
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check
+    if (stList_length(tokens) != (npRead->nbTemplateEvents)) {
+        st_errAbort("Got incorrect number of model probs got %"PRId64"\n");
+    }
+    for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(npRead->templatePModel[i]));
+        if (j != 1) {
+            st_errAbort("error loading in template model P(model_state)\n");
+        }
+    }
+    free(string);
+    stList_destruct(tokens);
+
+    // line 9 model_state (template)
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check
+    if (stList_length(tokens) != (npRead->nbComplementEvents)) {
+        st_errAbort("Got incorrect number of model states (kmers) got %"PRId64"\n");
+    }
+    for (int64_t i = 0; i < npRead->nbComplementEvents; i++) {
+        modelState = (char *)stList_get(tokens, i);
+        npRead->complementModelState[i] = emissions_discrete_getKmerIndexFromPtr(modelState);
+    }
+    free(string);
+    stList_destruct(tokens);
+
+    // line 8 pModel (template)
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check
+    if (stList_length(tokens) != (npRead->nbComplementEvents)) {
+        st_errAbort("Got incorrect number of model probs got %"PRId64"\n");
+    }
+    for (int64_t i = 0; i < npRead->nbComplementEvents; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(npRead->complementPModel[i]));
+        if (j != 1) {
+            st_errAbort("error loading in template model P(model_state)\n");
+        }
+    }
+    free(string);
+    stList_destruct(tokens);
+
     fclose(fH);
     return npRead;
 }
@@ -278,10 +345,40 @@ stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSeq
         double eventMean = nanopore_getEventMean(eventSequence, eventIndex);
         double eventSd = nanopore_getEventSd(eventSequence, eventIndex);
         double eventDuration = nanopore_getEventDuration(eventSequence, eventIndex);
+        st_uglyf("Event %lld, μ: %f σ: %f d: %f \n", eventIndex, eventMean, eventSd, eventDuration);
         EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDuration, kmerIndex);
         stList_append(mapOfEventsToKmers, t);
     }
     return mapOfEventsToKmers;
+}
+
+static stList *nanopore_makeEventTuplesFromOneDRead(int64_t *kmerIndices, double *events, double *probs,
+                                                    int64_t numberOfEvents, double threshold) {
+    stList *map = stList_construct3(0, &free);
+    for (int64_t i = 0; i < numberOfEvents; i++) {
+        double p = probs[i];
+        if (p < threshold) {
+            continue;
+        } else {
+            int64_t kmerIndex = kmerIndices[i];
+            double eventMean = nanopore_getEventMean(events, i);
+            double eventSd = nanopore_getEventSd(events, i);
+            double eventDuration = nanopore_getEventDuration(events, i);
+            EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDuration, kmerIndex);
+            stList_append(map, t);
+        }
+    }
+    return map;
+}
+
+stList *nanopore_getTemplateOneDAssignments(NanoporeRead *npRead, double threshold) {
+    return nanopore_makeEventTuplesFromOneDRead(npRead->templateModelState, npRead->templateEvents,
+                                                npRead->templatePModel, npRead->nbTemplateEvents, threshold);
+}
+
+stList *nanopore_getComplementOneDAssignments(NanoporeRead *npRead, double threshold) {
+    return nanopore_makeEventTuplesFromOneDRead(npRead->complementModelState, npRead->complementEvents,
+                                                npRead->complementPModel, npRead->nbComplementEvents, threshold);
 }
 
 void nanopore_descaleNanoporeRead(NanoporeRead *npRead) {

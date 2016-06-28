@@ -252,10 +252,13 @@ static void test_eventSequence(CuTest *testCase) {
 }
 
 static void test_loadNanoporeRead(CuTest *testCase) {
-    int64_t length = 1000;
+    int64_t length = 4096;
     char *read = getRandomSequence(length);
     double param = 0.0;
+    double prob = 1.0;
     char *tempFile = stString_print("./tempRead.npread");
+    stList *kmers = path_listPotentialKmers(KMER_LENGTH, strlen(CANONICAL_NUCLEOTIDES), CANONICAL_NUCLEOTIDES);
+
     CuAssertTrue(testCase, !stFile_exists(tempFile));
     FILE *fH = fopen(tempFile, "w");
 
@@ -290,6 +293,34 @@ static void test_loadNanoporeRead(CuTest *testCase) {
     }
     fprintf(fH, "\n");
 
+    // line 7 template model_state
+    char *kmer;
+    for (int64_t i = 0; i < length; i++) {
+        kmer = (char *)stList_get(kmers, i);
+        fprintf(fH, "%s\t", kmer);
+    }
+    fprintf(fH, "\n");
+
+    // line 8 pModel template
+    for (int64_t i = 0; i < length; i++) {
+        fprintf(fH, "%f\t", prob);
+    }
+    fprintf(fH, "\n");
+
+    // line 9 complement model_state
+    *kmer;
+    for (int64_t i = 0; i < length; i++) {
+        kmer = (char *)stList_get(kmers, i);
+        fprintf(fH, "%s\t", kmer);
+    }
+    fprintf(fH, "\n");
+
+    // line 10 pModel complement
+    for (int64_t i = 0; i < length; i++) {
+        fprintf(fH, "%f\t", prob);
+    }
+    fprintf(fH, "\n");
+
     fclose(fH);
 
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile);
@@ -317,8 +348,20 @@ static void test_loadNanoporeRead(CuTest *testCase) {
         CuAssertTrue(testCase, npRead->complementEvents[i] == i);
     }
 
+    for (int64_t i = 0; i < length; i++) {
+        kmer = (char *)stList_get(kmers, i);
+        int64_t index = emissions_discrete_getKmerIndexFromPtr(kmer);
+        CuAssertIntEquals(testCase, index, npRead->templateModelState[i]);
+        CuAssertIntEquals(testCase, index, npRead->complementModelState[i]);
+    }
+    for (int64_t i = 0; i < length; i++) {
+        CuAssertDblEquals(testCase, npRead->templatePModel[i], prob, 0.0);
+        CuAssertDblEquals(testCase, npRead->complementPModel[i], prob, 0.0);
+    }
+
     nanopore_nanoporeReadDestruct(npRead);
     stFile_rmrf(tempFile);
+    stList_destruct(kmers);
     free(read);
     free(tempFile);
 }

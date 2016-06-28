@@ -71,7 +71,7 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
             k_i[k] = *(target + (x_i + k));
         }
 
-        // get the kmer index
+        // get the kmer index // todo could make this the other function
         int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromPtr(pathKmer);
 
         // get the expected event mean amplitude and noise
@@ -261,43 +261,6 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
 
     return alignedPairs;
 }
-
-/*
-void rebasePairwiseAlignmentCoordinates(int64_t *start, int64_t *end, int64_t *strand,
-                                        int64_t coordinateShift, bool flipStrand) {
-    *start += coordinateShift;
-    *end += coordinateShift;
-    if (flipStrand) {
-        *strand = *strand ? 0 : 1;
-        int64_t i = *end;
-        *end = *start;
-        *start = i;
-    }
-}
-
-stList *signalUtils_guideAlignmentToRebasedAnchorPairs(struct PairwiseAlignment *pA, PairwiseAlignmentParameters *p) {
-    // check if we need to flip the reference
-    bool flipStrand1 = !pA->strand1;
-    int64_t refCoordShift = (pA->strand1 ? pA->start1 : pA->end1);
-
-    // rebase the reference alignment to (0), but not the nanopore read, this is corrected when remapping the
-    // anchorPairs
-    signalUtils_rebasePairwiseAlignmentCoordinates(&(pA->start1), &(pA->end1), &(pA->strand1), -refCoordShift, flipStrand1);
-    checkPairwiseAlignment(pA);
-
-    //Convert input alignment into anchor pairs
-    stList *unfilteredAnchorPairs = convertPairwiseForwardStrandAlignmentToAnchorPairs(
-            pA, p->constraintDiagonalTrim);
-
-    // sort
-    stList_sort(unfilteredAnchorPairs, (int (*)(const void *, const void *)) stIntTuple_cmpFn);
-
-    // filter
-    stList *anchorPairs = filterToRemoveOverlap(unfilteredAnchorPairs);
-
-    return anchorPairs;
-}
- */
 
 Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t queryStart, int64_t queryEnd,
                                                  int64_t *eventMap) {

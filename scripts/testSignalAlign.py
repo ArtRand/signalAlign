@@ -64,6 +64,7 @@ class signalAlign_alignment_test(unittest.TestCase):
         ecoli_reference = SIGNALALIGN_ROOT + "tests/test_sequences/E.coli_K12.fasta"
         self.check_alignments(true_alignments=ecoli_true_alignments, reads=ecoli_reads, reference=ecoli_reference)
 
+
 class signalAlign_EM_test(unittest.TestCase):
     def setUp(self):
         os.makedirs("./signalAlign_unittest/")
@@ -79,8 +80,6 @@ class signalAlign_EM_test(unittest.TestCase):
 
         self.assertTrue(result == 0, "error running signalAlign alignments command was {}"
                                      "".format(em_command))
-
-
 
 
 def main():

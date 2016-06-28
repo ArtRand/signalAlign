@@ -20,6 +20,8 @@ struct _referenceSequence {
     bool initialized;
 };
 
+char *signalUtils_stringReverse(char *str);
+
 ReferenceSequence *signalUtils_ReferenceSequenceConstructFull(char *forwardReferencePath, char *backwardReferencePath,
                                                               struct PairwiseAlignment *pA);
 

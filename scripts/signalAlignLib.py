@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Small library for working with MinION data
 """
 from __future__ import print_function, division
@@ -49,6 +48,7 @@ def cull_fast5_files(path_to_files, maximum_files):
 
     return fast5s
 
+
 def get_bwa_index(reference, dest):
     bwa = Bwa(reference)
     bwa.build_index(dest)
@@ -66,73 +66,15 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
 
     # load MinION read
     npRead = NanoporeRead(fast5)
-    if npRead.is_open is False:
-        print("problem opeining file {filename}".format(filename=fast5), file=sys.stderr)
-        npRead.close()
-        return False
-
-    if npRead.get_twoD_event_map() and npRead.get_template_events() and npRead.get_complement_events():
-        # get model params
-        t_model_bool = npRead.get_template_model_adjustments()
-        c_model_bool = npRead.get_complement_model_adjustments()
-        if t_model_bool is False or c_model_bool is False:
-            return False
-
-        # transform events
-        t_transformed = npRead.adjust_events_for_drift(npRead.template_events, npRead.template_drift)
-        c_transformed = npRead.adjust_events_for_drift(npRead.complement_events, npRead.complement_drift)
-
-        # check if that worked
-        if t_transformed is False or c_transformed is False:
-            return False
-
-        # Make the npRead
-
-        # line 1
-        print(len(npRead.alignment_table_sequence), end=' ', file=out_file)  # alignment read length
-        print(len(npRead.template_events), end=' ', file=out_file)           # nb of template events
-        print(len(npRead.complement_events), end=' ', file=out_file)         # nb of complement events
-        print(npRead.template_scale, end=' ', file=out_file)                 # template scale
-        print(npRead.template_shift, end=' ', file=out_file)                 # template shift
-        print(npRead.template_var, end=' ', file=out_file)                   # template var
-        print(npRead.template_scale_sd, end=' ', file=out_file)              # template scale_sd
-        print(npRead.template_var_sd, end=' ', file=out_file)                # template var_sd
-        print(npRead.complement_scale, end=' ', file=out_file)               # complement scale
-        print(npRead.complement_shift, end=' ', file=out_file)               # complement shift
-        print(npRead.complement_var, end=' ', file=out_file)                 # complement var
-        print(npRead.complement_scale_sd, end=' ', file=out_file)            # complement scale_sd
-        print(npRead.complement_var_sd, end='\n', file=out_file)             # complement var_sd
-
-        # line 2
-        print(npRead.alignment_table_sequence, end='\n', file=out_file)
-
-        # line 3
-        for _ in npRead.template_event_map:
-            print(_, end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 4
-        for mean, start, stdev, length in npRead.template_events:
-            print(mean, stdev, length, sep=' ', end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 5 remember to flip the map around because this will be aligned to the reverse complement!
-        for _ in npRead.complement_event_map[::-1]:
-            print(_, end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 6
-        for mean, start, stdev, length in npRead.complement_events:
-            print(mean, stdev, length, sep=' ', end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
+    proceed = npRead.write_npRead(out_file=out_file)
+    if proceed:
         # make the 2d read
         write_fasta(id=fast5, sequence=npRead.alignment_table_sequence, destination=temp_fasta)
 
         # models
         # template model
         if npRead.template_model_id == "template_median68pA.model":
-            print("signalAlign - found default template model", file=sys.stderr)
+            #print("signalAlign - found default template model", file=sys.stderr)
             default_template_model = True
         else:
             print("signalAlign - WARNING: found non-default template model", file=sys.stderr)
@@ -140,10 +82,10 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
 
         # complement model
         if npRead.complement_model_id == "complement_median68pA_pop2.model":
-            print("signalAlign - found default complement model", file=sys.stderr)
+            #print("signalAlign - found default complement model", file=sys.stderr)
             default_complement_model = True
         elif npRead.complement_model_id == "complement_median68pA_pop1.model":
-            print("signalAlign - found pop2 complement model", file=sys.stderr)
+            #print("signalAlign - found pop2 complement model", file=sys.stderr)
             default_complement_model = False
         else:
             print("signalAlign - WARNING: found non-default complement model", file=sys.stderr)
@@ -154,7 +96,7 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
     else:
         npRead.close()
         print("problem making npRead for {fast5}".format(fast5=fast5), file=sys.stderr)
-        return False
+        return False, None, None
 
 
 def parse_substitution_file(substitution_file):
@@ -716,6 +658,99 @@ class NanoporeRead(object):
             return model_name
         else:
             return None
+
+    def write_npRead(self, out_file):
+        if self.is_open is False:
+            print("problem opeining file {filename}".format(filename=self.filename), file=sys.stderr)
+            self.close()
+            return False
+
+        twoD_map_check = self.get_twoD_event_map()
+        template_events_check = self.get_template_events()
+        complement_events_check = self.get_complement_events()
+
+        proceed = False not in [twoD_map_check, template_events_check, complement_events_check]
+
+        if proceed:
+            # get model params
+            t_model_bool = self.get_template_model_adjustments()
+            c_model_bool = self.get_complement_model_adjustments()
+            if t_model_bool is False or c_model_bool is False:
+                return False
+
+            # transform events
+            t_transformed = self.adjust_events_for_drift(self.template_events, self.template_drift)
+            c_transformed = self.adjust_events_for_drift(self.complement_events, self.complement_drift)
+
+            # check if that worked
+            if t_transformed is False or c_transformed is False:
+                return False
+
+            # Make the npRead
+
+            # line 1
+            print(len(self.alignment_table_sequence), end=' ', file=out_file)  # alignment read length
+            print(len(self.template_events), end=' ', file=out_file)           # nb of template events
+            print(len(self.complement_events), end=' ', file=out_file)         # nb of complement events
+            print(self.template_scale, end=' ', file=out_file)                 # template scale
+            print(self.template_shift, end=' ', file=out_file)                 # template shift
+            print(self.template_var, end=' ', file=out_file)                   # template var
+            print(self.template_scale_sd, end=' ', file=out_file)              # template scale_sd
+            print(self.template_var_sd, end=' ', file=out_file)                # template var_sd
+            print(self.complement_scale, end=' ', file=out_file)               # complement scale
+            print(self.complement_shift, end=' ', file=out_file)               # complement shift
+            print(self.complement_var, end=' ', file=out_file)                 # complement var
+            print(self.complement_scale_sd, end=' ', file=out_file)            # complement scale_sd
+            print(self.complement_var_sd, end='\n', file=out_file)             # complement var_sd
+
+            # line 2
+            print(self.alignment_table_sequence, end='\n', file=out_file)
+
+            # line 3
+            for _ in self.template_event_map:
+                print(_, end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            # line 4
+            for mean, start, stdev, length in self.template_events:
+            #for mean, stdev, length in self.template_event_table['mean', 'stdv', 'length']: # todo
+                print(mean, stdev, length, sep=' ', end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            # line 5 remember to flip the map around because this will be aligned to the reverse complement!
+            for _ in self.complement_event_map[::-1]:
+                print(_, end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            # line 6
+            for mean, start, stdev, length in self.complement_events:
+            #for mean, stdev, length in self.complement_event_table['mean', 'stdv', 'length']: # todo
+                print(mean, stdev, length, sep=' ', end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            # line 7 model_state (template)
+            for _ in self.template_event_table['model_state']:
+                print(_, sep=' ', end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            # line 8 p(model) (template)
+            for _ in self.template_event_table['p_model_state']:
+                print(_, sep=' ', end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            # line 9 model_state (complement)
+            for _ in self.complement_event_table['model_state']:
+                print(_, sep=' ', end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            # line 10 p(model) (complement)
+            for _ in self.complement_event_table['p_model_state']:
+                print(_, sep=' ', end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            return True
+        else:
+            return False
 
     def close(self):
         self.fastFive.close()

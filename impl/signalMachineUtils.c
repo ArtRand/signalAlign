@@ -4,7 +4,7 @@
 
 
 // Borrowed from Bob Stout http://stjarnhimlen.se/snippets/strrev.c
-static char *strrev(char *str) {
+char *signalUtils_stringReverse(char *str) {
     char *p1, *p2;
 
     if (! str || ! *str)
@@ -47,9 +47,9 @@ static inline struct PairwiseAlignment *referenceSequence_copyPairwiseAlignment(
 static inline void referenceSequence_setTrimmedSeqeuences(ReferenceSequence *self) {
     self->trimmedForwardSequence = signalUtils_getSubSequence(self->reference, self->A->start1,
                                                               self->A->end1, self->A->strand1);
-    self->trimmedBackwardSequence = strrev(signalUtils_getSubSequence(self->complementOfReference,
-                                                                      self->A->start1, self->A->end1,
-                                                                      self->A->strand1));
+    self->trimmedBackwardSequence = signalUtils_stringReverse(signalUtils_getSubSequence(self->complementOfReference,
+                                                                                         self->A->start1, self->A->end1,
+                                                                                         self->A->strand1));
 
 }
 

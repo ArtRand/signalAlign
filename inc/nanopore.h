@@ -30,6 +30,14 @@ typedef struct _nanoporeRead {
 
     int64_t *complementEventMap;
     double *complementEvents;
+
+    // these are temporary until I come up with something better
+    int64_t *templateModelState;
+    double *templatePModel;
+
+    int64_t *complementModelState;
+    double *complementPModel;
+
     bool scaled;
 } NanoporeRead;
 
@@ -56,6 +64,10 @@ stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *even
 void nanopore_descaleNanoporeRead(NanoporeRead *npRead);
 
 stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSequence, char *nucleotideSequence);
+
+stList *nanopore_getTemplateOneDAssignments(NanoporeRead *npRead, double threshold);
+
+stList *nanopore_getComplementOneDAssignments(NanoporeRead *npRead, double threshold);
 
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead);
 
