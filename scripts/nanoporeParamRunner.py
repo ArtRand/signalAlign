@@ -3,7 +3,8 @@
 from __future__ import print_function
 import sys
 import os
-from signalAlignLib import make_temp_sequence, get_bwa_index, get_npRead_2dseq_and_models, exonerated_bwa
+from random import shuffle
+from signalAlignLib import get_npRead_2dseq_and_models, exonerated_bwa
 from argparse import ArgumentParser
 from serviceCourse.file_handlers import FolderHandler
 
@@ -119,6 +120,10 @@ def main(args):
 
     fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
 
+    if len(fast5s) > args.nb_files:
+        shuffle(fast5s)
+        fast5s = fast5s[:args.nb_files]
+    
     for fast5 in fast5s:
         #estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder, bwa_index=bwa_ref_index,
         #                forward_reference_path=plus_strand_sequence, backward_reference_path=minus_strand_sequence,
