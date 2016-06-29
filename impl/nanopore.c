@@ -345,7 +345,6 @@ stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSeq
         double eventMean = nanopore_getEventMean(eventSequence, eventIndex);
         double eventSd = nanopore_getEventSd(eventSequence, eventIndex);
         double eventDuration = nanopore_getEventDuration(eventSequence, eventIndex);
-        st_uglyf("Event %lld, μ: %f σ: %f d: %f \n", eventIndex, eventMean, eventSd, eventDuration);
         EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDuration, kmerIndex);
         stList_append(mapOfEventsToKmers, t);
     }

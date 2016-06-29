@@ -292,21 +292,21 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
     return eventS;
 }
 
-void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP *nHdp,
+void getSignalExpectations(StateMachine *sM, const char *model, const char *inputHmm, NanoporeHDP *nHdp,
                            Hmm *hmmExpectations, StateMachineType type,
                            NanoporeReadAdjustmentParameters npp, Sequence *eventSequence,
                            int64_t *eventMap, int64_t mapOffset, char *trainingTarget, PairwiseAlignmentParameters *p,
                            stList *unmappedAnchors, Strand strand, DegenerateType degenerate) {
     // load match model, build stateMachine
-    StateMachine *sM = buildStateMachine(model, npp, type, strand, nHdp);
+    //StateMachine *sM = buildStateMachine(model, npp, type, strand, nHdp);
 
     // load HMM
-    if (inputHmm == NULL) {
-        st_errAbort("[signalMachine] ERROR: need to have input HMMs\n");
-    }
+    //if (inputHmm == NULL) {
+    //    st_errAbort("[signalMachine] ERROR: need to have input HMMs\n");
+    //}
 
-    fprintf(stderr, "signalAlign - loading HMM from file, %s\n", inputHmm);
-    loadHmmRoutine(inputHmm, sM, type, hmmExpectations);
+    //fprintf(stderr, "signalAlign - loading HMM from file, %s\n", inputHmm);
+    //loadHmmRoutine(inputHmm, sM, type, hmmExpectations);
 
     // correct sequence length
     int64_t lX = sequence_correctSeqLength(strlen(trainingTarget), event);
@@ -324,7 +324,7 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
 
     getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
                                 diagonalCalculation_Expectations, 1, 1);
-    stateMachine_destruct(sM);
+    //stateMachine_destruct(sM);
 }
 
 int main(int argc, char *argv[]) {
@@ -656,10 +656,21 @@ int main(int argc, char *argv[]) {
                                                                 npRead->complementParams.shift,
                                                                 npRead->complementParams.var);
 
+        if (templateHmmFile == NULL) {
+            st_errAbort("[signalMachine] ERROR: need to have input HMMs\n");
+        }
+
+        StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams,
+                                                        sMtype, template, nHdpT, templateHmmFile);
+
+        if (ESTIMATE_PARAMS) {
+            estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_getTemplateOneDAssignments);
+        }
+
         // get expectations for template
         fprintf(stderr, "signalAlign - getting expectations for template\n");
 
-        getSignalExpectations(templateModelFile, templateHmmFile, nHdpT,
+        getSignalExpectations(sMt, templateModelFile, templateHmmFile, nHdpT,
                               templateExpectations, sMtype, npRead->templateParams,
                               tEventSequence, npRead->templateEventMap, pA->start2,
                               R->getTemplateTargetSequence(R), p,
@@ -677,8 +688,18 @@ int main(int argc, char *argv[]) {
 
         // get expectations for the complement
         fprintf(stderr, "signalAlign - getting expectations for complement\n");
+        if (complementHmmFile == NULL) {
+            st_errAbort("[signalMachine] ERROR: need to have input HMMs\n");
+        }
 
-        getSignalExpectations(complementModelFile, complementHmmFile, nHdpC,
+        StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
+                                                        sMtype, complement, nHdpC, complementHmmFile);
+
+        if (ESTIMATE_PARAMS) {
+            estimateNanoporeParams(sMt, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
+        }
+
+        getSignalExpectations(sMc, complementModelFile, complementHmmFile, nHdpC,
                               complementExpectations, sMtype,
                               npRead->complementParams, cEventSequence, npRead->complementEventMap, pA->start2,
                               R->getComplementTargetSequence(R), p, anchorPairs, complement, degenerate);
@@ -692,6 +713,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "signalAlign - writing expectations to file: %s\n", complementExpectationsFile);
         hmmContinuous_writeToFile(complementExpectationsFile, complementExpectations, sMtype);
 
+        stateMachine_destruct(sMt);
+        stateMachine_destruct(sMc);
         signalUtils_ReferenceSequenceDestruct(R);
         hmmContinuous_destruct(templateExpectations, sMtype);
         hmmContinuous_destruct(complementExpectations, sMtype);
