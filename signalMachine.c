@@ -217,6 +217,7 @@ void estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
                             NanoporeReadAdjustmentParameters *params,
                             stList *(*assignmentFunction)(NanoporeRead *, double)) {
     StateMachine3 *sM3 = (StateMachine3 *)sM;
+
     st_uglyf("Re-estimating parameters\n");
     st_uglyf("Before: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
     stList *map = assignmentFunction(npRead, ASSIGNMENT_THRESHOLD);
@@ -696,7 +697,7 @@ int main(int argc, char *argv[]) {
                                                         sMtype, complement, nHdpC, complementHmmFile);
 
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMt, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
+            estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
         }
 
         getSignalExpectations(sMc, complementModelFile, complementHmmFile, nHdpC,
@@ -776,7 +777,7 @@ int main(int argc, char *argv[]) {
                                                         sMtype, complement, nHdpC, complementHmmFile);
 
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMt, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
+            estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
         }
 
         stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,

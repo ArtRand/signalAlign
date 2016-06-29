@@ -89,7 +89,7 @@ def main():
     #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
     testSuite.addTest(signalAlign_EM_test('test_EM'))
 
-    testRunner = unittest.TextTestRunner(verbosity=2)
+    testRunner = unittest.TextTestRunner(verbosity=1)
     testRunner.run(testSuite)
 
 if __name__ == '__main__':

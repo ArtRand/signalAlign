@@ -110,6 +110,7 @@ def count_lines_in_build_alignment(build_alignment_path):
         count += 1
     return count
 
+
 def get_initial_hdp_args(args, hdp_type):
     # if we're making a HDP with fixed concentration parameters
     if hdp_type in [0, 2, 4, 6, 8]:
