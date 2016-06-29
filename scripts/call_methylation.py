@@ -77,7 +77,6 @@ def main(args):
         call_methyl_args = {
             "sequence": reference_sequence,
             "alignment_file": aln,
-            "forward": forward_bool,
             "out_file": out_file,
             "positions": positions,
             "degenerate_type": degenerate_enum(args.degenerate),
