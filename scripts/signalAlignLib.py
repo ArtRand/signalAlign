@@ -74,22 +74,19 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
         # models
         # template model
         if npRead.template_model_id == "template_median68pA.model":
-            #print("signalAlign - found default template model", file=sys.stderr)
-            default_template_model = True
+            default_template_model = "template_median68pA.model"
         else:
             print("signalAlign - WARNING: found non-default template model", file=sys.stderr)
-            default_template_model = False
+            default_template_model = None
 
         # complement model
         if npRead.complement_model_id == "complement_median68pA_pop2.model":
-            #print("signalAlign - found default complement model", file=sys.stderr)
-            default_complement_model = True
+            default_complement_model = "complement_median68pA_pop2.model"
         elif npRead.complement_model_id == "complement_median68pA_pop1.model":
-            #print("signalAlign - found pop2 complement model", file=sys.stderr)
-            default_complement_model = False
+            default_complement_model = "complement_median68pA_pop1.model"
         else:
             print("signalAlign - WARNING: found non-default complement model", file=sys.stderr)
-            default_complement_model = False
+            default_complement_model = None
 
         npRead.close()
         return True, default_template_model, default_complement_model
@@ -335,25 +332,48 @@ class NanoporeRead(object):
                 self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
                 self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
 
+        supported_versions = ["1.15.0", "1.19.0", "1.22.2"]
+        self.version = self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"]
+
+        if self.version not in supported_versions:
+            print("Unsupported Version (1.15.0 and 1.19.0 supported)", file=sys.stdout)
+            return False
+
         # initialize version-specific paths
-        if self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"] == "1.15.0":
+        if self.version == "1.15.0":
             self.template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
             self.template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
             self.template_model_id = self.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_template")
+            self.template_read = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Fastq"][()].split()[2]
 
             self.complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
             self.complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
             self.complement_model_id = self.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_complement")
+            self.complement_read = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Fastq"][()].split()[2]
             return True
 
-        elif self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"] == '1.19.0':
+        elif self.version == "1.19.0":
             self.template_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_template/Events'
             self.template_model_address = "/Analyses/Basecall_1D_000/BaseCalled_template/Model"
             self.template_model_id = self.get_model_id("/Analyses/Basecall_1D_000/Summary/basecall_1d_template")
+            self.template_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_template/Fastq"][()].split()[2]
 
             self.complement_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_complement/Events'
             self.complement_model_address = "/Analyses/Basecall_1D_000/BaseCalled_complement/Model"
             self.complement_model_id = self.get_model_id("/Analyses/Basecall_1D_000/Summary/basecall_1d_complement")
+            self.complement_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_complement/Fastq"][()].split()[2]
+            return True
+
+        elif self.version == "1.22.2":
+            self.template_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_template/Events'
+            self.template_model_address = ""
+            self.template_model_id = None
+            self.template_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_template/Fastq"][()].split()[2]
+
+            self.complement_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_complement/Events'
+            self.complement_model_address = ""
+            self.complement_model_id = None
+            self.complement_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_complement/Fastq"][()].split()[2]
             return True
         else:
             print("Unsupported Version (1.15.0 and 1.19.0 supported)", file=sys.stdout)
@@ -408,8 +428,8 @@ class NanoporeRead(object):
             event_map = [0]
             previous_prob = 0
             for i, line in islice(enumerate(events), 1, None):
-                move = line[6]
-                this_prob = line[8]
+                move = line['move']
+                this_prob = line['p_model_state']
                 if move == 1:
                     event_map.append(i)
                 if move > 1:
@@ -421,12 +441,14 @@ class NanoporeRead(object):
                         event_map[-1] = i
                 previous_prob = this_prob
             final_event_index = [event_map[-1]]
-            padding = final_event_index * 5 # make this a kmer-measured thing
+            padding = final_event_index * (self.kmer_length - 1) #5 # make this a kmer-measured thing
             event_map = event_map + padding
             return event_map
-        self.template_strand_event_map = make_map(self.template_event_table)
-        self.complement_strand_event_map = make_map(self.complement_event_table)
-        return
+        self.template_strand_event_map = make_map(self.template_events)
+        self.complement_strand_event_map = make_map(self.complement_events)
+        assert len(self.template_strand_event_map) == len(self.template_read)
+        assert len(self.complement_strand_event_map) == len(self.complement_read)
+        return True
 
     def get_twoD_event_map(self):
         """Maps the kmers in the alignment table sequence read to events in the template and complement strand reads
@@ -443,6 +465,7 @@ class NanoporeRead(object):
             return False
 
         if not self.has2D_alignment_table:
+            print("{file} doesn't have 2D alignment table".format(self.filename))
             return False
 
         self.assemble_2d_sequence_from_table()
@@ -524,7 +547,7 @@ class NanoporeRead(object):
     def adjust_events_for_drift(self, events, drift):
         """Adjust event means by drift
         """
-        if (events == None or drift == None):
+        if events is None or drift is None:
             return False
 
         # transform events by time
@@ -541,10 +564,11 @@ class NanoporeRead(object):
 
     def get_template_events(self):
         if self.template_event_table_address in self.fastFive:
-            self.template_event_table = self.fastFive[self.template_event_table_address]
+            #self.template_event_table = self.fastFive[self.template_event_table_address]
             # maybe move to transform function
-            self.template_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
-                                    for e in self.template_event_table]
+            #self.template_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
+            #                        for e in self.template_event_table]
+            self.template_events = self.fastFive[self.template_event_table_address]
             return True
 
         if self.template_event_table_address not in self.fastFive:
@@ -552,10 +576,10 @@ class NanoporeRead(object):
 
     def get_complement_events(self):
         if self.complement_event_table_address in self.fastFive:
-            #self.has_complement_events = True
-            self.complement_event_table = self.fastFive[self.complement_event_table_address]
-            self.complement_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
-                                      for e in self.complement_event_table]
+            #self.complement_event_table = self.fastFive[self.complement_event_table_address]
+            #self.complement_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
+            #                          for e in self.complement_event_table]
+            self.complement_events = self.fastFive[self.complement_event_table_address]
             return True
 
         if self.complement_event_table_address not in self.fastFive:
@@ -570,11 +594,16 @@ class NanoporeRead(object):
             self.template_var = self.fastFive[self.template_model_address].attrs["var"]
             self.template_scale_sd = self.fastFive[self.template_model_address].attrs["scale_sd"]
             self.template_var_sd = self.fastFive[self.template_model_address].attrs["var_sd"]
-            return True
 
         if self.template_model_address not in self.fastFive:
             self.has_template_model = False
-            return False
+            self.template_scale = 1
+            self.template_shift = 1
+            self.template_drift = 1
+            self.template_var = 1
+            self.template_scale_sd = 1
+            self.template_var_sd = 1
+        return
 
     def get_complement_model_adjustments(self):
         if self.complement_model_address in self.fastFive:
@@ -585,10 +614,16 @@ class NanoporeRead(object):
             self.complement_var = self.fastFive[self.complement_model_address].attrs["var"]
             self.complement_scale_sd = self.fastFive[self.complement_model_address].attrs["scale_sd"]
             self.complement_var_sd = self.fastFive[self.complement_model_address].attrs["var_sd"]
-            return True
+
         if self.complement_model_address not in self.fastFive:
             self.has_complement_model = False
-            return False
+            self.complement_scale = 0
+            self.complement_shift = 0
+            self.complement_drift = 0
+            self.complement_var = 0
+            self.complement_scale_sd = 0
+            self.complement_var_sd = 0
+        return
 
     @staticmethod
     def calculate_lambda(noise_mean, noise_stdev):
@@ -668,88 +703,104 @@ class NanoporeRead(object):
         twoD_map_check = self.get_twoD_event_map()
         template_events_check = self.get_template_events()
         complement_events_check = self.get_complement_events()
+        oneD_event_map_check = self.init_1d_event_maps()
 
-        proceed = False not in [twoD_map_check, template_events_check, complement_events_check]
+        proceed = False not in [twoD_map_check, template_events_check, complement_events_check, oneD_event_map_check]
 
         if proceed:
             # get model params
-            t_model_bool = self.get_template_model_adjustments()
-            c_model_bool = self.get_complement_model_adjustments()
-            if t_model_bool is False or c_model_bool is False:
-                return False
+            self.get_template_model_adjustments()
+            self.get_complement_model_adjustments()
 
             # transform events
-            t_transformed = self.adjust_events_for_drift(self.template_events, self.template_drift)
-            c_transformed = self.adjust_events_for_drift(self.complement_events, self.complement_drift)
-
-            # check if that worked
-            if t_transformed is False or c_transformed is False:
-                return False
+            if self.version in ["1.15.0", "1.19.0"]:
+                t_transformed = self.adjust_events_for_drift(self.template_events, self.template_drift)
+                c_transformed = self.adjust_events_for_drift(self.complement_events, self.complement_drift)
+                # check if that worked
+                if t_transformed is False or c_transformed is False:
+                    return False
 
             # Make the npRead
 
-            # line 1
-            print(len(self.alignment_table_sequence), end=' ', file=out_file)  # alignment read length
-            print(len(self.template_events), end=' ', file=out_file)           # nb of template events
-            print(len(self.complement_events), end=' ', file=out_file)         # nb of complement events
-            print(self.template_scale, end=' ', file=out_file)                 # template scale
-            print(self.template_shift, end=' ', file=out_file)                 # template shift
-            print(self.template_var, end=' ', file=out_file)                   # template var
-            print(self.template_scale_sd, end=' ', file=out_file)              # template scale_sd
-            print(self.template_var_sd, end=' ', file=out_file)                # template var_sd
-            print(self.complement_scale, end=' ', file=out_file)               # complement scale
-            print(self.complement_shift, end=' ', file=out_file)               # complement shift
-            print(self.complement_var, end=' ', file=out_file)                 # complement var
-            print(self.complement_scale_sd, end=' ', file=out_file)            # complement scale_sd
-            print(self.complement_var_sd, end='\n', file=out_file)             # complement var_sd
+            # line 1 parameters
+            print(len(self.alignment_table_sequence), end=' ', file=out_file)  # 0alignment read length
+            print(len(self.template_events), end=' ', file=out_file)           # 1nb of template events
+            print(len(self.complement_events), end=' ', file=out_file)         # 2nb of complement events
+            print(len(self.template_read), end=' ', file=out_file)             # 3length of template read
+            print(len(self.complement_read), end=' ', file=out_file)           # 4length of template read
+            print(self.template_scale, end=' ', file=out_file)                 # 5template scale
+            print(self.template_shift, end=' ', file=out_file)                 # 67template shift
+            print(self.template_var, end=' ', file=out_file)                   # 7template var
+            print(self.template_scale_sd, end=' ', file=out_file)              # 8template scale_sd
+            print(self.template_var_sd, end=' ', file=out_file)                # 9template var_sd
+            print(self.complement_scale, end=' ', file=out_file)               # 0complement scale
+            print(self.complement_shift, end=' ', file=out_file)               # 1complement shift
+            print(self.complement_var, end=' ', file=out_file)                 # 2complement var
+            print(self.complement_scale_sd, end=' ', file=out_file)            # 3complement scale_sd
+            print(self.complement_var_sd, end='\n', file=out_file)             # 4complement var_sd
 
-            # line 2
+            # line 2 alignment table sequence
             print(self.alignment_table_sequence, end='\n', file=out_file)
 
-            # line 3
+            # line 3 template read
+            print(self.template_read, end='\n', file=out_file)
+
+            # line 4 tempalte strand map
+            for _ in self.template_strand_event_map:
+                print(_, end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            # line 5 complement read
+            print(self.complement_read, end='\n', file=out_file)
+
+            # line 6 complement strand map
+            for _ in self.complement_strand_event_map:
+                print(_, end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+
+            # line 7 template 2D event map
             for _ in self.template_event_map:
                 print(_, end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
-            # line 4
-            for mean, start, stdev, length in self.template_events:
-            #for mean, stdev, length in self.template_event_table['mean', 'stdv', 'length']: # todo
+            # line 8 template events
+            for mean, stdev, length in self.template_events['mean', 'stdv', 'length']:
                 print(mean, stdev, length, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
-            # line 5 remember to flip the map around because this will be aligned to the reverse complement!
+            # line 9 complement 2D event map
             for _ in self.complement_event_map[::-1]:
                 print(_, end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
-            # line 6
-            for mean, start, stdev, length in self.complement_events:
-            #for mean, stdev, length in self.complement_event_table['mean', 'stdv', 'length']: # todo
+            # line 10 complement events
+            for mean, stdev, length in self.complement_events['mean', 'stdv', 'length']:
                 print(mean, stdev, length, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
-            # line 7 model_state (template)
-            for _ in self.template_event_table['model_state']:
+            # line 11 model_state (template)
+            for _ in self.template_events['model_state']:
                 print(_, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
-            # line 8 p(model) (template)
-            for _ in self.template_event_table['p_model_state']:
+            # line 12 p(model) (template)
+            for _ in self.template_events['p_model_state']:
                 print(_, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
-            # line 9 model_state (complement)
-            for _ in self.complement_event_table['model_state']:
+            # line 13 model_state (complement)
+            for _ in self.complement_events['model_state']:
                 print(_, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
-            # line 10 p(model) (complement)
-            for _ in self.complement_event_table['p_model_state']:
+            # line 14 p(model) (complement)
+            for _ in self.complement_events['p_model_state']:
                 print(_, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
             return True
         else:
+            print("write_npRead: Procede was False", file=sys.stderr)
             return False
 
     def close(self):
@@ -869,19 +920,28 @@ class SignalAlignment(object):
         # flags
 
         # input (match) models
-        template_lookup_table = "../models/testModel_template.model"
-        complement_lookup_table = "../models/testModel_complement.model" if def_complement_model else \
+        r7_template_lookup_table = "../models/testModel_template.model"
+        r7_complement_lookup_table = "../models/testModel_complement.model" if def_complement_model else \
             "../models/testModel_complement_pop1.model"
 
-        assert (os.path.exists(template_lookup_table)), \
-            "Didn't find default template look-up table"
-        template_model_flag = "-T {t_model} ".format(t_model="../../signalAlign/models/testModel_template.model")
+        r9_template_lookup_table = "../models/testModelR9_template.model"
+        #r9_complement_lookup_table = "../models/testModelR9_complement_pop2.model"
+        r9_complement_lookup_table = "../models/testModelR9_complement.model"
+        #r9_complement_lookup_table = "../models/testModelR9_template.model"
 
-        assert (os.path.exists(complement_lookup_table)), \
-            "Didn't find 'pop1' complement look-up table"
+        if def_template_model is not None:
+            assert (os.path.exists(r7_template_lookup_table)), "Didn't find default template look-up table"
+            template_model_flag = "-T {t_model} ".format(t_model=r7_template_lookup_table)
+        else:
+            assert(os.path.exists(r9_template_lookup_table)), "Didn't find R9 look-up table"
+            template_model_flag = "-T {t_model} ".format(t_model=r9_template_lookup_table)
 
-        complement_model_flag = "-C {c_model} " \
-                                "".format(c_model=complement_lookup_table)
+        if def_complement_model is not None:
+            assert (os.path.exists(r7_complement_lookup_table)), "Didn't find complement look-up table"
+            complement_model_flag = "-C {c_model} ".format(c_model=r7_complement_lookup_table)
+        else:
+            assert(os.path.exists(r9_complement_lookup_table)), "Didn't find R9 complement look-up table"
+            complement_model_flag = "-C {c_model} ".format(c_model=r9_complement_lookup_table)
 
         # reference sequences
         if self.forward_reference is not None or self.backward_reference is not None:
@@ -981,7 +1041,7 @@ class SignalAlignment(object):
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
-        temp_folder.remove_folder()
+        #temp_folder.remove_folder()
         return True
 
 

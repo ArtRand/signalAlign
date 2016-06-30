@@ -18,17 +18,23 @@ typedef struct _nanoporeReadAdjustmentParameters {
 
 typedef struct _nanoporeRead {
     int64_t readLength; // 2D read length in nucleotides
+    int64_t templateReadLength;
+    int64_t complementReadLength;
     int64_t nbTemplateEvents; // number of events in the array
     int64_t nbComplementEvents; // same
     NanoporeReadAdjustmentParameters templateParams;
     NanoporeReadAdjustmentParameters complementParams;
 
     char *twoDread; // dread indeed
+    char *templateRead;
+    char *complementRead;
 
     int64_t *templateEventMap;
+    int64_t *templateStrandEventMap;
     double *templateEvents; // mean, stdev, length
 
     int64_t *complementEventMap;
+    int64_t *complementStrandEventMap;
     double *complementEvents;
 
     // these are temporary until I come up with something better
@@ -68,6 +74,13 @@ stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSeq
 stList *nanopore_getTemplateOneDAssignments(NanoporeRead *npRead, double threshold);
 
 stList *nanopore_getComplementOneDAssignments(NanoporeRead *npRead, double threshold);
+
+stList *nanopore_getOneDAssignmentsFromRead(int64_t *strandEventMap, double *events, char *strandRead,
+                                            int64_t readLength);
+
+stList *nanopore_complementOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore);
+
+stList *nanopore_templateOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore);
 
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead);
 

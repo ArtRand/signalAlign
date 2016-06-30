@@ -7,22 +7,30 @@
 
 static NanoporeRead *nanopore_NanoporeReadConstruct(int64_t readLength,
                                                     int64_t nbTemplateEvents,
-                                                    int64_t nbComplementEvents) {
+                                                    int64_t nbComplementEvents,
+                                                    int64_t templateReadLength,
+                                                    int64_t complementReadLength) {
     NanoporeRead *npRead = st_malloc(sizeof(NanoporeRead));
 
     npRead->readLength = readLength;
     npRead->nbTemplateEvents = nbTemplateEvents;
     npRead->nbComplementEvents = nbComplementEvents;
+    npRead->templateReadLength = templateReadLength;
+    npRead->complementReadLength = complementReadLength;
 
     npRead->twoDread = st_malloc((npRead->readLength + 1) * sizeof(char));
+    npRead->templateRead = st_malloc((npRead->templateReadLength + 1) * sizeof(char));
+    npRead->complementRead= st_malloc((npRead->complementReadLength+ 1) * sizeof(char));
 
     // the map contains the index of the event corresponding to each kmer in the read sequence so
     // the length of the map has to be the same as the read sequence, not the number of events
     // there can be events that aren't mapped to a kmer
     npRead->templateEventMap = st_malloc(npRead->readLength * sizeof(int64_t));
+    npRead->templateStrandEventMap = st_malloc(npRead->templateReadLength * sizeof(int64_t));
     npRead->templateEvents = st_malloc(npRead->nbTemplateEvents * NB_EVENT_PARAMS * sizeof(double));
 
     npRead->complementEventMap = st_malloc(npRead->readLength * sizeof(int64_t));
+    npRead->complementStrandEventMap = st_malloc(npRead->complementReadLength * sizeof(int64_t));
     npRead->complementEvents = st_malloc(npRead->nbComplementEvents * NB_EVENT_PARAMS * sizeof(double));
 
     npRead->templateModelState = st_malloc(npRead->nbTemplateEvents * sizeof(int64_t));
@@ -84,10 +92,11 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     //        [complement scale] [complement shift] [complement var] [complement scale_sd] [complement var_sd] \n
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
-    int64_t npRead_readLength, npRead_nbTemplateEvents, npRead_nbComplementEvents;
+    int64_t npRead_readLength, npRead_nbTemplateEvents, npRead_nbComplementEvents,
+            templateReadLength, complementReadLength;
 
-    if (stList_length(tokens) != 13) {
-        st_errAbort("nanopore_loadNanoporeReadFromFile: incorrect line 1 for file %s got %"PRId64"tokens should get 12",
+    if (stList_length(tokens) != 15) {
+        st_errAbort("nanopore_loadNanoporeReadFromFile: incorrect line 1 for file %s got %"PRId64"tokens should get 16",
                     nanoporeReadFile, stList_length(tokens));
 
     }
@@ -104,49 +113,61 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     if (j != 1) {
         st_errAbort("error parsing nanopore complement event lengths\n");
     }
+    j = sscanf(stList_get(tokens, 3), "%"SCNd64, &templateReadLength);
+    if (j != 1) {
+        st_errAbort("error parsing nanopore template read length\n");
+    }
+    j = sscanf(stList_get(tokens, 4), "%"SCNd64, &complementReadLength);
+    if (j != 1) {
+        st_errAbort("error parsing nanopore complement read length\n");
+    }
+
     NanoporeRead *npRead = nanopore_NanoporeReadConstruct(npRead_readLength,
                                                           npRead_nbTemplateEvents,
-                                                          npRead_nbComplementEvents);
+                                                          npRead_nbComplementEvents,
+                                                          templateReadLength,
+                                                          complementReadLength);
+
     // template params
-    j = sscanf(stList_get(tokens, 3), "%lf", &(npRead->templateParams.scale));
+    j = sscanf(stList_get(tokens, 5), "%lf", &(npRead->templateParams.scale));
     if (j != 1) {
         st_errAbort("error parsing nanopore template scale\n");
     }
-    j = sscanf(stList_get(tokens, 4), "%lf", &(npRead->templateParams.shift));
+    j = sscanf(stList_get(tokens, 6), "%lf", &(npRead->templateParams.shift));
     if (j != 1) {
         st_errAbort("error parsing nanopore template shift\n");
     }
-    j = sscanf(stList_get(tokens, 5), "%lf", &(npRead->templateParams.var));
+    j = sscanf(stList_get(tokens, 7), "%lf", &(npRead->templateParams.var));
     if (j != 1) {
         st_errAbort("error parsing nanopore template var\n");
     }
-    j = sscanf(stList_get(tokens, 6), "%lf", &(npRead->templateParams.scale_sd));
+    j = sscanf(stList_get(tokens, 8), "%lf", &(npRead->templateParams.scale_sd));
     if (j != 1) {
         st_errAbort("error parsing nanopore template scale_sd\n");
     }
-    j = sscanf(stList_get(tokens, 7), "%lf", &(npRead->templateParams.var_sd));
+    j = sscanf(stList_get(tokens, 9), "%lf", &(npRead->templateParams.var_sd));
     if (j != 1) {
         st_errAbort("error parsing nanopore template var_sd\n");
     }
 
     // complement params
-    j = sscanf(stList_get(tokens, 8), "%lf", &(npRead->complementParams.scale));
+    j = sscanf(stList_get(tokens, 10), "%lf", &(npRead->complementParams.scale));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement scale\n");
     }
-    j = sscanf(stList_get(tokens, 9), "%lf", &(npRead->complementParams.shift));
+    j = sscanf(stList_get(tokens, 11), "%lf", &(npRead->complementParams.shift));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement shift\n");
     }
-    j = sscanf(stList_get(tokens, 10), "%lf", &(npRead->complementParams.var));
+    j = sscanf(stList_get(tokens, 12), "%lf", &(npRead->complementParams.var));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement var\n");
     }
-    j = sscanf(stList_get(tokens, 11), "%lf", &(npRead->complementParams.scale_sd));
+    j = sscanf(stList_get(tokens, 13), "%lf", &(npRead->complementParams.scale_sd));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement scale_sd\n");
     }
-    j = sscanf(stList_get(tokens, 12), "%lf", &(npRead->complementParams.var_sd));
+    j = sscanf(stList_get(tokens, 14), "%lf", &(npRead->complementParams.var_sd));
     if (j != 1) {
         st_errAbort("error parsing nanopore template var_sd\n");
     }
@@ -164,7 +185,63 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     npRead->twoDread[npRead->readLength] = '\0';
     free(string);
 
-    // line 3 [template event map] \n
+    // line 3 [template read] \n
+    string = stFile_getLineFromFile(fH);
+    j = sscanf(string, "%s", npRead->templateRead);
+    if (j != 1) {
+        st_errAbort("error parsing template read from npRead file\n");
+    }
+    npRead->templateRead[npRead->templateReadLength] = '\0';
+    free(string);
+
+    // line 4 [template strand event map] \n
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check for correctness
+    if (stList_length(tokens) != npRead->templateReadLength) {
+        st_errAbort(
+                "template event map is not the correct length, should be %"PRId64", got %"PRId64"",
+                npRead->templateReadLength,
+                stList_length(tokens));
+    }
+    for (int64_t i = 0; i < npRead->templateReadLength; i++) {
+        j = sscanf(stList_get(tokens, i), "%"SCNd64, &(npRead->templateStrandEventMap[i]));
+        if (j != 1) {
+            st_errAbort("error loading in template eventMap\n");
+        }
+    }
+    free(string);
+    stList_destruct(tokens);
+
+    // line 5 [complement read] \n
+    string = stFile_getLineFromFile(fH);
+    j = sscanf(string, "%s", npRead->complementRead);
+    if (j != 1) {
+        st_errAbort("error parsing template read from npRead file\n");
+    }
+    npRead->complementRead[npRead->complementReadLength] = '\0';
+    free(string);
+
+    // line 6 [complement strand event map] \n
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check for correctness
+    if (stList_length(tokens) != npRead->complementReadLength) {
+        st_errAbort(
+                "template event map is not the correct length, should be %"PRId64", got %"PRId64"",
+                npRead->complementReadLength,
+                stList_length(tokens));
+    }
+    for (int64_t i = 0; i < npRead->complementReadLength; i++) {
+        j = sscanf(stList_get(tokens, i), "%"SCNd64, &(npRead->complementStrandEventMap[i]));
+        if (j != 1) {
+            st_errAbort("error loading in template eventMap\n");
+        }
+    }
+    free(string);
+    stList_destruct(tokens);
+
+    // line 7 [template 2D event map] \n
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check for correctness
@@ -183,7 +260,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
-    // line 4 [template events (mean, stddev, length)] \n
+    // line 8 [template events (mean, stddev, length)] \n
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check
@@ -202,7 +279,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
-    // line 5 [complement event map] \n
+    // line 9 [complement 2D event map] \n
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check for correctness
@@ -221,7 +298,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
-    // line 6 [complement events (mean, stddev, length)] \n
+    // line 10 [complement events (mean, stddev, length)] \n
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check
@@ -240,7 +317,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
-    // line 7 model_state (template)
+    // line 11 model_state (template)
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     char *modelState;
@@ -255,7 +332,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
-    // line 8 pModel (template)
+    // line 12 pModel (template)
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check
@@ -271,7 +348,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
-    // line 9 model_state (template)
+    // line 13 model_state (complement)
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check
@@ -285,7 +362,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
-    // line 8 pModel (template)
+    // line 14 pModel (complement)
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check
@@ -378,6 +455,40 @@ stList *nanopore_getTemplateOneDAssignments(NanoporeRead *npRead, double thresho
 stList *nanopore_getComplementOneDAssignments(NanoporeRead *npRead, double threshold) {
     return nanopore_makeEventTuplesFromOneDRead(npRead->complementModelState, npRead->complementEvents,
                                                 npRead->complementPModel, npRead->nbComplementEvents, threshold);
+}
+
+stList *nanopore_getOneDAssignmentsFromRead(int64_t *strandEventMap, double *events, char *strandRead,
+                                            int64_t readLength) {
+    stList *map = stList_construct3(0, &free);
+    int64_t rows = sequence_correctSeqLength(readLength, kmer);
+    int64_t pE = INT64_MIN;
+    for (int64_t i = 0; i < rows; i++) {
+        int64_t eventIndex = strandEventMap[i];
+        int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(strandRead + i);
+        double eventMean = nanopore_getEventMean(events, eventIndex);
+        double eventSd = nanopore_getEventSd(events, eventIndex);
+        double eventDuration = nanopore_getEventDuration(events, eventIndex);
+        if (eventIndex > pE) {
+            //st_uglyf("seqIndex: %lld eventIndex: %lld mean: %f sd: %f dur: %f kmerIndex: %lld\n",
+            //         i, eventIndex, eventMean, eventSd, eventDuration, kmerIndex);
+            EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDuration, kmerIndex);
+            stList_append(map, t);
+            pE = eventIndex;
+        }
+    }
+    return map;
+}
+
+stList *nanopore_templateOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore) {
+    (void) ignore;
+    return nanopore_getOneDAssignmentsFromRead(npRead->templateStrandEventMap, npRead->templateEvents,
+                                               npRead->templateRead, npRead->templateReadLength);
+}
+
+stList *nanopore_complementOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore) {
+    (void) ignore;
+    return nanopore_getOneDAssignmentsFromRead(npRead->complementStrandEventMap, npRead->complementEvents,
+                                               npRead->complementRead, npRead->complementReadLength);
 }
 
 void nanopore_descaleNanoporeRead(NanoporeRead *npRead) {
@@ -478,6 +589,7 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
         st_errAbort("Cannot get scale params with no assignments\n");
     }
     if (drift_out) {
+        st_errAbort("Drift not implemented yet\n");
         XWX = (double*) calloc(9, sizeof(double));
         XWy = (double*) calloc(3, sizeof(double));
 

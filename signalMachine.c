@@ -221,6 +221,7 @@ void estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
     st_uglyf("Re-estimating parameters\n");
     st_uglyf("Before: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
     stList *map = assignmentFunction(npRead, ASSIGNMENT_THRESHOLD);
+    st_uglyf("Map is %lld long\n", stList_length(map));
     nanopore_compute_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
     st_uglyf("After: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
     sM3->scale = params->scale;
@@ -744,7 +745,8 @@ int main(int argc, char *argv[]) {
 
         // re-estimate the nanoporeAdjustment parameters
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_getTemplateOneDAssignments);
+            //estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_getTemplateOneDAssignments);
+            estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_templateOneDAssignmentsFromRead);
         }
 
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
@@ -777,7 +779,8 @@ int main(int argc, char *argv[]) {
                                                         sMtype, complement, nHdpC, complementHmmFile);
 
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
+            //estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
+            estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_complementOneDAssignmentsFromRead);
         }
 
         stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,

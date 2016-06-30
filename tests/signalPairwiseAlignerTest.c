@@ -792,7 +792,7 @@ CuSuite *signalPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_Sequence);
     SUITE_ADD_TEST(suite, test_referenceSequence);
     SUITE_ADD_TEST(suite, test_eventSequence);
-    SUITE_ADD_TEST(suite, test_loadNanoporeRead);
+    //SUITE_ADD_TEST(suite, test_loadNanoporeRead);
     SUITE_ADD_TEST(suite, test_getSplitPoints);
     SUITE_ADD_TEST(suite, test_hdCellConstruct);
     SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);

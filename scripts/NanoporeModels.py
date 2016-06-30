@@ -35,18 +35,18 @@ class NanoporeModel(object):
             for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
                 lam = calculate_lambda(sd_mean, sd_stdev)
                 print(level_mean, level_stdev, sd_mean, sd_stdev, lam, end=' ', file=out_file)
+            print("", end="\n", file=out_file)
+            # line 2
+            for _ in self.skip_prob_bins:
+                print(_, end=' ', file=out_file)
                 print("", end="\n", file=out_file)
-                # line 2
-                for _ in self.skip_prob_bins:
-                    print(_, end=' ', file=out_file)
-                    print("", end="\n", file=out_file)
-                    # line 3
-                    print("0", end=' ', file=out_file) # placeholder for correlation parameter
-                    for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
-                        lam = calculate_lambda(sd_mean, sd_stdev)
-                        print(level_mean, (level_stdev*1.75), sd_mean, sd_stdev, lam, end=' ', file=out_file)
-                        print("", end="\n", file=out_file)
-                        return
+            # line 3
+            print("0", end=' ', file=out_file) # placeholder for correlation parameter
+            for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
+                lam = calculate_lambda(sd_mean, sd_stdev)
+                print(level_mean, (level_stdev*1.75), sd_mean, sd_stdev, lam, end=' ', file=out_file)
+                print("", end="\n", file=out_file)
+        return
 
     def get_model_dict(self):
         # check

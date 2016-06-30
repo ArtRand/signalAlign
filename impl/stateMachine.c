@@ -1099,6 +1099,7 @@ void stateMachine3_setTransitionsToNucleotideDefaults(StateMachine *sM) {
     sM3->TRANSITION_GAP_SWITCH_TO_Y = -4.910694825551255; //0.0073673675173412815f;
 }
 
+/*
 void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
     StateMachine3 *sM3 = (StateMachine3 *) sM;
     sM3->TRANSITION_MATCH_CONTINUE = -0.23552123624314988; // log(step_prob) (0.79015888282447311)
@@ -1108,6 +1109,20 @@ void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
     sM3->TRANSITION_GAP_OPEN_Y = -4.3187242127300092; // log(1 - (skip_prob + step_prob)) (0.013316862192829682)
     sM3->TRANSITION_GAP_EXTEND_X = -1.6269694202638481; // log(skip_prob) (0.19652425498269727)
     sM3->TRANSITION_GAP_EXTEND_Y = -4.3187242127239411; // log(stay_prob) 0.013316862192910478
+    sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
+    sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
+}
+ */
+// Temp change for r9 experiment
+void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
+    StateMachine3 *sM3 = (StateMachine3 *) sM;
+    sM3->TRANSITION_MATCH_CONTINUE = -0.43078291609245423; // log(step_prob) (0.65)
+    sM3->TRANSITION_MATCH_FROM_GAP_X = -0.41551544396166595; // log(1 - skip_prob) (1 - 0.34)
+    sM3->TRANSITION_MATCH_FROM_GAP_Y = -0.010050335853501451; // log(1 - stay_prob) (1 - 0.01)
+    sM3->TRANSITION_GAP_OPEN_X = -1.0788096613719298; // log(skip_prob) (0.34)
+    sM3->TRANSITION_GAP_OPEN_Y = -4.6051701859880909; // log(1 - (skip_prob + step_prob)) (1 - (0.34 + 0.65))
+    sM3->TRANSITION_GAP_EXTEND_X = -1.0788096613719298; // log(skip_prob) (0.34)
+    sM3->TRANSITION_GAP_EXTEND_Y = -4.6051701859880909; // log(stay_prob) 0.013316862192910478
     sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
     sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
 }
