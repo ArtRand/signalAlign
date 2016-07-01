@@ -565,10 +565,14 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3
     eventMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean, sM->scale, sM->shift, sM->var);
 
     double noiseMean = emissions_signal_getModelFluctuationMean(eventModel, kmerIndex);
-    double noiseStdDev = emissions_signal_getModelFluctuationSd(eventModel, kmerIndex);
+    //double noiseStdDev = emissions_signal_getModelFluctuationSd(eventModel, kmerIndex);
+
+    double modelNoiseLambda = emissions_signal_getModelFluctuationLambda(eventModel, kmerIndex);
 
     double l_probEventMean = emissions_signal_logGaussPdf(eventMean, levelMean, levelStdDev);
-    double l_probEventNoise = emissions_signal_logGaussPdf(eventNoise, noiseMean, noiseStdDev);
+    // I tried using the inverse gaussian here
+    //double l_probEventNoise = emissions_signal_logGaussPdf(eventNoise, noiseMean, noiseStdDev);
+    double l_probEventNoise = emissions_signal_logInvGaussPdf(eventNoise, noiseMean, modelNoiseLambda);
 
     // clean
     free(kmer_i);
@@ -604,10 +608,13 @@ double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
     double levelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
     double noiseMean = emissions_signal_getModelFluctuationMean(eventModel, kmerIndex);
-    double noiseStdDev = emissions_signal_getModelFluctuationSd(eventModel, kmerIndex);
+    //double noiseStdDev = emissions_signal_getModelFluctuationSd(eventModel, kmerIndex);
+
+    double modelNoiseLambda = emissions_signal_getModelFluctuationLambda(eventModel, kmerIndex);
 
     double l_probEventMean = emissions_signal_logGaussPdf(eventMean, levelMean, levelStdDev);
-    double l_probEventNoise = emissions_signal_logGaussPdf(eventNoise, noiseMean, noiseStdDev);
+    //double l_probEventNoise = emissions_signal_logGaussPdf(eventNoise, noiseMean, noiseStdDev);
+    double l_probEventNoise = emissions_signal_logInvGaussPdf(eventNoise, noiseMean, modelNoiseLambda);
 
     // clean
     free(kmer_i);
@@ -1099,7 +1106,7 @@ void stateMachine3_setTransitionsToNucleotideDefaults(StateMachine *sM) {
     sM3->TRANSITION_GAP_SWITCH_TO_Y = -4.910694825551255; //0.0073673675173412815f;
 }
 
-/*
+
 void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
     StateMachine3 *sM3 = (StateMachine3 *) sM;
     sM3->TRANSITION_MATCH_CONTINUE = -0.23552123624314988; // log(step_prob) (0.79015888282447311)
@@ -1112,8 +1119,9 @@ void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
     sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
     sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
 }
- */
-// Temp change for r9 experiment
+
+/* Temp change for r9 experiment
+
 void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
     StateMachine3 *sM3 = (StateMachine3 *) sM;
     sM3->TRANSITION_MATCH_CONTINUE = -0.43078291609245423; // log(step_prob) (0.65)
@@ -1126,6 +1134,7 @@ void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
     sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
     sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
 }
+ */
 
 static void stateMachine3_cellCalculate(StateMachine *sM,
                                         void *current, void *lower, void *middle, void *upper,

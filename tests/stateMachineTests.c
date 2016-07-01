@@ -225,7 +225,7 @@ static void test_nanoporeScaleParams(CuTest *testCase) {
     stList *filteredRemappedAnchors = getRemappedAnchors(referenceSequence, npRead, p);
     stList *map = nanopore_getAnchorKmersToEventsMap(filteredRemappedAnchors, eventSequence->elements,
                                                      referenceSequence->elements);
-    st_uglyf("Map has %lld assignments\n", stList_length(map));
+    //st_uglyf("Map has %lld assignments\n", stList_length(map));
     // test the event/kmer tuples
     for (int64_t i = 0; i < stList_length(map); i++) {
         EventKmerTuple *t = stList_get(map, i);
@@ -248,29 +248,31 @@ static void test_nanoporeScaleParams(CuTest *testCase) {
     CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 10.0);
     CuAssertTrue(testCase, absPercentDiff(params->var, npRead->templateParams.var) < 50.0);
-
+    /*
     st_uglyf("npRead scale: %f, estimated: %f diff %f\n", npRead->templateParams.scale, params->scale,
              absPercentDiff(params->scale, npRead->templateParams.scale));
     st_uglyf("npRead shift: %f, estimated: %f diff %f\n", npRead->templateParams.shift, params->shift,
              absPercentDiff(params->shift, npRead->templateParams.shift));
     st_uglyf("npRead var: %f, estimated: %f diff %f\n", npRead->templateParams.var, params->var,
              absPercentDiff(params->var, npRead->templateParams.var));
+    */
 }
 
 static void test_nanoporeScaleParamsFromOneDAssignments(CuTest *testCase) {
     NanoporeRead *npRead = loadTestNanoporeRead();
     stList *templateMap = nanopore_getTemplateOneDAssignments(npRead, 0.0);
-    st_uglyf("Map has %lld assignments\n", stList_length(templateMap));
+    //st_uglyf("Map has %lld assignments\n", stList_length(templateMap));
     NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
     StateMachine *sM = loadDescaledStateMachine3(npRead);
     nanopore_compute_scale_params(sM->EMISSION_MATCH_MATRIX, templateMap, params, FALSE, TRUE);
+/*
     st_uglyf("npRead scale: %f, estimated: %f diff %f\n", npRead->templateParams.scale, params->scale,
              absPercentDiff(params->scale, npRead->templateParams.scale));
     st_uglyf("npRead shift: %f, estimated: %f diff %f\n", npRead->templateParams.shift, params->shift,
              absPercentDiff(params->shift, npRead->templateParams.shift));
     st_uglyf("npRead var: %f, estimated: %f diff %f\n", npRead->templateParams.var, params->var,
              absPercentDiff(params->var, npRead->templateParams.var));
-
+*/
     CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->var, npRead->templateParams.var) < 50.0);
@@ -280,16 +282,18 @@ static void test_nanoporeScaleParamsFromStrandRead(CuTest *testCase) {
     NanoporeRead *npRead = loadTestNanoporeRead();
     stList *map = nanopore_getOneDAssignmentsFromRead(npRead->templateStrandEventMap, npRead->templateEvents,
                                                       npRead->templateRead, npRead->templateReadLength);
-    st_uglyf("Map has %lld assignments\n", stList_length(map));
+    //st_uglyf("Map has %lld assignments\n", stList_length(map));
     NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
     StateMachine *sM = loadDescaledStateMachine3(npRead);
     nanopore_compute_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
+/*
     st_uglyf("npRead scale: %f, estimated: %f diff %f\n", npRead->templateParams.scale, params->scale,
              absPercentDiff(params->scale, npRead->templateParams.scale));
     st_uglyf("npRead shift: %f, estimated: %f diff %f\n", npRead->templateParams.shift, params->shift,
              absPercentDiff(params->shift, npRead->templateParams.shift));
     st_uglyf("npRead var: %f, estimated: %f diff %f\n", npRead->templateParams.var, params->var,
              absPercentDiff(params->var, npRead->templateParams.var));
+*/
     CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->var, npRead->templateParams.var) < 50.0);
@@ -442,7 +446,7 @@ static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
     checkAlignedPairs(testCase, alignedPairs, refSeq->length, npRead->nbTemplateEvents);
     // for ch1_file1 template there should be this many aligned pairs with banding
     //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 1067);
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 1076);
 
     stList *alignedPairs_descaled = getAlignedPairsUsingAnchors(sMdescaled,
                                                                 refSeq, eventSequence, filteredRemappedAnchors, p,
@@ -451,7 +455,7 @@ static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
 
     // for ch1_file1 template there should be this many aligned pairs with banding
     //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs_descaled));
-    CuAssertTrue(testCase, stList_length(alignedPairs_descaled) == 1067);
+    CuAssertTrue(testCase, stList_length(alignedPairs_descaled) == 1076);
 
     // check against alignment without banding
     stList *alignedPairs_noband = getAlignedPairsWithoutBanding(sM, refSeq->elements, npRead->templateEvents,
@@ -462,7 +466,7 @@ static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
 
     checkAlignedPairs(testCase, alignedPairs_noband, refSeq->length, npRead->nbTemplateEvents);
     //st_uglyf("got %lld alignedPairs without anchors\n", stList_length(alignedPairs_noband));
-    CuAssertTrue(testCase, stList_length(alignedPairs_noband) == 1066);
+    CuAssertTrue(testCase, stList_length(alignedPairs_noband) == 1076);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -536,7 +540,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
 
     checkAlignedPairs(testCase, alignedPairs, refSeq->length, npRead->nbTemplateEvents);
     //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 1067);
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 1076);
     Sequence *degenerateSequence = replaceBasesInSequence(refSeq, "C", "E");
     stList *alignedPairs_methyl = getAlignedPairsUsingAnchors(sM, degenerateSequence,
                                                               eventSequence, filteredRemappedAnchors, p,
@@ -544,7 +548,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
                                                               0, 0);
     checkAlignedPairs(testCase, alignedPairs_methyl, degenerateSequence->length, npRead->nbTemplateEvents);
     //st_uglyf("got %lld methyl alignedPairs with anchors\n", stList_length(alignedPairs_methyl));
-    CuAssertTrue(testCase, stList_length(alignedPairs_methyl) == 1067);
+    CuAssertTrue(testCase, stList_length(alignedPairs_methyl) == 1076);
     sequence_destruct(degenerateSequence);
     degenerateSequence = replaceBasesInSequence(refSeq, "C", "O");
     stList *alignedPairs_hydroxy = getAlignedPairsUsingAnchors(sM, degenerateSequence,
@@ -553,7 +557,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
                                                                0, 0);
     checkAlignedPairs(testCase, alignedPairs_hydroxy, degenerateSequence->length, npRead->nbTemplateEvents);
     //st_uglyf("got %lld hydroxy alignedPairs with anchors\n", stList_length(alignedPairs_hydroxy));
-    CuAssertTrue(testCase, stList_length(alignedPairs_hydroxy) == 1067);
+    CuAssertTrue(testCase, stList_length(alignedPairs_hydroxy) == 1076);
 
 
     sequence_destruct(degenerateSequence);
@@ -565,7 +569,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
     checkAlignedPairsWithOverlap(testCase, alignedPairs_degenerate,
                                  degenerateSequence->length, npRead->nbTemplateEvents);
     //st_uglyf("got %lld degenerate alignedPairs with anchors\n", stList_length(alignedPairs_degenerate));
-    CuAssertTrue(testCase, stList_length(alignedPairs_degenerate) == 7257);
+    CuAssertTrue(testCase, stList_length(alignedPairs_degenerate) == 7349);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -931,12 +935,12 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    //SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
-    //SUITE_ADD_TEST(suite, test_nanoporeScaleParams);
+    SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
+    SUITE_ADD_TEST(suite, test_nanoporeScaleParams);
 
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromStrandRead);
-    /*
+
     SUITE_ADD_TEST(suite, test_models);
     SUITE_ADD_TEST(suite, test_loadPoreModel);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
@@ -948,6 +952,6 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
-    */
+
     return suite;
 }

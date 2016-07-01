@@ -617,12 +617,12 @@ class NanoporeRead(object):
 
         if self.complement_model_address not in self.fastFive:
             self.has_complement_model = False
-            self.complement_scale = 0
-            self.complement_shift = 0
-            self.complement_drift = 0
-            self.complement_var = 0
-            self.complement_scale_sd = 0
-            self.complement_var_sd = 0
+            self.complement_scale = 1
+            self.complement_shift = 1
+            self.complement_drift = 1
+            self.complement_var = 1
+            self.complement_scale_sd = 1
+            self.complement_var_sd = 1
         return
 
     @staticmethod
@@ -1041,7 +1041,7 @@ class SignalAlignment(object):
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
-        #temp_folder.remove_folder()
+        temp_folder.remove_folder()
         return True
 
 

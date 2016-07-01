@@ -666,7 +666,7 @@ int main(int argc, char *argv[]) {
                                                         sMtype, template, nHdpT, templateHmmFile);
 
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_getTemplateOneDAssignments);
+            estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_templateOneDAssignmentsFromRead);
         }
 
         // get expectations for template
@@ -698,7 +698,7 @@ int main(int argc, char *argv[]) {
                                                         sMtype, complement, nHdpC, complementHmmFile);
 
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
+            estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_complementOneDAssignmentsFromRead);
         }
 
         getSignalExpectations(sMc, complementModelFile, complementHmmFile, nHdpC,
@@ -745,7 +745,6 @@ int main(int argc, char *argv[]) {
 
         // re-estimate the nanoporeAdjustment parameters
         if (ESTIMATE_PARAMS) {
-            //estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_getTemplateOneDAssignments);
             estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_templateOneDAssignmentsFromRead);
         }
 
@@ -779,7 +778,6 @@ int main(int argc, char *argv[]) {
                                                         sMtype, complement, nHdpC, complementHmmFile);
 
         if (ESTIMATE_PARAMS) {
-            //estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_getComplementOneDAssignments);
             estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_complementOneDAssignmentsFromRead);
         }
 
