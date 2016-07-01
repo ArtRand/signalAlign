@@ -5,7 +5,7 @@
 
 #define STEP 6  // space between degenerate nucleotides in for error correction
 #define ESTIMATE_PARAMS 1
-#define ASSIGNMENT_THRESHOLD 0.0
+#define ASSIGNMENT_THRESHOLD 0.1
 
 void usage() {
     fprintf(stderr, "signalMachine binary, meant to be used through the signalAlign program.\n");
@@ -218,17 +218,17 @@ void estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
                             stList *(*assignmentFunction)(NanoporeRead *, double)) {
     StateMachine3 *sM3 = (StateMachine3 *)sM;
 
-    st_uglyf("Re-estimating parameters\n");
-    st_uglyf("Before: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
+    st_uglyf("SENTINAL - Re-estimating parameters\n");
+    st_uglyf("SENTINAL - Before: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
     stList *map = assignmentFunction(npRead, ASSIGNMENT_THRESHOLD);
-    st_uglyf("Map is %lld long\n", stList_length(map));
+    st_uglyf("SENTINAL - Map is %lld long\n", stList_length(map));
     nanopore_compute_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
-    st_uglyf("After: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
+    st_uglyf("SENTINAL - After: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
     sM3->scale = params->scale;
     sM3->shift = params->shift;
     sM3->var = params->var;
     if ((sM3->scale != params->scale) || (sM3->shift != params->shift) || (sM3->var != params->var)) {
-        st_errAbort("Problem updating statemachine\n");
+        st_errAbort("ERROR - Problem updating statemachine\n");
     }
     stList_destruct(map);
     return;

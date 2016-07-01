@@ -578,7 +578,6 @@ void nanopore_lineq_solve(double *A, double *b, double *x_out, int64_t n) {
     free(aux_matrix);
 }
 
-
 // weighted least squares to compute normalization params
 void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params,
                                    bool drift_out, bool var_out) {
