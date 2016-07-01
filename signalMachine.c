@@ -4,7 +4,7 @@
 #include "pairwiseAligner.h"
 
 #define STEP 6  // space between degenerate nucleotides in for error correction
-#define ESTIMATE_PARAMS 0
+#define ESTIMATE_PARAMS 1
 #define ASSIGNMENT_THRESHOLD 0.0
 
 void usage() {
@@ -666,6 +666,7 @@ int main(int argc, char *argv[]) {
                                                         sMtype, template, nHdpT, templateHmmFile,
                                                         templateExpectations);
 
+        // temporary way to 'turn off' estimates if I want to
         if (ESTIMATE_PARAMS) {
             estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_templateOneDAssignmentsFromRead);
         }
