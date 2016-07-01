@@ -336,7 +336,7 @@ class NanoporeRead(object):
         self.version = self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"]
 
         if self.version not in supported_versions:
-            print("Unsupported Version (1.15.0 and 1.19.0 supported)", file=sys.stdout)
+            print("Unsupported Version (1.15.0, 1.19.0, and 1.22.2 supported)", file=sys.stdout)
             return False
 
         # initialize version-specific paths
@@ -376,7 +376,7 @@ class NanoporeRead(object):
             self.complement_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_complement/Fastq"][()].split()[2]
             return True
         else:
-            print("Unsupported Version (1.15.0 and 1.19.0 supported)", file=sys.stdout)
+            print("Unsupported Version (1.15.0, 1.19.0, and 1.22.2 supported)", file=sys.stdout)
             return False
 
     def assemble_2d_sequence_from_table(self):
@@ -465,7 +465,7 @@ class NanoporeRead(object):
             return False
 
         if not self.has2D_alignment_table:
-            print("{file} doesn't have 2D alignment table".format(self.filename))
+            print("{file} doesn't have 2D alignment table".format(file=self.filename))
             return False
 
         self.assemble_2d_sequence_from_table()
