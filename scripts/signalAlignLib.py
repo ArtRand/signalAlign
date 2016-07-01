@@ -66,6 +66,8 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
 
     # load MinION read
     npRead = NanoporeRead(fast5)
+    if npRead.has2D_alignment_table is False:
+        return False, None, None
     proceed = npRead.write_npRead(out_file=out_file)
     if proceed:
         # make the 2d read
@@ -303,6 +305,7 @@ class NanoporeRead(object):
         self.skip_prob_bins = []
         self.template_model_name = ""
         self.complement_model_name = ""
+        self.initialize_twoD()
 
     def open(self):
         try:
@@ -441,7 +444,7 @@ class NanoporeRead(object):
                         event_map[-1] = i
                 previous_prob = this_prob
             final_event_index = [event_map[-1]]
-            padding = final_event_index * (self.kmer_length - 1) #5 # make this a kmer-measured thing
+            padding = final_event_index * (self.kmer_length - 1)
             event_map = event_map + padding
             return event_map
         self.template_strand_event_map = make_map(self.template_events)
@@ -460,9 +463,9 @@ class NanoporeRead(object):
         previous_complement_event = None
         previous_template_event = None
 
-        twoD_init = self.initialize_twoD()
-        if twoD_init is False:
-            return False
+        #twoD_init = self.initialize_twoD()
+        #if twoD_init is False:
+        #    return False
 
         if not self.has2D_alignment_table:
             print("{file} doesn't have 2D alignment table".format(file=self.filename))
@@ -874,6 +877,7 @@ class SignalAlignment(object):
                                                                                         twod_read_path=temp_2d_read)
 
         if success is False:
+            print("file {file} does not have 2D or is corrupt".format(file=read_label), file=sys.stderr)
             return False
 
         # add an indicator for the model being used
