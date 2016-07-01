@@ -33,7 +33,7 @@ struct _strawManHmm {
     double *(*getEmissionExpFcn)(Hmm *hmm, int64_t kmerIndex);
     double *(*getPosteriorExpFcn)(Hmm *hmm, int64_t kmerIndex);
     double *(*getEventModelEntry)(Hmm *hmm, int64_t kmerIndex);
-    // a boolian mask for the kmers that have been observed
+    // a boolean mask for the kmers that have been observed
     bool *observed;
     // boolian indicating whether the HMM object has a an event model or not
     bool hasModel;

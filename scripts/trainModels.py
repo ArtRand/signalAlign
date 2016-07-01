@@ -212,7 +212,7 @@ def main(args):
     # Using model: {model}
     # Using HDPs: {thdp} / {chdp}
     # Training emissions: {emissions}
-    #          transitions: {transitions}
+    #        transitions: {transitions}
     \n
     """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref, outLoc=args.out, iter=args.iter,
                iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP,

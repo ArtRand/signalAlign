@@ -43,7 +43,6 @@ static inline void hmmContinuous_loadIntoStateMachine(StateMachine *sM, Hmm *hmm
     }
     if (type == threeStateHdp) {
         continuousPairHmm_loadTransitionsIntoStateMachine(sM, hmm);
-        //hdpHmm_loadTransitions(sM, hmm);
     }
 }
 
@@ -406,6 +405,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName, double transitionPseud
     // Downcast
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
     cpHmm->hasModel = (bool )hasModel;
+
     // cleanup
     free(string);
     stList_destruct(tokens);
@@ -753,10 +753,12 @@ void hdpHmm_destruct(Hmm *hmm) {
 
 ///////////////////////////////////////////////// CORE FUNCTIONS //////////////////////////////////////////////////////
 void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMachineType type, Hmm *expectations) {
+    // check for supported types
     if ((type != threeStateHdp) && (type != threeState)) {
         st_errAbort("hmmContinuous_loadSignalHmm - ERROR: got unsupported HMM type %i\n", type);
     }
 
+    // load hmm from file
     Hmm *hmm = hmmContinuous_loadSignalHmmFromFile(hmmFile, type, 0.0, 0.001); // TODO make sure you want these pseudocounts
     if ((expectations != NULL) && (type == threeState)) {
         hmmContinuous_loadModelPrior(hmm, expectations);

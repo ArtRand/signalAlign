@@ -4,7 +4,7 @@
 #include "pairwiseAligner.h"
 
 #define STEP 6  // space between degenerate nucleotides in for error correction
-#define ESTIMATE_PARAMS 1
+#define ESTIMATE_PARAMS 0
 #define ASSIGNMENT_THRESHOLD 0.0
 
 void usage() {
@@ -191,10 +191,10 @@ inline void loadHmmRoutine(const char *hmmFile, StateMachine *sM, StateMachineTy
 
 StateMachine *buildStateMachineAndLoadHmm(const char *modelFile, NanoporeReadAdjustmentParameters npp,
                                           StateMachineType type, Strand strand, NanoporeHDP *nHdp,
-                                          const char *HmmFile) {
+                                          const char *HmmFile, Hmm *hmmExpectations) {
     StateMachine *sM = buildStateMachine(modelFile, npp, type, strand, nHdp);
     if (HmmFile != NULL) {
-        loadHmmRoutine(HmmFile, sM, sM->type, NULL);
+        loadHmmRoutine(HmmFile, sM, sM->type, hmmExpectations);
     }
     return sM;
 }
@@ -558,9 +558,9 @@ int main(int argc, char *argv[]) {
 //        #pragma omp parallel for
         for (int64_t i = 0; i < STEP; i++) {
             StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams, sMtype,
-                                                            template, nHdpT, templateHmmFile);
+                                                            template, nHdpT, templateHmmFile, NULL);
             StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
-                                                            sMtype, complement, nHdpC, complementHmmFile);
+                                                            sMtype, complement, nHdpC, complementHmmFile, NULL);
             if (posteriorProbsFile == NULL) {
                 st_errAbort("SignalAlign - didn't find output file path\n");
             }
@@ -663,7 +663,8 @@ int main(int argc, char *argv[]) {
         }
 
         StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams,
-                                                        sMtype, template, nHdpT, templateHmmFile);
+                                                        sMtype, template, nHdpT, templateHmmFile,
+                                                        templateExpectations);
 
         if (ESTIMATE_PARAMS) {
             estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_templateOneDAssignmentsFromRead);
@@ -695,7 +696,8 @@ int main(int argc, char *argv[]) {
         }
 
         StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
-                                                        sMtype, complement, nHdpC, complementHmmFile);
+                                                        sMtype, complement, nHdpC, complementHmmFile,
+                                                        complementExpectations);
 
         if (ESTIMATE_PARAMS) {
             estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_complementOneDAssignmentsFromRead);
@@ -741,7 +743,7 @@ int main(int argc, char *argv[]) {
 
         // make template stateMachine
         StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams,
-                                                        sMtype, template, nHdpT, templateHmmFile);
+                                                        sMtype, template, nHdpT, templateHmmFile, NULL);
 
         // re-estimate the nanoporeAdjustment parameters
         if (ESTIMATE_PARAMS) {
@@ -775,7 +777,7 @@ int main(int argc, char *argv[]) {
         // Complement alignment
         fprintf(stderr, "signalAlign - starting complement alignment\n");
         StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
-                                                        sMtype, complement, nHdpC, complementHmmFile);
+                                                        sMtype, complement, nHdpC, complementHmmFile, NULL);
 
         if (ESTIMATE_PARAMS) {
             estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_complementOneDAssignmentsFromRead);
