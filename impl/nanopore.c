@@ -594,16 +594,12 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
 
         for (int i = 0; i < stList_length(kmerToEventMap); i++) {
             EventKmerTuple *t = stList_get(kmerToEventMap, i);
-            //double event = read_events[i];
             double event = t->eventMean;
-            //double time = read_times[i];
             double time = t->eventDuration;
-            //int64_t id = kmer_id(read_kmers[i], alphabet, alphabet_size, kmer_length);
             int64_t id = t->kmerIndex;
 
-            //double level_mean = level_means[id];
+
             double level_mean = model[1 + (id * MODEL_PARAMS)];
-            //double level_sd = level_sds[id];
             double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
 
             // weights should technically include variance parameter, but will only results in
@@ -632,9 +628,6 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
 
         nanopore_lineq_solve(XWX, XWy, beta, 3);
 
-        //*shift_out = beta[0];
-        //*scale_out = beta[1];
-        //*drift_out = beta[2];
         // todo drift not part of C stuct yet
         params->shift = beta[0];
         params->scale = beta[1];
@@ -646,14 +639,12 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
                 //int64_t id = kmer_id(read_kmers[i], alphabet, alphabet_size, kmer_length);
                 int64_t id = t->kmerIndex;
 
-                //double level_mean = level_means[id];
+
                 double level_mean = model[1 + (id * MODEL_PARAMS)];
-                //double level_sd = level_sds[id];
                 double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
                 double level_var = level_sd * level_sd;
-                //double event = read_events[i];
+
                 double event = t->eventMean;
-                //double time = read_times[i];
                 double time = t->eventDuration;
 
                 double predicted_val = beta[0] + beta[1] * level_mean + beta[2] * time;
@@ -669,14 +660,12 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
 
         for (int i = 0; i < stList_length(kmerToEventMap); i++) {
             EventKmerTuple *t = stList_get(kmerToEventMap, i);
-            //double event = read_events[i];
+
             double event = t->eventMean;
-            //int64_t id = kmer_id(read_kmers[i], alphabet, alphabet_size, kmer_length);
             int64_t id = t->kmerIndex;
 
-            //double level_mean = level_means[id];
             double level_mean = model[1 + (id * MODEL_PARAMS)];
-            //double level_sd = level_sds[id];
+
             double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
             // weights should technically include variance parameter, but will only results in
             // some inefficiency, no bias
@@ -697,8 +686,6 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
 
         nanopore_lineq_solve(XWX, XWy, beta, 2);
 
-        //*shift_out = beta[0];
-        //*scale_out = beta[1];
         params->shift = beta[0];
         params->scale = beta[1];
 
@@ -706,14 +693,14 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
             double dispersion = 0.0;
             for (int64_t i = 0; i < stList_length(kmerToEventMap); i++) {
                 EventKmerTuple *t = stList_get(kmerToEventMap, i);
-                //int64_t id = kmer_id(read_kmers[i], alphabet, alphabet_size, kmer_length);
+
                 int64_t id = t->kmerIndex;
-                //double level_mean = level_means[id];
+
                 double level_mean = model[1 + (id * MODEL_PARAMS)];
-                //double level_sd = level_sds[id];
+
                 double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
                 double level_var = level_sd * level_sd;
-                //double event = read_events[i];
+
                 double event = t->eventMean;
 
                 double predicted_val = beta[0] + beta[1] * level_mean;
