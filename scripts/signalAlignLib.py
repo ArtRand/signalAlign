@@ -67,6 +67,7 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
     # load MinION read
     npRead = NanoporeRead(fast5)
     if npRead.has2D_alignment_table is False:
+        npRead.close()
         return False, None, None
     proceed = npRead.write_npRead(out_file=out_file)
     if proceed:
