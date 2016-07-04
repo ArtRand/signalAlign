@@ -21,11 +21,13 @@ def parse_args():
                         help="path to fasta reference file")
     parser.add_argument('--positions', '-p', required=False, action='store', type=str, dest='positions',
                         help='positions file')
-    parser.add_argument('--error_correct', action='store', default=None, required=False, type=int,
-                        dest='error_correct', help="Enable error correction, provide error correction position")
+    #parser.add_argument('--error_correct', action='store', default=None, required=False, type=int,
+    #                    dest='error_correct', help="Enable error correction, provide error correction position")
     parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
                         help="Specify degenerate nucleotide options: "
                              "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
+    parser.add_argument('--threshold', '-t', action='store', dest='threshold', default=0.0, type=float,
+                        help='Minimum threshold aligned pairs to consider')
     parser.add_argument('-n', required=False, action='store', type=int, dest='n', default=100,
                         help='Max number of alignments from each category to look at')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
@@ -80,6 +82,7 @@ def main(args):
             "out_file": out_file,
             "positions": positions,
             "degenerate_type": degenerate_enum(args.degenerate),
+            "threshold": args.threshold,
         }
         #c = CallMethylation(**call_methyl_args)
         #c.write()

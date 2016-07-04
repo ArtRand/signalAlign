@@ -106,9 +106,9 @@ class KmerHistogram(object):
 
 
 class CallMethylation(object):
-    def __init__(self, sequence, alignment_file, degenerate_type, label=None, positions=None, out_file=None):
+    def __init__(self, sequence, alignment_file, degenerate_type, label=None, positions=None, threshold=0.0,
+                 out_file=None):
         self.sequence = sequence
-        #self.forward = forward
         self.forward = ".forward." in alignment_file
         self.alignment_file = alignment_file
         self.data = None
@@ -119,8 +119,7 @@ class CallMethylation(object):
         self.out_file = out_file
         self.positions = positions
         self.degenerate = degenerate_type
-        #self.marginal_probs = {"C": 0, "E": 0, "O": 0} if self.degenerate in [1, 2] \
-        #    else {"A": 0, "C": 0, "G": 0, "T": 0}
+        self.threshold = threshold
 
         if label is not None:
             self.label = label
@@ -148,7 +147,7 @@ class CallMethylation(object):
     def get_range(position):
         return range(position - 5, position + 1)
 
-    def call_methyls(self, positions=None):
+    def call_methyls(self, positions=None, threshold=0.0):
         if positions is None:
             template_sites = self.find_occurences("C") if self.forward is True else self.find_occurences("G")
             complement_sites = self.find_occurences("G") if self.forward is True else self.find_occurences("C")
@@ -163,35 +162,25 @@ class CallMethylation(object):
 
                 # select the rows in the dataFrame that have events aligned to this position
                 crit = self.data['ref_index'].map(lambda x: x in positions)
-                select = self.data[crit].ix[self.data['strand'] == strand]
+                select = self.data[crit].ix[(self.data['strand'] == strand) & (self.data['prob'] >= threshold)]
                 select = select.drop(select[['strand', 'ref_kmer']], axis=1)
 
                 if select.empty:
                     continue
 
-                #site_probs = {
-                #    "C": 0,
-                #    "E": 0,
-                #    "O": 0,
-                #}
                 marginal_probs = {"C": 0, "E": 0, "O": 0} if self.degenerate in [1, 2] \
                     else {"A": 0, "C": 0, "G": 0, "T": 0}
 
                 for r in select.itertuples():
                     offset = site - r[1] if regular_offset is True else 5 - (site - r[1])
                     call = r[5][offset]
-                    #site_probs[call] += r[4]
                     marginal_probs[call] += r[4]
 
-                #total_prob = sum(site_probs.values())
                 total_prob = sum(marginal_probs.values())
 
-                #for call in site_probs:
-                #    site_probs[call] /= total_prob
                 for call in marginal_probs:
                     marginal_probs[call] /= total_prob
 
-                #self.probs.append((strand, site, site_probs))
                 self.probs.append((strand, site, marginal_probs))
 
         template_offset = True if self.forward is True else False
@@ -200,7 +189,7 @@ class CallMethylation(object):
         get_calls(complement_sites, 'c', complement_offset)
 
     def write(self, out_file=None):
-        self.call_methyls(positions=self.positions)
+        self.call_methyls(positions=self.positions, threshold=self.threshold)
         fH = open(out_file, 'a') if self.out_file is None else open(self.out_file, 'a')
 
         file_name = self.alignment_file.split("/")[-1]

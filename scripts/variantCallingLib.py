@@ -89,7 +89,7 @@ def make_degenerate_reference(input_sequence, positions, forward_sequence_path, 
     return True
 
 
-def load_data(file_path):
+def load_variant_call_data(file_path):
     data = pd.read_table(file_path,
                          usecols=(0, 1, 2, 3, 4, 5, 6),
                          names=['site', 'strand', 'pA', 'pC', 'pG', 'pT', 'read'],
@@ -112,7 +112,7 @@ def rc_probs(probs):
 
 
 def call_sites_with_marginal_probs(data, reference_sequence_string, min_depth=0, get_sites=False):
-    d = load_data(data)
+    d = load_variant_call_data(data)
 
     reference_sequence_list = list(reference_sequence_string)
 
@@ -142,17 +142,18 @@ def call_sites_with_marginal_probs(data, reference_sequence_string, min_depth=0,
 
         marginal_prob = marginal_forward_p + rc_probs(marginal_backward_p)
 
-        normed_marginal_probs = marginal_prob.map(lambda x: x / sum(marginal_prob))
+        normed_marginal_probs = marginal_prob.map(lambda y: y / sum(marginal_prob))
         called_base = normed_marginal_probs.argmax()[1]
-        #called_base = marginal_prob.map(lambda x: x / sum(marginal_prob)).argmax()[1]
 
         if called_base != reference_sequence_list[site]:
             if get_sites is False:
-                print("Changing {orig} to {new} at {site}".format(orig=reference_sequence_list[site], new=called_base, site=site))
+                print("Changing {orig} to {new} at {site} depth {depth}"
+                      "".format(orig=reference_sequence_list[site], new=called_base, site=site, depth=len(x['read'])))
                 reference_sequence_list[site] = called_base
             else:
                 print("Proposing edit at {site} from {orig} to {new}, \n{probs}"
-                      "".format(orig=reference_sequence_list[site], new=called_base, site=site, probs=normed_marginal_probs))
+                      "".format(orig=reference_sequence_list[site], new=called_base, site=site,
+                                probs=normed_marginal_probs))
                 difference = normed_marginal_probs.max() - normed_marginal_probs["p" + reference_sequence_list[site]]
                 print(difference)
                 add_to_candidates((site, difference))
