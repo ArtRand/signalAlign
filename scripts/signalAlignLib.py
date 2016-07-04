@@ -256,9 +256,7 @@ class TargetRegions(object):
     def __init__(self, tsv, already_sorted=False):
         assert(os.stat(tsv).st_size != 0), "Empty regions file"
 
-        self.region_array = np.loadtxt(tsv,
-                                       usecols=(0, 1),
-                                       dtype=np.int32)
+        self.region_array = np.loadtxt(tsv, usecols=(0, 1), dtype=np.int32)
 
         if len(self.region_array.shape) == 1:
             a = np.empty([1, 2], dtype=np.int32)
