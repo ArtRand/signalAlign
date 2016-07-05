@@ -334,11 +334,11 @@ class NanoporeRead(object):
                 self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
                 self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
 
-        supported_versions = ["1.15.0", "1.19.0", "1.22.2", "1.22.4"]
+        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4"]
         self.version = self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"]
 
         if self.version not in supported_versions:
-            print("Unsupported Version (1.15.0, 1.19.0, and 1.22.2 supported)", file=sys.stdout)
+            print("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)", file=sys.stdout)
             return False
 
         # initialize version-specific paths
@@ -354,7 +354,7 @@ class NanoporeRead(object):
             self.complement_read = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Fastq"][()].split()[2]
             return True
 
-        elif self.version == "1.19.0":
+        elif self.version == "1.19.0" or self.version == "1.20.0":
             self.template_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_template/Events'
             self.template_model_address = "/Analyses/Basecall_1D_000/BaseCalled_template/Model"
             self.template_model_id = self.get_model_id("/Analyses/Basecall_1D_000/Summary/basecall_1d_template")

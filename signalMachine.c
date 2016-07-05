@@ -4,7 +4,7 @@
 #include "pairwiseAligner.h"
 
 #define STEP 6  // space between degenerate nucleotides in for error correction
-#define ESTIMATE_PARAMS 1
+#define ESTIMATE_PARAMS 0
 #define ASSIGNMENT_THRESHOLD 0.1
 
 void usage() {

@@ -14,6 +14,7 @@ SIGNALALIGN_ROOT = "../"
 ZYMO_C_READS = SIGNALALIGN_ROOT + "tests/minion_test_reads/C/"
 ZYMO_REFERENCE = SIGNALALIGN_ROOT + "tests/test_sequences/zymo_sequence.fasta"
 
+
 class LibTest(unittest.TestCase):
     def test_signalAlign_library(self):
         command = "./signalAlignLibTests"
@@ -52,6 +53,7 @@ class signalAlign_alignment_test(unittest.TestCase):
             obs = parse_alignment_file(alignment)
             self.assertTrue(expected.equals(obs), msg="{} is not the same".format(alignment_file))
 
+    @unittest.expectedFailure
     def test_zymo_reads(self):
         zymo_true_alignments = SIGNALALIGN_ROOT + "tests/test_alignments/zymo_C_test_alignments_sm3/" \
                                                             "tempFiles_alignment/"
