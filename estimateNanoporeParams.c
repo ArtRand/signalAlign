@@ -62,20 +62,34 @@ void printEstimateOfParams(NanoporeRead *npRead, StateMachine *sM, double thresh
 
 void printEventsAndParams(NanoporeRead *npRead) {
     // kmer | mean | stDev | prob | scale | shift | var | (drift)
-    fprintf(stdout, "kmer_index\tevent_mean\tevent_stdv\tp_model\tscale\tshift\tva\tstrand\n");
+    fprintf(stdout, "kmer_index\tevent_mean\tevent_stdv\tstart\tp_model\tscale\tshift\tdrift\tstrand\n");
     for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
         int64_t index = i * NB_EVENT_PARAMS;
-        fprintf(stdout, "%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
-                npRead->templateModelState[i], npRead->templateEvents[index], npRead->templateEvents[index + 1],
-                npRead->templatePModel[i], npRead->templateParams.scale, npRead->templateParams.shift,
-                npRead->templateParams.var, "t");
+        fprintf(stdout, "%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
+                npRead->templateModelState[i],
+                npRead->templateEvents[index], // mean
+                npRead->templateEvents[index + 1], // st_dev
+                npRead->templateEvents[index + 3], // start
+                npRead->templatePModel[i],
+                npRead->templateParams.scale,
+                npRead->templateParams.shift,
+                npRead->templateParams.var,
+                npRead->templateParams.drift,
+                "t");
     }
     for (int64_t i = 0; i < npRead->nbComplementEvents; i++) {
         int64_t index = i * NB_EVENT_PARAMS;
-        fprintf(stdout, "%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
-                npRead->complementModelState[i], npRead->complementEvents[index], npRead->complementEvents[index + 1],
-                npRead->complementPModel[i], npRead->complementParams.scale, npRead->complementParams.shift,
-                npRead->complementParams.var, "c");
+        fprintf(stdout, "%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
+                npRead->complementModelState[i],
+                npRead->complementEvents[index], // mean
+                npRead->complementEvents[index + 1], // st_dev
+                npRead->complementEvents[index + 3], // start
+                npRead->complementPModel[i],
+                npRead->complementParams.scale,
+                npRead->complementParams.shift,
+                npRead->complementParams.var,
+                npRead->complementParams.drift,
+                "c");
     }
 }
 
@@ -142,12 +156,6 @@ int main(int argc, char *argv[]) {
                                        nanopore_complementOneDAssignmentsFromRead);
     printEventsAndParams(npRead);
 
-    //printEstimateOfParams(npRead, sMt, thresholds[i], &npRead->templateParams, npReadFile, "t",
-    //                      nanopore_getTemplateOneDAssignments);
-    //printEstimateOfParams(npRead, sMc, thresholds[i], &npRead->complementParams, npReadFile, "c",
-    //                      nanopore_getComplementOneDAssignments);
-
-    //fprintf(stdout, "\n");
     (void) j;  // silence unused variable warning.
     return 0;
 }

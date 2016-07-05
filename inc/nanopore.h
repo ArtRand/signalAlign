@@ -1,7 +1,7 @@
 #ifndef NANOPORE
 #define NANOPORE
 #include "sonLibTypes.h"
-#define NB_EVENT_PARAMS 3
+#define NB_EVENT_PARAMS 4
 
 #ifndef MACHEP
 #define MACHEP 1.11022302462515654042E-16
@@ -14,6 +14,7 @@ typedef struct _nanoporeReadAdjustmentParameters {
     double var;
     double scale_sd;
     double var_sd;
+    double drift;
 } NanoporeReadAdjustmentParameters;
 
 typedef struct _nanoporeRead {
@@ -31,7 +32,7 @@ typedef struct _nanoporeRead {
 
     int64_t *templateEventMap;
     int64_t *templateStrandEventMap;
-    double *templateEvents; // mean, stdev, length
+    double *templateEvents; // mean, stdev, length, start_time
 
     int64_t *complementEventMap;
     int64_t *complementStrandEventMap;

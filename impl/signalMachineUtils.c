@@ -177,11 +177,17 @@ void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
     StateMachine3 *sM3 = (StateMachine3 *)sM;
 
     st_uglyf("SENTINAL - Re-estimating parameters\n");
-    st_uglyf("SENTINAL - Before: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
+    st_uglyf("SENTINAL - Before: scale: %f shift: %f var: %f drift %f\n", params->scale, params->shift, params->var,
+             params->drift);
+
     stList *map = assignmentFunction(npRead, assignmentThreshold);
     st_uglyf("SENTINAL - Map is %lld long\n", stList_length(map));
-    nanopore_compute_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
-    st_uglyf("SENTINAL - After: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
+
+    nanopore_compute_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params, TRUE, TRUE);
+
+    st_uglyf("SENTINAL - After: scale: %f shift: %f var: %f drift: %f\n", params->scale, params->shift, params->var,
+    params->drift);
+
     sM3->scale = params->scale;
     sM3->shift = params->shift;
     sM3->var = params->var;

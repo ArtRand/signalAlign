@@ -601,7 +601,7 @@ class NanoporeRead(object):
             self.has_template_model = False
             self.template_scale = 1
             self.template_shift = 1
-            self.template_drift = 1
+            self.template_drift = 0
             self.template_var = 1
             self.template_scale_sd = 1
             self.template_var_sd = 1
@@ -621,7 +621,7 @@ class NanoporeRead(object):
             self.has_complement_model = False
             self.complement_scale = 1
             self.complement_shift = 1
-            self.complement_drift = 1
+            self.complement_drift = 0
             self.complement_var = 1
             self.complement_scale_sd = 1
             self.complement_var_sd = 1
@@ -735,11 +735,13 @@ class NanoporeRead(object):
             print(self.template_var, end=' ', file=out_file)                   # 7template var
             print(self.template_scale_sd, end=' ', file=out_file)              # 8template scale_sd
             print(self.template_var_sd, end=' ', file=out_file)                # 9template var_sd
-            print(self.complement_scale, end=' ', file=out_file)               # 0complement scale
-            print(self.complement_shift, end=' ', file=out_file)               # 1complement shift
-            print(self.complement_var, end=' ', file=out_file)                 # 2complement var
-            print(self.complement_scale_sd, end=' ', file=out_file)            # 3complement scale_sd
-            print(self.complement_var_sd, end='\n', file=out_file)             # 4complement var_sd
+            print(self.template_drift, end=' ', file=out_file)                 # 0template_drift
+            print(self.complement_scale, end=' ', file=out_file)               # 1complement scale
+            print(self.complement_shift, end=' ', file=out_file)               # 2complement shift
+            print(self.complement_var, end=' ', file=out_file)                 # 3complement var
+            print(self.complement_scale_sd, end=' ', file=out_file)            # 4complement scale_sd
+            print(self.complement_var_sd, end=' ', file=out_file)              # 5complement var_sd
+            print(self.complement_drift, end='\n', file=out_file)              # 6complement_drift
 
             # line 2 alignment table sequence
             print(self.alignment_table_sequence, end='\n', file=out_file)
@@ -766,8 +768,8 @@ class NanoporeRead(object):
             print("", end="\n", file=out_file)
 
             # line 8 template events
-            for mean, stdev, length in self.template_events['mean', 'stdv', 'length']:
-                print(mean, stdev, length, sep=' ', end=' ', file=out_file)
+            for mean, stdev, length, start in self.template_events['mean', 'stdv', 'length', 'start']:
+                print(mean, stdev, length, start, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
             # line 9 complement 2D event map
@@ -776,8 +778,8 @@ class NanoporeRead(object):
             print("", end="\n", file=out_file)
 
             # line 10 complement events
-            for mean, stdev, length in self.complement_events['mean', 'stdv', 'length']:
-                print(mean, stdev, length, sep=' ', end=' ', file=out_file)
+            for mean, stdev, length, start in self.complement_events['mean', 'stdv', 'length', 'start']:
+                print(mean, stdev, length, start, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
             # line 11 model_state (template)

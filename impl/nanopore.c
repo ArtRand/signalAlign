@@ -81,6 +81,7 @@ NanoporeReadAdjustmentParameters *nanopore_readAdjustmentParametersConstruct() {
     params->shift = 0.0;
     params->var = 0.0;
     params->var_sd = 0.0;
+    params->drift = 0.0;
     return params;
 }
 
@@ -95,7 +96,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     int64_t npRead_readLength, npRead_nbTemplateEvents, npRead_nbComplementEvents,
             templateReadLength, complementReadLength;
 
-    if (stList_length(tokens) != 15) {
+    if (stList_length(tokens) != 17) {
         st_errAbort("nanopore_loadNanoporeReadFromFile: incorrect line 1 for file %s got %"PRId64"tokens should get 16",
                     nanoporeReadFile, stList_length(tokens));
 
@@ -149,27 +150,34 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     if (j != 1) {
         st_errAbort("error parsing nanopore template var_sd\n");
     }
-
+    j = sscanf(stList_get(tokens, 10), "%lf", &(npRead->templateParams.drift));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore template drift\n");
+    }
     // complement params
-    j = sscanf(stList_get(tokens, 10), "%lf", &(npRead->complementParams.scale));
+    j = sscanf(stList_get(tokens, 11), "%lf", &(npRead->complementParams.scale));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement scale\n");
     }
-    j = sscanf(stList_get(tokens, 11), "%lf", &(npRead->complementParams.shift));
+    j = sscanf(stList_get(tokens, 12), "%lf", &(npRead->complementParams.shift));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement shift\n");
     }
-    j = sscanf(stList_get(tokens, 12), "%lf", &(npRead->complementParams.var));
+    j = sscanf(stList_get(tokens, 13), "%lf", &(npRead->complementParams.var));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement var\n");
     }
-    j = sscanf(stList_get(tokens, 13), "%lf", &(npRead->complementParams.scale_sd));
+    j = sscanf(stList_get(tokens, 14), "%lf", &(npRead->complementParams.scale_sd));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement scale_sd\n");
     }
-    j = sscanf(stList_get(tokens, 14), "%lf", &(npRead->complementParams.var_sd));
+    j = sscanf(stList_get(tokens, 15), "%lf", &(npRead->complementParams.var_sd));
     if (j != 1) {
         st_errAbort("error parsing nanopore template var_sd\n");
+    }
+    j = sscanf(stList_get(tokens, 16), "%lf", &(npRead->complementParams.drift));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore complement drift\n");
     }
 
     // cleanup line 1
@@ -260,7 +268,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
-    // line 8 [template events (mean, stddev, length)] \n
+    // line 8 [template events (mean, stddev, length, start)] \n
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check
@@ -588,7 +596,6 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
         st_errAbort("Cannot get scale params with no assignments\n");
     }
     if (drift_out) {
-        st_errAbort("Drift not implemented yet\n");
         XWX = (double*) calloc(9, sizeof(double));
         XWy = (double*) calloc(3, sizeof(double));
 
@@ -597,7 +604,6 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
             double event = t->eventMean;
             double time = t->eventDuration;
             int64_t id = t->kmerIndex;
-
 
             double level_mean = model[1 + (id * MODEL_PARAMS)];
             double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
@@ -628,17 +634,16 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
 
         nanopore_lineq_solve(XWX, XWy, beta, 3);
 
-        // todo drift not part of C stuct yet
         params->shift = beta[0];
         params->scale = beta[1];
+        params->drift = beta[2];
 
         if (var_out) {
             double dispersion = 0.0;
             for (int64_t i = 0; i < stList_length(kmerToEventMap); i++) {
                 EventKmerTuple *t = stList_get(kmerToEventMap, i);
-                //int64_t id = kmer_id(read_kmers[i], alphabet, alphabet_size, kmer_length);
-                int64_t id = t->kmerIndex;
 
+                int64_t id = t->kmerIndex;
 
                 double level_mean = model[1 + (id * MODEL_PARAMS)];
                 double level_sd = model[1 + (id * MODEL_PARAMS + 1)];

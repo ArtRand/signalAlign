@@ -302,15 +302,15 @@ static void test_nanoporeScaleParamsFromStrandRead(CuTest *testCase) {
 static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     // make some DNA sequences and fake nanopore read data
     char *sX = "ACGATAXGGACAT";
-    double sY[21] = {
-            58.743435, 0.887833, 0.0571, //ACGATA 0
-            53.604965, 0.816836, 0.0571, //CGATAC 1
-            58.432015, 0.735143, 0.0571, //GATACG 2
-            63.684352, 0.795437, 0.0571, //ATACGG 3
-            //63.520262, 0.757803, 0.0571, //TACGGA skip
-            58.921430, 0.812959, 0.0571, //ACGGAC 4
-            59.895882, 0.740952, 0.0571, //CGGACA 5
-            61.684303, 0.722332, 0.0571, //GGACAT 6
+    double sY[28] = {
+            58.743435, 0.887833, 0.0571, 0.0, //ACGATA 0
+            53.604965, 0.816836, 0.0571, 0.1,//CGATAC 1
+            58.432015, 0.735143, 0.0571, 0.2,//GATACG 2
+            63.684352, 0.795437, 0.0571, 0.3,//ATACGG 3
+            //63.520262, 0.757803, 0.0571, 0.0,//TACGGA skip
+            58.921430, 0.812959, 0.0571, 0.4,//ACGGAC 4
+            59.895882, 0.740952, 0.0571, 0.5,//CGGACA 5
+            61.684303, 0.722332, 0.0571, 0.67,//GGACAT 6
     };
 
     // make variables for the (corrected) length of the sequences
@@ -507,7 +507,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
 
     // for ch1_file1 template there should be this many aligned pairs with banding
     //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 1213);
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 1212);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
