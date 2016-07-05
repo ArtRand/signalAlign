@@ -51,7 +51,8 @@ typedef struct _nanoporeRead {
 typedef struct _eventKmerTuple {
     double eventMean;
     double eventSd;
-    double eventDuration;
+    //double eventDuration;
+    double deltaTime;
     int64_t kmerIndex;
 } EventKmerTuple;
 
@@ -60,7 +61,7 @@ typedef struct _eventKmerTuple {
 // TODO refactor format so that it can handle 1D reads also
 NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile);
 
-EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double duration, int64_t kmerIndex);
+EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double deltaTime, int64_t kmerIndex);
 
 NanoporeReadAdjustmentParameters *nanopore_readAdjustmentParametersConstruct();
 

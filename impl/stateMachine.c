@@ -1280,7 +1280,7 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
                                                                    int64_t from, int64_t to,
                                                                    double eP, double tP, void *extraArgs)) {
     /*
-     * Description of (potentially ambigious) arguments:
+     * Description of (potentially ambiguous) arguments:
      * parameterSetSize = the number of kmers that we are using, of len(kmer) = 1, then the number is 4 (or 5 if we're
      * including N). It's 25 if len(kmer) = 2, it's 4096 in the 6-mer model.
      */

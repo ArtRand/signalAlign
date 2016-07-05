@@ -62,7 +62,6 @@ void printEstimateOfParams(NanoporeRead *npRead, StateMachine *sM, double thresh
 
 void printEventsAndParams(NanoporeRead *npRead) {
     // kmer | mean | stDev | prob | scale | shift | var | (drift)
-    fprintf(stdout, "kmer_index\tevent_mean\tevent_stdv\tstart\tp_model\tscale\tshift\tdrift\tstrand\n");
     for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
         int64_t index = i * NB_EVENT_PARAMS;
         fprintf(stdout, "%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",

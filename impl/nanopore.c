@@ -59,18 +59,23 @@ static inline double nanopore_getEventDuration(double *events, int64_t index) {
     return events[2 + (index * NB_EVENT_PARAMS)];
 }
 
+static inline double nanopore_getEventDeltaTime(double *events, int64_t index) {
+    //return *(events + ((1 + index * NB_EVENT_PARAMS) + (sizeof(double))));
+    return events[3 + (index * NB_EVENT_PARAMS)];
+}
+
 static void nanopore_descaleEvents(int64_t nb_events, double *events, double scale, double shift) {
     for (int64_t i = 0; i < nb_events; i += NB_EVENT_PARAMS) {
         events[i] = (events[i] - shift) / scale;
     }
 }
 
-EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double duration, int64_t kmerIndex) {
+EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double deltaTime, int64_t kmerIndex) {
     EventKmerTuple *t = st_malloc(sizeof(EventKmerTuple));
     t->eventMean = mean;
     t->eventSd = sd;
     t->kmerIndex = kmerIndex;
-    t->eventDuration = duration;
+    t->deltaTime = deltaTime;
     return t;
 }
 
@@ -429,8 +434,8 @@ stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSeq
         int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(nucleotideSequence + ref_idx);
         double eventMean = nanopore_getEventMean(eventSequence, eventIndex);
         double eventSd = nanopore_getEventSd(eventSequence, eventIndex);
-        double eventDuration = nanopore_getEventDuration(eventSequence, eventIndex);
-        EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDuration, kmerIndex);
+        double eventDeltaTime = nanopore_getEventDeltaTime(eventSequence, eventIndex);
+        EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDeltaTime, kmerIndex);
         stList_append(mapOfEventsToKmers, t);
     }
     return mapOfEventsToKmers;
@@ -475,11 +480,11 @@ stList *nanopore_getOneDAssignmentsFromRead(int64_t *strandEventMap, double *eve
         int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(strandRead + i);
         double eventMean = nanopore_getEventMean(events, eventIndex);
         double eventSd = nanopore_getEventSd(events, eventIndex);
-        double eventDuration = nanopore_getEventDuration(events, eventIndex);
+        double eventDeltaTime = nanopore_getEventDeltaTime(events, eventIndex);
         if (eventIndex > pE) {
             //st_uglyf("seqIndex: %lld eventIndex: %lld mean: %f sd: %f dur: %f kmerIndex: %lld\n",
-            //         i, eventIndex, eventMean, eventSd, eventDuration, kmerIndex);
-            EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDuration, kmerIndex);
+            //         i, eventIndex, eventMean, eventSd, eventDeltaTime, kmerIndex);
+            EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDeltaTime, kmerIndex);
             stList_append(map, t);
             pE = eventIndex;
         }
@@ -602,7 +607,7 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
         for (int i = 0; i < stList_length(kmerToEventMap); i++) {
             EventKmerTuple *t = stList_get(kmerToEventMap, i);
             double event = t->eventMean;
-            double time = t->eventDuration;
+            double time = t->deltaTime;
             int64_t id = t->kmerIndex;
 
             double level_mean = model[1 + (id * MODEL_PARAMS)];
@@ -650,7 +655,7 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
                 double level_var = level_sd * level_sd;
 
                 double event = t->eventMean;
-                double time = t->eventDuration;
+                double time = t->deltaTime;
 
                 double predicted_val = beta[0] + beta[1] * level_mean + beta[2] * time;
                 double residual = event - predicted_val;

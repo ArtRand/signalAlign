@@ -235,11 +235,11 @@ static void test_nanoporeScaleParams(CuTest *testCase) {
         double *event = eventSequence->get(eventSequence->elements, stIntTuple_get(pair, 1));
         double eventMean = *event;
         double eventSd = *(1 + event);
-        double eventDuration = *(2 + event);
+        double eventDuration = *(3 + event);
         CuAssertIntEquals(testCase, checkKmerIndex, t->kmerIndex);
         CuAssertDblEquals(testCase, eventMean, t->eventMean, 0.0);
         CuAssertDblEquals(testCase, eventSd, t->eventSd, 0.0);
-        CuAssertDblEquals(testCase, eventDuration, t->eventDuration, 0.0);
+        CuAssertDblEquals(testCase, eventDuration, t->deltaTime, 0.0);
     }
     NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
     StateMachine *sM = loadDescaledStateMachine3(npRead);

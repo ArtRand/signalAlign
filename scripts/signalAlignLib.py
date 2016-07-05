@@ -768,8 +768,9 @@ class NanoporeRead(object):
             print("", end="\n", file=out_file)
 
             # line 8 template events
+            template_start_time = self.template_events[0]['start']
             for mean, stdev, length, start in self.template_events['mean', 'stdv', 'length', 'start']:
-                print(mean, stdev, length, start, sep=' ', end=' ', file=out_file)
+                print(mean, stdev, length, (start - template_start_time), sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
             # line 9 complement 2D event map
@@ -778,8 +779,9 @@ class NanoporeRead(object):
             print("", end="\n", file=out_file)
 
             # line 10 complement events
+            complement_start_time = self.complement_events[0]['start']
             for mean, stdev, length, start in self.complement_events['mean', 'stdv', 'length', 'start']:
-                print(mean, stdev, length, start, sep=' ', end=' ', file=out_file)
+                print(mean, stdev, length, (start - complement_start_time), sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
             # line 11 model_state (template)
