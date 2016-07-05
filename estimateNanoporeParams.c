@@ -96,8 +96,8 @@ void printEventsAndParams(NanoporeRead *npRead) {
 int main(int argc, char *argv[]) {
     int64_t j = 0;
     char *npReadFile = NULL;
-    char *templateModelFile = stString_print("../models/testModel_template.model");
-    char *complementModelFile = stString_print("../models/testModel_complement.model");
+    char *templateModelFile = stString_print("../models/testModelR9_template.model");
+    char *complementModelFile = stString_print("../models/testModelR9_complement_pop2.model");
     double threshold = 0.8;
 
     int key;

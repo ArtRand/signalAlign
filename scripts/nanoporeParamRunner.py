@@ -96,9 +96,8 @@ def estimate_params(fast5, working_folder, threshold):
         return False
 
     # input (match) models
-    template_lookup_table = "../models/testModel_template.model"
-    complement_lookup_table = "../models/testModel_complement.model" if def_complement_model else \
-        "../models/testModel_complement_pop1.model"
+    template_lookup_table = "../models/testModelR9_template.model"
+    complement_lookup_table = "../models/testModelR9_complement_pop2.model"
 
     binary = "./estimateNanoporeParams"
 
