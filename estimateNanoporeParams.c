@@ -7,6 +7,8 @@
 #include "pairwiseAligner.h"
 #include "signalMachineUtils.h"
 
+#define ASSIGNMENT_THRESHOLD 0.0
+
 void usage() {
     fprintf(stderr, "estimateNanoporeParams: need more arguments\n");
 }
@@ -22,12 +24,6 @@ Sequence *initializeSequenceFromNpReadFile(NanoporeRead *npRead, bool templateSt
             (templateStrand ? npRead->templateEvents : npRead->complementEvents),
             sequence_getEvent, sequence_sliceEventSequence, event);
 }
-
-//stList *getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap, int64_t mapOffset) {
-//    stList *remapedAnchors = nanopore_remapAnchorPairsWithOffset(unmappedAnchors, eventMap, mapOffset);
-//    stList *filteredRemappedAnchors = filterToRemoveOverlap(remapedAnchors);
-//    return filteredRemappedAnchors;
-//}
 
 Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t queryStart, int64_t queryEnd,
                                                  int64_t *eventMap) {
@@ -62,6 +58,25 @@ void printEstimateOfParams(NanoporeRead *npRead, StateMachine *sM, double thresh
             trueParams->scale, trueParams->shift, trueParams->var,
             scale_err, shift_err, var_err,
             threshold, strand, readLabel);
+}
+
+void printEventsAndParams(NanoporeRead *npRead) {
+    // kmer | mean | stDev | prob | scale | shift | var | (drift)
+    fprintf(stdout, "kmer_index\tevent_mean\tevent_stdv\tp_model\tscale\tshift\tva\tstrand\n");
+    for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
+        int64_t index = i * NB_EVENT_PARAMS;
+        fprintf(stdout, "%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
+                npRead->templateModelState[i], npRead->templateEvents[index], npRead->templateEvents[index + 1],
+                npRead->templatePModel[i], npRead->templateParams.scale, npRead->templateParams.shift,
+                npRead->templateParams.var, "t");
+    }
+    for (int64_t i = 0; i < npRead->nbComplementEvents; i++) {
+        int64_t index = i * NB_EVENT_PARAMS;
+        fprintf(stdout, "%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
+                npRead->complementModelState[i], npRead->complementEvents[index], npRead->complementEvents[index + 1],
+                npRead->complementPModel[i], npRead->complementParams.scale, npRead->complementParams.shift,
+                npRead->complementParams.var, "c");
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -118,23 +133,19 @@ int main(int argc, char *argv[]) {
         st_errAbort("Could not find npRead here: %s\n", npReadFile);
     }
 
-    double thresholds[5] = {
-            0.0,
-            0.2,
-            0.4,
-            0.6,
-            0.8,
-    };
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    StateMachine *sMt = getStateMachine3(templateModelFile);
+    StateMachine *sMc = getStateMachine3(complementModelFile);
+    signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
+                                       nanopore_templateOneDAssignmentsFromRead);
+    signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
+                                       nanopore_complementOneDAssignmentsFromRead);
+    printEventsAndParams(npRead);
 
-    for (int64_t i = 0; i < 5; i++) {
-        NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
-        StateMachine *sMt = getStateMachine3(templateModelFile);
-        StateMachine *sMc = getStateMachine3(complementModelFile);
-        printEstimateOfParams(npRead, sMt, thresholds[i], &npRead->templateParams, npReadFile, "t",
-                              nanopore_getTemplateOneDAssignments);
-        printEstimateOfParams(npRead, sMc, thresholds[i], &npRead->complementParams, npReadFile, "c",
-                              nanopore_getComplementOneDAssignments);
-    }
+    //printEstimateOfParams(npRead, sMt, thresholds[i], &npRead->templateParams, npReadFile, "t",
+    //                      nanopore_getTemplateOneDAssignments);
+    //printEstimateOfParams(npRead, sMc, thresholds[i], &npRead->complementParams, npReadFile, "c",
+    //                      nanopore_getComplementOneDAssignments);
 
     //fprintf(stdout, "\n");
     (void) j;  // silence unused variable warning.

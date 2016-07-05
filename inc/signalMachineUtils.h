@@ -37,6 +37,10 @@ stList *signalUtils_guideAlignmentToRebasedAnchorPairs(struct PairwiseAlignment 
 
 stList *signalUtils_getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap, int64_t mapOffset);
 
+void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
+                                        NanoporeReadAdjustmentParameters *params, double assignmentThreshold,
+                                        stList *(*assignmentFunction)(NanoporeRead *, double));
+
 void signalUtils_ReferenceSequenceDestruct(ReferenceSequence *self);
 
 void printFoo();

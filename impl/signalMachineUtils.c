@@ -171,6 +171,27 @@ stList *signalUtils_getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eve
     return filteredRemappedAnchors;
 }
 
+void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
+                            NanoporeReadAdjustmentParameters *params, double assignmentThreshold,
+                            stList *(*assignmentFunction)(NanoporeRead *, double)) {
+    StateMachine3 *sM3 = (StateMachine3 *)sM;
+
+    st_uglyf("SENTINAL - Re-estimating parameters\n");
+    st_uglyf("SENTINAL - Before: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
+    stList *map = assignmentFunction(npRead, assignmentThreshold);
+    st_uglyf("SENTINAL - Map is %lld long\n", stList_length(map));
+    nanopore_compute_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
+    st_uglyf("SENTINAL - After: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
+    sM3->scale = params->scale;
+    sM3->shift = params->shift;
+    sM3->var = params->var;
+    if ((sM3->scale != params->scale) || (sM3->shift != params->shift) || (sM3->var != params->var)) {
+        st_errAbort("ERROR - Problem updating statemachine\n");
+    }
+    stList_destruct(map);
+    return;
+}
+
 void printFoo() {
     fprintf(stderr, "HELLO FOO!\n");
 }

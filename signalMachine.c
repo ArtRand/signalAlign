@@ -4,7 +4,7 @@
 #include "pairwiseAligner.h"
 
 #define STEP 6  // space between degenerate nucleotides in for error correction
-#define ESTIMATE_PARAMS 0
+#define ESTIMATE_PARAMS 1
 #define ASSIGNMENT_THRESHOLD 0.1
 
 void usage() {
@@ -213,26 +213,7 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
     destroy_nanopore_hdp(nHdp);
 }
 
-void estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
-                            NanoporeReadAdjustmentParameters *params,
-                            stList *(*assignmentFunction)(NanoporeRead *, double)) {
-    StateMachine3 *sM3 = (StateMachine3 *)sM;
 
-    st_uglyf("SENTINAL - Re-estimating parameters\n");
-    st_uglyf("SENTINAL - Before: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
-    stList *map = assignmentFunction(npRead, ASSIGNMENT_THRESHOLD);
-    st_uglyf("SENTINAL - Map is %lld long\n", stList_length(map));
-    nanopore_compute_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
-    st_uglyf("SENTINAL - After: scale: %f shift: %f var: %f\n", params->scale, params->shift, params->var);
-    sM3->scale = params->scale;
-    sM3->shift = params->shift;
-    sM3->var = params->var;
-    if ((sM3->scale != params->scale) || (sM3->shift != params->shift) || (sM3->var != params->var)) {
-        st_errAbort("ERROR - Problem updating statemachine\n");
-    }
-    stList_destruct(map);
-    return;
-}
 
 static double totalScore(stList *alignedPairs) {
     double score = 0.0;
@@ -668,7 +649,8 @@ int main(int argc, char *argv[]) {
 
         // temporary way to 'turn off' estimates if I want to
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_templateOneDAssignmentsFromRead);
+            signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
+                                               nanopore_templateOneDAssignmentsFromRead);
         }
 
         // get expectations for template
@@ -701,7 +683,8 @@ int main(int argc, char *argv[]) {
                                                         complementExpectations);
 
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_complementOneDAssignmentsFromRead);
+            signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
+                                               nanopore_complementOneDAssignmentsFromRead);
         }
 
         getSignalExpectations(sMc, complementModelFile, complementHmmFile, nHdpC,
@@ -748,7 +731,8 @@ int main(int argc, char *argv[]) {
 
         // re-estimate the nanoporeAdjustment parameters
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMt, npRead, &npRead->templateParams, nanopore_templateOneDAssignmentsFromRead);
+            signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
+                                               nanopore_templateOneDAssignmentsFromRead);
         }
 
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
@@ -781,7 +765,8 @@ int main(int argc, char *argv[]) {
                                                         sMtype, complement, nHdpC, complementHmmFile, NULL);
 
         if (ESTIMATE_PARAMS) {
-            estimateNanoporeParams(sMc, npRead, &npRead->complementParams, nanopore_complementOneDAssignmentsFromRead);
+            signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
+                                               nanopore_complementOneDAssignmentsFromRead);
         }
 
         stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
