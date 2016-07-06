@@ -8,19 +8,29 @@
 #include "CuTest.h"
 #include "pairwiseAligner.h"
 #include "discreteHmm.h"
-//#include "continuousHmm.h"
-//#include "randomSequences.h"
+#include "signalMachineUtils.h"
 
-Sequence *getTestReferenceSequence() {
+Sequence *getZymoReferenceSequence() {
     char *ZymoReferenceFilePath = stString_print("../../signalAlign/tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(ZymoReferenceFilePath, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
     int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
     Sequence *refSeq = sequence_constructKmerSequence(lX, ZymoReferenceSeq,
                                                       sequence_getKmer, sequence_sliceNucleotideSequence,
-            //sequence_getKmerWithBoundsCheck, sequence_sliceNucleotideSequence,
                                                       "CEO", 3, kmer);
     free(ZymoReferenceFilePath);
+    return refSeq;
+}
+
+Sequence *getEcoliReferenceSequence() {
+    char *ecoliReferencePath = stString_print("../../signalAlign/tests/test_npReads/ecoliRef.txt");
+    FILE *fH = fopen(ecoliReferencePath, "r");
+    char *referenceSeq = stFile_getLineFromFile(fH);
+    int64_t lX = sequence_correctSeqLength(strlen(referenceSeq), event);
+    Sequence *refSeq = sequence_constructKmerSequence(lX, referenceSeq,
+                                                      sequence_getKmer, sequence_sliceNucleotideSequence,
+                                                      "CEO", 3, kmer);
+    free(ecoliReferencePath);
     return refSeq;
 }
 
@@ -31,6 +41,17 @@ double absPercentDiff(double obs, double exp) {
 
 NanoporeRead *loadTestNanoporeRead() {
     char *npReadFile = stString_print("../tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    if (!stFile_exists(npReadFile)) {
+        st_errAbort("Could not find test npRead file\n");
+    }
+
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    free(npReadFile);
+    return npRead;
+}
+
+NanoporeRead *loadTestR9NanoporeRead() {
+    char *npReadFile = stString_print("../tests/test_npReads/c2925_ecoli_ch34_read1023.npRead");
     if (!stFile_exists(npReadFile)) {
         st_errAbort("Could not find test npRead file\n");
     }
@@ -59,6 +80,15 @@ StateMachine *loadDescaledStateMachine3(NanoporeRead *npRead) {
     free(templateModelFile);
     return sM;
 }
+
+StateMachine *loadR9DescaledStateMachine3(NanoporeRead *npRead) {
+    // load stateMachine from model file
+    char *templateModelFile = stString_print("../../signalAlign/models/testModelR9_template.model");
+    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams);
+    free(templateModelFile);
+    return sM;
+}
+
 
 StateMachine *loadStateMachineHdp(NanoporeRead *npRead) {
     char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
@@ -234,7 +264,7 @@ static void test_nanoporeScaleParamsFromAnchorPairs(CuTest *testCase) {
     NanoporeRead *npRead = loadTestNanoporeRead();
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
                                                   sequence_sliceEventSequence, event);
-    Sequence *referenceSequence = getTestReferenceSequence();
+    Sequence *referenceSequence = getZymoReferenceSequence();
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
     p->constraintDiagonalTrim = 18;
     stList *filteredRemappedAnchors = getRemappedAnchors(referenceSequence, npRead, p);
@@ -312,6 +342,27 @@ static void test_nanoporeScaleParamsFromStrandRead(CuTest *testCase) {
     CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->var, npRead->templateParams.var) < 50.0);
+}
+
+static void test_adjustForDrift(CuTest *testCase) {
+    NanoporeRead *npRead = loadTestR9NanoporeRead();
+    StateMachine *sM = loadR9DescaledStateMachine3(npRead);
+    signalUtils_estimateNanoporeParams(sM, npRead, &npRead->templateParams, 0.0,
+                                       nanopore_templateOneDAssignmentsFromRead,
+                                       nanopore_adjustTemplateEventsForDrift);
+    //nanopore_adjustEventsForDrift(npRead);
+    NanoporeRead *npRead_unadjusted = loadTestR9NanoporeRead();
+
+    for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
+        int64_t eventIndex = i * NB_EVENT_PARAMS;
+        double expected = npRead_unadjusted->templateEvents[eventIndex] -
+                (npRead->templateParams.drift * npRead->templateEvents[3 + eventIndex]);
+        double actual = npRead->templateEvents[eventIndex];
+        CuAssertDblEquals(testCase, expected, actual, 0.0);
+    }
+    stateMachine_destruct(sM);
+    nanopore_nanoporeReadDestruct(npRead);
+    nanopore_nanoporeReadDestruct(npRead_unadjusted);
 }
 
 static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
@@ -436,14 +487,8 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     sequence_destruct(SsY);
 }
 
-static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
-    // load the reference sequence and the nanopore read
-    Sequence *refSeq = getTestReferenceSequence();
-    NanoporeRead *npRead = loadTestNanoporeRead();
-
-    // load stateMachine(s)
-    StateMachine *sM = loadScaledStateMachine3(npRead);
-    StateMachine *sMdescaled = loadDescaledStateMachine3(npRead);
+static inline void test_stateMachine(CuTest *testCase, StateMachine *sM, NanoporeRead *npRead, Sequence *refSeq,
+                                     int64_t targetAlignedPairs) {
     // parameters for pairwise alignment using defaults
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
@@ -457,22 +502,43 @@ static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
     // do alignment with scaled stateMachine
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs,
-                                                       0, 0);
+                                                       1, 1);
     checkAlignedPairs(testCase, alignedPairs, refSeq->length, npRead->nbTemplateEvents);
     // for ch1_file1 template there should be this many aligned pairs with banding
-    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 1076);
+    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+    CuAssertTrue(testCase, stList_length(alignedPairs) == targetAlignedPairs);
+    stList_destruct(filteredRemappedAnchors);
+    sequence_destruct(eventSequence);
+    stList_destruct(alignedPairs);
+    pairwiseAlignmentBandingParameters_destruct(p);
+}
 
-    stList *alignedPairs_descaled = getAlignedPairsUsingAnchors(sMdescaled,
-                                                                refSeq, eventSequence, filteredRemappedAnchors, p,
-                                                                diagonalCalculationPosteriorMatchProbs,
-                                                                0, 0);
+static void test_r9StateMachineWithBanding(CuTest *testCase) {
+    Sequence *refSeq = getEcoliReferenceSequence();
+    NanoporeRead *npRead = loadTestR9NanoporeRead();
+    StateMachine *sM = loadR9DescaledStateMachine3(npRead);
+    signalUtils_estimateNanoporeParams(sM, npRead, &npRead->templateParams, 0.0,
+                                       nanopore_templateOneDAssignmentsFromRead,
+                                       nanopore_adjustTemplateEventsForDrift);
+    test_stateMachine(testCase, sM, npRead, refSeq, 3251);
+    stateMachine_destruct(sM);
+    nanopore_nanoporeReadDestruct(npRead);
+    sequence_destruct(refSeq);
+}
 
-    // for ch1_file1 template there should be this many aligned pairs with banding
-    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs_descaled));
-    CuAssertTrue(testCase, stList_length(alignedPairs_descaled) == 1076);
+static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
+    // load the reference sequence and the nanopore read
+    Sequence *refSeq = getZymoReferenceSequence();
+    NanoporeRead *npRead = loadTestNanoporeRead();
+
+    // load stateMachine(s)
+    StateMachine *sM = loadScaledStateMachine3(npRead);
+    StateMachine *sMdescaled = loadDescaledStateMachine3(npRead);
+    test_stateMachine(testCase, sM, npRead, refSeq, 1076);
+    test_stateMachine(testCase, sMdescaled, npRead, refSeq, 1076);
 
     // check against alignment without banding
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
     stList *alignedPairs_noband = getAlignedPairsWithoutBanding(sM, refSeq->elements, npRead->templateEvents,
                                                                 refSeq->length, npRead->nbTemplateEvents, p,
                                                                 sequence_getKmer, sequence_getEvent,
@@ -487,9 +553,6 @@ static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
     pairwiseAlignmentBandingParameters_destruct(p);
     nanopore_nanoporeReadDestruct(npRead);
     sequence_destruct(refSeq);
-    sequence_destruct(eventSequence);
-    stList_destruct(alignedPairs);
-    stList_destruct(alignedPairs_descaled);
     stList_destruct(alignedPairs_noband);
     stateMachine_destruct(sM);
     stateMachine_destruct(sMdescaled);
@@ -497,7 +560,7 @@ static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
 
 static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     // load the reference sequence and the nanopore read
-    Sequence *refSeq = getTestReferenceSequence();
+    Sequence *refSeq = getZymoReferenceSequence();
     NanoporeRead *npRead = loadTestNanoporeRead();
 
     // this is a hack for this test so that I don't have to load the 200MB hdp file
@@ -534,7 +597,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
 }
 
 static void test_DegenerateNucleotides(CuTest *testCase) {
-    Sequence *refSeq = getTestReferenceSequence();
+    Sequence *refSeq = getZymoReferenceSequence();
     NanoporeRead *npRead = loadTestNanoporeRead();
 
     StateMachine *sM = loadDescaledStateMachine3(npRead);
@@ -842,7 +905,7 @@ static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
 }
 
 static void test_continuousPairHmm_em(CuTest *testCase) {
-    Sequence *refSeq = getTestReferenceSequence();
+    Sequence *refSeq = getZymoReferenceSequence();
     NanoporeRead *npRead = loadTestNanoporeRead();
     StateMachine *sM = loadDescaledStateMachine3(npRead);
     double pLikelihood = -INFINITY;
@@ -899,7 +962,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
 }
 
 static void test_hdpHmm_emTransitions(CuTest *testCase) {
-    Sequence *refSeq = getTestReferenceSequence();
+    Sequence *refSeq = getZymoReferenceSequence();
     NanoporeRead *npRead = loadTestNanoporeRead();
     nanopore_descaleNanoporeRead(npRead);  // hack, remember
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -954,10 +1017,12 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromStrandRead);
+    SUITE_ADD_TEST(suite, test_adjustForDrift);
     SUITE_ADD_TEST(suite, test_models);
     SUITE_ADD_TEST(suite, test_loadPoreModel);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_stateMachine3_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_r9StateMachineWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_DegenerateNucleotides);
     SUITE_ADD_TEST(suite, test_makeAndCheckModels);

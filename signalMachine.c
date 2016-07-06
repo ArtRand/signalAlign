@@ -213,8 +213,6 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
     destroy_nanopore_hdp(nHdp);
 }
 
-
-
 static double totalScore(stList *alignedPairs) {
     double score = 0.0;
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
@@ -280,17 +278,6 @@ void getSignalExpectations(StateMachine *sM, const char *model, const char *inpu
                            NanoporeReadAdjustmentParameters npp, Sequence *eventSequence,
                            int64_t *eventMap, int64_t mapOffset, char *trainingTarget, PairwiseAlignmentParameters *p,
                            stList *unmappedAnchors, Strand strand, DegenerateType degenerate) {
-    // load match model, build stateMachine
-    //StateMachine *sM = buildStateMachine(model, npp, type, strand, nHdp);
-
-    // load HMM
-    //if (inputHmm == NULL) {
-    //    st_errAbort("[signalMachine] ERROR: need to have input HMMs\n");
-    //}
-
-    //fprintf(stderr, "signalAlign - loading HMM from file, %s\n", inputHmm);
-    //loadHmmRoutine(inputHmm, sM, type, hmmExpectations);
-
     // correct sequence length
     int64_t lX = sequence_correctSeqLength(strlen(trainingTarget), event);
 
@@ -650,7 +637,8 @@ int main(int argc, char *argv[]) {
         // temporary way to 'turn off' estimates if I want to
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
-                                               nanopore_templateOneDAssignmentsFromRead);
+                                               nanopore_templateOneDAssignmentsFromRead,
+                                               nanopore_adjustTemplateEventsForDrift);
         }
 
         // get expectations for template
@@ -684,7 +672,8 @@ int main(int argc, char *argv[]) {
 
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
-                                               nanopore_complementOneDAssignmentsFromRead);
+                                               nanopore_complementOneDAssignmentsFromRead,
+                                               nanopore_adjustComplementEventsForDrift);
         }
 
         getSignalExpectations(sMc, complementModelFile, complementHmmFile, nHdpC,
@@ -732,7 +721,8 @@ int main(int argc, char *argv[]) {
         // re-estimate the nanoporeAdjustment parameters
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
-                                               nanopore_templateOneDAssignmentsFromRead);
+                                               nanopore_templateOneDAssignmentsFromRead,
+                                               nanopore_adjustTemplateEventsForDrift);
         }
 
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
@@ -766,7 +756,8 @@ int main(int argc, char *argv[]) {
 
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
-                                               nanopore_complementOneDAssignmentsFromRead);
+                                               nanopore_complementOneDAssignmentsFromRead,
+                                               nanopore_adjustComplementEventsForDrift);
         }
 
         stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,

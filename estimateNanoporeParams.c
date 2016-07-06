@@ -174,9 +174,9 @@ int main(int argc, char *argv[]) {
     StateMachine *sMt = getStateMachine3(templateModelFile);
     StateMachine *sMc = getStateMachine3(complementModelFile);
     signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
-                                       nanopore_templateOneDAssignmentsFromRead);
+                                       nanopore_templateOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
     signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
-                                       nanopore_complementOneDAssignmentsFromRead);
+                                       nanopore_complementOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
     stList *templateKmers = lineTokensFromFile(npReadFile, 10);
     stList *complementKmers = lineTokensFromFile(npReadFile, 12);
     printEventsAndParams(npRead, templateKmers, complementKmers);

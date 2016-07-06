@@ -39,7 +39,8 @@ stList *signalUtils_getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eve
 
 void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
                                         NanoporeReadAdjustmentParameters *params, double assignmentThreshold,
-                                        stList *(*assignmentFunction)(NanoporeRead *, double));
+                                        stList *(*assignmentFunction)(NanoporeRead *, double),
+                                        void (*driftAdjustmentFunction)(NanoporeRead *npRead));
 
 void signalUtils_ReferenceSequenceDestruct(ReferenceSequence *self);
 

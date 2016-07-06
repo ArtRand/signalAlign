@@ -84,6 +84,16 @@ stList *nanopore_complementOneDAssignmentsFromRead(NanoporeRead *npRead, double 
 
 stList *nanopore_templateOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore);
 
+void nanopore_adjustEventsForDrift(NanoporeRead *npRead);
+
+void nanopore_adjustTemplateEventsForDrift(NanoporeRead *npRead);
+
+void nanopore_adjustComplementEventsForDrift(NanoporeRead *npRead);
+
+// this is just a placeholder function that doesn't do anything. it's used in estimateNanoporeParams so that
+// the program returns 'raw' un-adjusted event means
+void nanopore_dontAdjustEvents(NanoporeRead *npRead);
+
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead);
 
 void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params,

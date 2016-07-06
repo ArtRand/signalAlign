@@ -504,6 +504,33 @@ stList *nanopore_complementOneDAssignmentsFromRead(NanoporeRead *npRead, double 
                                                npRead->complementRead, npRead->complementReadLength);
 }
 
+static void nanopore_adjustEventsForDriftP(double *events, double drift, int64_t nbEvents) {
+    for (int64_t i = 0; i < nbEvents; i++) {
+        double deltaTime = nanopore_getEventDeltaTime(events, i);
+        events[i * NB_EVENT_PARAMS] = (events[i * NB_EVENT_PARAMS] - (deltaTime * drift));
+    }
+}
+
+void nanopore_adjustEventsForDrift(NanoporeRead *npRead) {
+    nanopore_adjustEventsForDriftP(npRead->templateEvents, npRead->templateParams.drift, npRead->nbTemplateEvents);
+    nanopore_adjustEventsForDriftP(npRead->complementEvents, npRead->complementParams.drift,
+                                   npRead->nbComplementEvents);
+}
+
+void nanopore_adjustTemplateEventsForDrift(NanoporeRead *npRead) {
+    nanopore_adjustEventsForDriftP(npRead->templateEvents, npRead->templateParams.drift, npRead->nbTemplateEvents);
+}
+
+void nanopore_dontAdjustEvents(NanoporeRead *npRead) {
+    (void) npRead;
+    return;
+}
+
+void nanopore_adjustComplementEventsForDrift(NanoporeRead *npRead) {
+    nanopore_adjustEventsForDriftP(npRead->complementEvents, npRead->complementParams.drift,
+                                   npRead->nbComplementEvents);
+}
+
 void nanopore_descaleNanoporeRead(NanoporeRead *npRead) {
     nanopore_descaleEvents(npRead->nbTemplateEvents, npRead->templateEvents,
                            npRead->templateParams.scale,
