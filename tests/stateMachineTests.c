@@ -215,7 +215,7 @@ static void test_models(CuTest *testCase) {
     stateMachine_destruct(sM);
 }
 
-static void test_nanoporeScaleParams(CuTest *testCase) {
+static void test_nanoporeScaleParamsFromAnchorPairs(CuTest *testCase) {
     NanoporeRead *npRead = loadTestNanoporeRead();
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
                                                   sequence_sliceEventSequence, event);
@@ -936,7 +936,7 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
-    SUITE_ADD_TEST(suite, test_nanoporeScaleParams);
+    SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
 
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromStrandRead);

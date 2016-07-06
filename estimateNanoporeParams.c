@@ -41,6 +41,25 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
     return eventS;
 }
 
+stList *listOneDKmers(const char *nanoporeReadFile, int64_t getLine) {
+    FILE *fH = fopen(nanoporeReadFile, "r");
+    int64_t lineCount = 1;
+    stList *tokens;
+    char *string = stFile_getLineFromFile(fH);
+    while (string != NULL) {
+        string = stFile_getLineFromFile(fH);
+        if (lineCount == getLine) {
+            tokens = stString_split(string);
+            return tokens;
+        } else {
+            lineCount++;
+            free(string);
+        }
+    }
+    fclose(fH);
+    return stList_construct3(0, &free);
+}
+
 void printEstimateOfParams(NanoporeRead *npRead, StateMachine *sM, double threshold,
                            NanoporeReadAdjustmentParameters *trueParams, char *readLabel, char *strand,
                            stList *(*assignmentFunction)(NanoporeRead *, double)) {
@@ -60,12 +79,15 @@ void printEstimateOfParams(NanoporeRead *npRead, StateMachine *sM, double thresh
             threshold, strand, readLabel);
 }
 
-void printEventsAndParams(NanoporeRead *npRead) {
-    // kmer | mean | stDev | prob | scale | shift | var | (drift)
+void printEventsAndParams(NanoporeRead *npRead, stList *templateKmers, stList *complementKmers) {
+    char *t_modelState, *c_modelState;
+    // kmer | mean | stDev | start | prob | scale | shift | var | drift | strand
     for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
         int64_t index = i * NB_EVENT_PARAMS;
-        fprintf(stdout, "%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
-                npRead->templateModelState[i],
+        t_modelState = (char *)stList_get(templateKmers, i);
+        fprintf(stdout, "%s\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
+                //npRead->templateModelState[i],
+                t_modelState,
                 npRead->templateEvents[index], // mean
                 npRead->templateEvents[index + 1], // st_dev
                 npRead->templateEvents[index + 3], // start
@@ -78,8 +100,10 @@ void printEventsAndParams(NanoporeRead *npRead) {
     }
     for (int64_t i = 0; i < npRead->nbComplementEvents; i++) {
         int64_t index = i * NB_EVENT_PARAMS;
-        fprintf(stdout, "%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
-                npRead->complementModelState[i],
+        c_modelState = (char *)stList_get(complementKmers, i);
+        fprintf(stdout, "%s\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
+                //npRead->complementModelState[i],
+                c_modelState,
                 npRead->complementEvents[index], // mean
                 npRead->complementEvents[index + 1], // st_dev
                 npRead->complementEvents[index + 3], // start
@@ -153,8 +177,11 @@ int main(int argc, char *argv[]) {
                                        nanopore_templateOneDAssignmentsFromRead);
     signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
                                        nanopore_complementOneDAssignmentsFromRead);
-    printEventsAndParams(npRead);
-
+    stList *templateKmers = listOneDKmers(npReadFile, 10);
+    stList *complementKmers = listOneDKmers(npReadFile, 12);
+    printEventsAndParams(npRead, templateKmers, complementKmers);
+    stList_destruct(templateKmers);
+    stList_destruct(complementKmers);
     (void) j;  // silence unused variable warning.
     return 0;
 }
