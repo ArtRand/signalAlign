@@ -194,6 +194,13 @@ static void test_loadPoreModel(CuTest *testCase) {
     stateMachine_destruct(sM);
 }
 
+static void test_stateMachineModel(CuTest *testCase, StateMachine *sM) {
+    for (int64_t i = 1; i < sM->parameterSetSize * MODEL_PARAMS; i++) {
+        CuAssertTrue(testCase, sM->EMISSION_MATCH_MATRIX[i] > 0.0);
+        CuAssertTrue(testCase, sM->EMISSION_MATCH_MATRIX[i] < INT64_MAX);
+    }
+}
+
 static void test_models(CuTest *testCase) {
     CuAssertTrue(testCase, stFile_exists("../models/testModel_template.model"));
     CuAssertTrue(testCase, stFile_exists("../models/testModel_complement.model"));
@@ -203,15 +210,23 @@ static void test_models(CuTest *testCase) {
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_complement.model"));
 
     StateMachine *sM = getStateMachine3("../models/testModel_template.model");
+    test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
-    sM = getStateMachine3("../models/testModel_template.model");
+
+    sM = getStateMachine3("../models/testModel_complement.model");
+    test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
+
     sM = getStateMachine3("../models/testModel_complement_pop1.model");
+    test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 
     sM = getStateMachine3("../models/testModelR9_template.model");
+    test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
+
     sM = getStateMachine3("../models/testModelR9_complement.model");
+    test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 }
 
@@ -937,10 +952,8 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
-
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromStrandRead);
-
     SUITE_ADD_TEST(suite, test_models);
     SUITE_ADD_TEST(suite, test_loadPoreModel);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);

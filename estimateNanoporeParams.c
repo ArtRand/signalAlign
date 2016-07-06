@@ -41,8 +41,8 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
     return eventS;
 }
 
-stList *listOneDKmers(const char *nanoporeReadFile, int64_t getLine) {
-    FILE *fH = fopen(nanoporeReadFile, "r");
+stList *lineTokensFromFile(const char *filePath, int64_t getLine) {
+    FILE *fH = fopen(filePath, "r");
     int64_t lineCount = 1;
     stList *tokens;
     char *string = stFile_getLineFromFile(fH);
@@ -177,11 +177,16 @@ int main(int argc, char *argv[]) {
                                        nanopore_templateOneDAssignmentsFromRead);
     signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
                                        nanopore_complementOneDAssignmentsFromRead);
-    stList *templateKmers = listOneDKmers(npReadFile, 10);
-    stList *complementKmers = listOneDKmers(npReadFile, 12);
+    stList *templateKmers = lineTokensFromFile(npReadFile, 10);
+    stList *complementKmers = lineTokensFromFile(npReadFile, 12);
     printEventsAndParams(npRead, templateKmers, complementKmers);
+
     stList_destruct(templateKmers);
     stList_destruct(complementKmers);
+    nanopore_nanoporeReadDestruct(npRead);
+    stateMachine_destruct(sMt);
+    stateMachine_destruct(sMc);
+
     (void) j;  // silence unused variable warning.
     return 0;
 }
