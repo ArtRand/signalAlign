@@ -108,6 +108,9 @@ def estimate_params(fast5, working_folder):
     print("running command {command}".format(command=command), file=sys.stderr)
 
     os.system(command)
+    working_folder.remove_file(npRead_path)
+    working_folder.remove_file(npRead_fasta)
+    return
 
 
 def main(args):
