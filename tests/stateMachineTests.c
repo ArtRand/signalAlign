@@ -288,7 +288,7 @@ static void test_nanoporeScaleParamsFromAnchorPairs(CuTest *testCase) {
     }
     NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
     StateMachine *sM = loadDescaledStateMachine3(npRead);
-    nanopore_compute_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
+    nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
 
     CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 10.0);
@@ -309,7 +309,7 @@ static void test_nanoporeScaleParamsFromOneDAssignments(CuTest *testCase) {
     //st_uglyf("Map has %lld assignments\n", stList_length(templateMap));
     NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
     StateMachine *sM = loadDescaledStateMachine3(npRead);
-    nanopore_compute_scale_params(sM->EMISSION_MATCH_MATRIX, templateMap, params, FALSE, TRUE);
+    nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, templateMap, params, FALSE, TRUE);
 /*
     st_uglyf("npRead scale: %f, estimated: %f diff %f\n", npRead->templateParams.scale, params->scale,
              absPercentDiff(params->scale, npRead->templateParams.scale));
@@ -327,18 +327,27 @@ static void test_nanoporeScaleParamsFromStrandRead(CuTest *testCase) {
     NanoporeRead *npRead = loadTestNanoporeRead();
     stList *map = nanopore_getOneDAssignmentsFromRead(npRead->templateStrandEventMap, npRead->templateEvents,
                                                       npRead->templateRead, npRead->templateReadLength);
-    //st_uglyf("Map has %lld assignments\n", stList_length(map));
+    st_uglyf("Map has %lld assignments\n", stList_length(map));
     NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
     StateMachine *sM = loadDescaledStateMachine3(npRead);
-    nanopore_compute_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
-/*
+    nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, TRUE, TRUE);
+    nanopore_compute_noise_scale_params(sM->EMISSION_MATCH_MATRIX, map, params);
+
     st_uglyf("npRead scale: %f, estimated: %f diff %f\n", npRead->templateParams.scale, params->scale,
              absPercentDiff(params->scale, npRead->templateParams.scale));
     st_uglyf("npRead shift: %f, estimated: %f diff %f\n", npRead->templateParams.shift, params->shift,
              absPercentDiff(params->shift, npRead->templateParams.shift));
     st_uglyf("npRead var: %f, estimated: %f diff %f\n", npRead->templateParams.var, params->var,
              absPercentDiff(params->var, npRead->templateParams.var));
-*/
+    st_uglyf("npRead drift: %f, estimated: %f diff %f\n", npRead->templateParams.drift, params->drift,
+             absPercentDiff(params->drift, npRead->templateParams.drift));
+
+    st_uglyf("npRead scale_sd: %f, estimated: %f diff %f\n", npRead->templateParams.scale_sd, params->scale_sd,
+             absPercentDiff(params->scale_sd, npRead->templateParams.scale_sd));
+    st_uglyf("npRead var_sd: %f, estimated: %f diff %f\n", npRead->templateParams.var_sd, params->var_sd,
+             absPercentDiff(params->var_sd, npRead->templateParams.var_sd));
+
+
     CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->var, npRead->templateParams.var) < 50.0);
@@ -520,7 +529,7 @@ static void test_r9StateMachineWithBanding(CuTest *testCase) {
     signalUtils_estimateNanoporeParams(sM, npRead, &npRead->templateParams, 0.0,
                                        nanopore_templateOneDAssignmentsFromRead,
                                        nanopore_adjustTemplateEventsForDrift);
-    test_stateMachine(testCase, sM, npRead, refSeq, 3251);
+    test_stateMachine(testCase, sM, npRead, refSeq, 3441);
     stateMachine_destruct(sM);
     nanopore_nanoporeReadDestruct(npRead);
     sequence_destruct(refSeq);
@@ -1013,6 +1022,7 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
+    
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);

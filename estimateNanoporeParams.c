@@ -66,7 +66,7 @@ void printEstimateOfParams(NanoporeRead *npRead, StateMachine *sM, double thresh
     NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
     stList *map = assignmentFunction(npRead, threshold);
     fprintf(stderr, "Got %"PRId64" assignments\n", stList_length(map));
-    nanopore_compute_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
+    nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
 
     double scale_err = absPercentDiff(params->scale, trueParams->scale);
     double shift_err = absPercentDiff(params->shift, trueParams->shift);

@@ -174,29 +174,33 @@ stList *signalUtils_getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eve
 void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
                                         NanoporeReadAdjustmentParameters *params, double assignmentThreshold,
                                         stList *(*assignmentFunction)(NanoporeRead *, double),
-                                        void (*driftAdjustmentFunction)(NanoporeRead *npRead)) {
+                                        void (*driftAdjustmentFunction)(NanoporeRead *)) {
     StateMachine3 *sM3 = (StateMachine3 *)sM;
 
     st_uglyf("SENTINEL - Re-estimating parameters\n");
     st_uglyf("SENTINEL - Before: scale: %f shift: %f var: %f drift %f\n", params->scale, params->shift, params->var,
              params->drift);
-
+    st_uglyf("SENTINEL - Before: scale_sd: %f var_sd: %f\n", params->scale_sd, params->var_sd);
     stList *map = assignmentFunction(npRead, assignmentThreshold);
     st_uglyf("SENTINEL - Map is %lld long\n", stList_length(map));
 
-    nanopore_compute_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params, TRUE, TRUE);
+    nanopore_compute_mean_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params, TRUE, TRUE);
+    nanopore_compute_noise_scale_params(sM3->model.EMISSION_MATCH_MATRIX, map, params);
 
     st_uglyf("SENTINEL - After: scale: %f shift: %f var: %f drift: %f\n", params->scale, params->shift, params->var,
     params->drift);
+    st_uglyf("SENTINEL - After: scale_sd: %f var_sd: %f\n", params->scale_sd, params->var_sd);
 
     sM3->scale = params->scale;
     sM3->shift = params->shift;
     sM3->var = params->var;
+
     if ((sM3->scale != params->scale) || (sM3->shift != params->shift) || (sM3->var != params->var)) {
         st_errAbort("ERROR - Problem updating stateMachine\n");
     }
 
     driftAdjustmentFunction(npRead);
+    emissions_signal_scaleNoise((StateMachine *)sM3, *params);
 
     stList_destruct(map);
     return;

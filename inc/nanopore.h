@@ -12,6 +12,7 @@ typedef struct _nanoporeReadAdjustmentParameters {
     double scale;
     double shift;
     double var;
+    double shift_sd;
     double scale_sd;
     double var_sd;
     double drift;
@@ -51,7 +52,6 @@ typedef struct _nanoporeRead {
 typedef struct _eventKmerTuple {
     double eventMean;
     double eventSd;
-    //double eventDuration;
     double deltaTime;
     int64_t kmerIndex;
 } EventKmerTuple;
@@ -96,8 +96,9 @@ void nanopore_dontAdjustEvents(NanoporeRead *npRead);
 
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead);
 
-void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params,
-                                   bool drift_out, bool var_out);
+void nanopore_compute_mean_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params, bool drift_out, bool var_out);
+
+void nanopore_compute_noise_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params);
 
 void nanopore_lineq_solve(double *A, double *b, double *x_out, int64_t n);
 

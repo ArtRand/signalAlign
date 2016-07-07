@@ -301,6 +301,8 @@ void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, d
 
 void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shift, double var);
 
+void emissions_signal_scaleNoise(StateMachine *sM, NanoporeReadAdjustmentParameters npp);
+
 double emissions_signal_getDurationProb(void *event, int64_t n);
 
 StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp);

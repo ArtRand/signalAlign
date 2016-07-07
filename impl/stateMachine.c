@@ -645,7 +645,7 @@ void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shif
     }
 }
 
-static void emissions_signal_scaleNoise(StateMachine *sM, NanoporeReadAdjustmentParameters npp) {
+void emissions_signal_scaleNoise(StateMachine *sM, NanoporeReadAdjustmentParameters npp) {
     for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS) + 1; i += MODEL_PARAMS) {
         // Fluctuation (noise) adjustments
         // noise_mean *= scale_sd

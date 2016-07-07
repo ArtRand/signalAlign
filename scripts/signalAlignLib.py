@@ -566,10 +566,6 @@ class NanoporeRead(object):
 
     def get_template_events(self):
         if self.template_event_table_address in self.fastFive:
-            #self.template_event_table = self.fastFive[self.template_event_table_address]
-            # maybe move to transform function
-            #self.template_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
-            #                        for e in self.template_event_table]
             self.template_events = self.fastFive[self.template_event_table_address]
             return True
 
@@ -578,9 +574,6 @@ class NanoporeRead(object):
 
     def get_complement_events(self):
         if self.complement_event_table_address in self.fastFive:
-            #self.complement_event_table = self.fastFive[self.complement_event_table_address]
-            #self.complement_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
-            #                          for e in self.complement_event_table]
             self.complement_events = self.fastFive[self.complement_event_table_address]
             return True
 

@@ -40,7 +40,11 @@ static NanoporeRead *nanopore_NanoporeReadConstruct(int64_t readLength,
     npRead->complementPModel = st_malloc(npRead->nbComplementEvents * sizeof(double));
 
     npRead->scaled = TRUE;
-    // return
+
+    // initialize to 0.0 these params are not in the ONT models
+    npRead->templateParams.shift_sd = 0.0;
+    npRead->complementParams.shift_sd = 0.0;
+
     return npRead;
 }
 
@@ -84,6 +88,7 @@ NanoporeReadAdjustmentParameters *nanopore_readAdjustmentParametersConstruct() {
     params->scale = 0.0;
     params->scale_sd = 0.0;
     params->shift = 0.0;
+    params->shift_sd = 0.0;
     params->var = 0.0;
     params->var_sd = 0.0;
     params->drift = 0.0;
@@ -521,14 +526,14 @@ void nanopore_adjustTemplateEventsForDrift(NanoporeRead *npRead) {
     nanopore_adjustEventsForDriftP(npRead->templateEvents, npRead->templateParams.drift, npRead->nbTemplateEvents);
 }
 
-void nanopore_dontAdjustEvents(NanoporeRead *npRead) {
-    (void) npRead;
-    return;
-}
-
 void nanopore_adjustComplementEventsForDrift(NanoporeRead *npRead) {
     nanopore_adjustEventsForDriftP(npRead->complementEvents, npRead->complementParams.drift,
                                    npRead->nbComplementEvents);
+}
+
+void nanopore_dontAdjustEvents(NanoporeRead *npRead) {
+    (void) npRead;
+    return;
 }
 
 void nanopore_descaleNanoporeRead(NanoporeRead *npRead) {
@@ -619,8 +624,8 @@ void nanopore_lineq_solve(double *A, double *b, double *x_out, int64_t n) {
 }
 
 // weighted least squares to compute normalization params
-void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params,
-                                   bool drift_out, bool var_out) {
+void nanopore_compute_mean_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params,
+                                        bool drift_out, bool var_out) {
     double* XWX = NULL;
     double* XWy = NULL;
     double* beta = NULL;
@@ -751,3 +756,71 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
     free(XWy);
     free(beta);
 }
+
+void nanopore_compute_noise_scale_params(double *model, stList *kmerToEventMap,
+                                         NanoporeReadAdjustmentParameters *params) {
+    double* XWX = NULL;
+    double* XWy = NULL;
+    double* beta = NULL;
+    if (stList_length(kmerToEventMap) == 0) {
+        st_errAbort("Cannot get scale params with no assignments\n");
+    }
+
+    XWX = (double*) calloc(4, sizeof(double));
+    XWy = (double*) calloc(2, sizeof(double));
+
+    for (int i = 0; i < stList_length(kmerToEventMap); i++) {
+        EventKmerTuple *t = stList_get(kmerToEventMap, i);
+
+        double noise = t->eventSd;
+        int64_t id = t->kmerIndex;
+
+        double noise_mean = model[1 + (id * MODEL_PARAMS + 2)];
+
+        double noise_sd = model[1 + (id * MODEL_PARAMS + 3)];
+        // weights should technically include variance parameter, but will only results in
+        // some inefficiency, no bias
+        double inv_var = 1.0 / (noise_sd * noise_sd);
+
+        double scaled_mean = noise_mean * inv_var;
+
+        XWX[0] += inv_var;
+        XWX[1] += scaled_mean;
+        XWX[3] += scaled_mean * noise_mean;
+
+        XWy[0] += inv_var * noise;
+        XWy[1] += scaled_mean * noise;
+    }
+    XWX[2] = XWX[1];
+
+    beta = (double*) malloc(sizeof(double) * 2);
+
+    nanopore_lineq_solve(XWX, XWy, beta, 2);
+
+    params->shift_sd = beta[0];
+    params->scale_sd = beta[1];
+
+    double dispersion = 0.0;
+    for (int64_t i = 0; i < stList_length(kmerToEventMap); i++) {
+        EventKmerTuple *t = stList_get(kmerToEventMap, i);
+
+        int64_t id = t->kmerIndex;
+
+        double nosie_mean = model[1 + (id * MODEL_PARAMS + 2)];
+        double noise_sd = model[1 + (id * MODEL_PARAMS + 3)];
+
+        double level_var = noise_sd * noise_sd;
+
+        double event = t->eventSd;
+
+        double predicted_val = beta[0] + beta[1] * nosie_mean;
+        double residual = event - predicted_val;
+        dispersion += (residual * residual) / level_var;
+    }
+    params->var_sd = sqrt(dispersion / stList_length(kmerToEventMap));
+
+    free(XWX);
+    free(XWy);
+    free(beta);
+}
+
