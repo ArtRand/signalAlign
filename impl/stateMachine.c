@@ -582,7 +582,8 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3
     //st_uglyf("MATCHING--x_i:%s (index: %lld), e_j mean: %f, \n modelMean: %f, modelLsd: %f probEvent: %f probNoise: %f, combined: %f\n",
     //         kmer_i, kmerIndex, eventMean, levelMean, levelStdDev, l_probEventMean, l_probEventNoise, prob);
 
-    return l_probEventMean + l_probEventNoise;
+    //return l_probEventMean + l_probEventNoise;
+    return l_probEventMean;
 }
 
 double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x_i, void *e_j, bool match) {
@@ -1134,7 +1135,19 @@ void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
     sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
     sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
 }
- */
+*/
+
+static void stateMachine3_setModelToHdpExpectedValues(StateMachine *sM, NanoporeHDP *nhdp) {
+    // get all the kmers that the HDP has data for
+    stList *kmers = path_listPotentialKmers(nhdp->kmer_length, nhdp->alphabet_size, nhdp->alphabet);
+    for (int64_t i = 0; i < stList_length(kmers); i++) {
+        int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(stList_get(kmers, i));
+        int64_t meanIndex = 1 + (kmerIndex * MODEL_PARAMS);
+        int64_t sdIndex = 1 + (kmerIndex * MODEL_PARAMS + 1);
+        sM->EMISSION_MATCH_MATRIX[meanIndex] = kmer_distr_expected_val(nhdp, stList_get(kmers, i));
+        sM->EMISSION_MATCH_MATRIX[sdIndex] = sqrt(kmer_distr_variance(nhdp, stList_get(kmers, i)));
+    }
+}
 
 static void stateMachine3_cellCalculate(StateMachine *sM,
                                         void *current, void *lower, void *middle, void *upper,
@@ -1472,7 +1485,6 @@ StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjus
 
     return (StateMachine *)sM3;
 }
-
 
 StateMachine *getStateMachine3(const char *modelFile) {
     if (!stFile_exists(modelFile)) {

@@ -497,10 +497,10 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
 }
 
 static inline void test_stateMachine(CuTest *testCase, StateMachine *sM, NanoporeRead *npRead, Sequence *refSeq,
-                                     int64_t targetAlignedPairs) {
+                                     int64_t targetAlignedPairs, double threshold) {
     // parameters for pairwise alignment using defaults
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-
+    p->threshold = threshold;
     // get anchors using lastz
     stList *filteredRemappedAnchors = getRemappedAnchors(refSeq, npRead, p);
 
@@ -513,8 +513,8 @@ static inline void test_stateMachine(CuTest *testCase, StateMachine *sM, Nanopor
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        1, 1);
     checkAlignedPairs(testCase, alignedPairs, refSeq->length, npRead->nbTemplateEvents);
-    // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+
+    st_uglyf("got %lld alignedPairs \n", stList_length(alignedPairs));
     CuAssertTrue(testCase, stList_length(alignedPairs) == targetAlignedPairs);
     stList_destruct(filteredRemappedAnchors);
     sequence_destruct(eventSequence);
@@ -526,11 +526,26 @@ static void test_r9StateMachineWithBanding(CuTest *testCase) {
     Sequence *refSeq = getEcoliReferenceSequence();
     NanoporeRead *npRead = loadTestR9NanoporeRead();
     StateMachine *sM = loadR9DescaledStateMachine3(npRead);
+    StateMachine *sM_2 = loadR9DescaledStateMachine3(npRead);
     signalUtils_estimateNanoporeParams(sM, npRead, &npRead->templateParams, 0.0,
                                        nanopore_templateOneDAssignmentsFromRead,
                                        nanopore_adjustTemplateEventsForDrift);
-    test_stateMachine(testCase, sM, npRead, refSeq, 3441);
+    test_stateMachine(testCase, sM, npRead, refSeq, 3441, 0.01);
+
+    // test noise scaling
+    for (int64_t i = 0; i < NUM_OF_KMERS; i++) {
+        int64_t noiseMeanIndex = 1 + (i * MODEL_PARAMS + 2);
+        int64_t noiseLambdaIndex = 1 + (i * MODEL_PARAMS + 4);
+        CuAssertTrue(testCase,
+                     sM->EMISSION_MATCH_MATRIX[noiseMeanIndex] ==
+                             sM_2->EMISSION_MATCH_MATRIX[noiseMeanIndex] * npRead->templateParams.scale_sd);
+        CuAssertTrue(testCase,
+                     sM->EMISSION_MATCH_MATRIX[noiseLambdaIndex] ==
+                             sM_2->EMISSION_MATCH_MATRIX[noiseLambdaIndex] * npRead->templateParams.var_sd);
+    }
+
     stateMachine_destruct(sM);
+    stateMachine_destruct(sM_2);
     nanopore_nanoporeReadDestruct(npRead);
     sequence_destruct(refSeq);
 }
@@ -543,8 +558,8 @@ static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
     // load stateMachine(s)
     StateMachine *sM = loadScaledStateMachine3(npRead);
     StateMachine *sMdescaled = loadDescaledStateMachine3(npRead);
-    test_stateMachine(testCase, sM, npRead, refSeq, 1076);
-    test_stateMachine(testCase, sMdescaled, npRead, refSeq, 1076);
+    test_stateMachine(testCase, sM, npRead, refSeq, 1076, 0.01);
+    test_stateMachine(testCase, sMdescaled, npRead, refSeq, 1076, 0.01);
 
     // check against alignment without banding
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -576,32 +591,12 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     nanopore_descaleNanoporeRead(npRead);
 
     StateMachine *sM = loadStateMachineHdp(npRead);
-
+    test_stateMachine(testCase, sM, npRead, refSeq, 1217, 0.1);
     // parameters for pairwise alignment using defaults
-    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-    p->threshold = 0.1;
-
-    // get anchors using lastz
-    stList *filteredRemappedAnchors = getRemappedAnchors(refSeq, npRead, p);
-
-    Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
-    // do alignment of template events
-    stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
-                                                       diagonalCalculationPosteriorMatchProbs,
-                                                       0, 0);
-    checkAlignedPairs(testCase, alignedPairs, refSeq->length, npRead->nbTemplateEvents);
-
-    // for ch1_file1 template there should be this many aligned pairs with banding
-    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 1212);
 
     // clean
-    pairwiseAlignmentBandingParameters_destruct(p);
     nanopore_nanoporeReadDestruct(npRead);
     sequence_destruct(refSeq);
-    sequence_destruct(eventSequence);
-    stList_destruct(alignedPairs);
     stateMachine_destruct(sM);
 }
 
@@ -1022,7 +1017,6 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);

@@ -359,7 +359,7 @@ int64_t* kmer_to_word(char* kmer, char* alphabet, int64_t alphabet_size, int64_t
         while (kmer[i] != alphabet[j]) {
             j++;
             if (j == alphabet_size) {
-                fprintf(stderr, "vanillaAlign - ERROR: K-mer contains character outside alphabet. "
+                fprintf(stderr, "[signalAlign] - ERROR: K-mer contains character outside alphabet. "
                         "Got offending kmer is: %s. alphabet is %s\n", kmer, alphabet);
                 exit(EXIT_FAILURE);
             }
