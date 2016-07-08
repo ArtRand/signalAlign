@@ -575,8 +575,8 @@ static void test_hdCellConstructWorstCase(CuTest *testCase) {
 
 static void test_dpDiagonal(CuTest *testCase) {
     // load model and make stateMachine
-    char *testModel = stString_print("../../signalAlign/models/testModel_template.model");
-    StateMachine *sM = getStateMachine3(testModel);
+    char *testModelPath = stString_print("../../signalAlign/models/testModel_template.model");
+    StateMachine *sM = getStateMachine3(testModelPath);
 
     Diagonal diagonal = diagonal_construct(3, -1, 1); // makes a diagonal with 2 cells
 
@@ -612,7 +612,7 @@ static void test_dpDiagonal(CuTest *testCase) {
     CuAssertTrue(testCase, dpDiagonal_equals(dpDiagonal, dpDiagonal2));
     //Check it runs
     CuAssertDblEquals(testCase, totalProb, dpDiagonal_dotProduct(dpDiagonal, dpDiagonal2), 0.001);
-
+    free(testModelPath);
     dpDiagonal_destruct(dpDiagonal);
     dpDiagonal_destruct(dpDiagonal2);
 
@@ -798,8 +798,8 @@ CuSuite *signalPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
-    SUITE_ADD_TEST(suite, test_getBlastPairs);
-    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+    //SUITE_ADD_TEST(suite, test_getBlastPairs);
+    //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
 
     //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);  // wonky
 

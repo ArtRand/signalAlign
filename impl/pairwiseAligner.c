@@ -261,6 +261,37 @@ double logAdd(double x, double y) {
 static double _NULLEVENT[] = {LOG_ZERO, 0};
 static double *NULLEVENT = _NULLEVENT;
 
+char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size) {
+    // copy and sort alphabet
+    char* internal_alphabet = (char *)malloc(sizeof(char) * (alphabet_size + 1));
+    for (int64_t i = 0; i < alphabet_size; i++) {
+        internal_alphabet[i] = alphabet[i];
+    }
+
+    int64_t min_idx;
+    char temp;
+    for (int64_t i = 0; i < alphabet_size; i++) {
+        min_idx = i;
+        for (int64_t j = i + 1; j < alphabet_size; j++) {
+            if (internal_alphabet[j] < internal_alphabet[min_idx]) {
+                min_idx = j;
+            }
+        }
+        temp = internal_alphabet[i];
+        internal_alphabet[i] = internal_alphabet[min_idx];
+        internal_alphabet[min_idx] = temp;
+    }
+
+    for (int64_t i = 1; i < alphabet_size; i++) {
+        if (alphabet[i - 1] == alphabet[i]) {
+            fprintf(stderr, "Characters of alphabet must be distinct.\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    internal_alphabet[alphabet_size] = '\0';
+    return internal_alphabet;
+}
+
 Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t), SequenceType type) {
     Sequence *self = malloc(sizeof(Sequence));
     self->type = type;
@@ -977,7 +1008,7 @@ DpDiagonal *dpMatrix_getDiagonal(DpMatrix *dpMatrix, int64_t xay) {
 int64_t dpMatrix_getActiveDiagonalNumber(DpMatrix *dpMatrix) {
     return dpMatrix->activeDiagonals;
 }
-
+// todo can add kmerLength here, percolate down to path
 DpDiagonal *dpMatrix_createDiagonal(DpMatrix *dpMatrix, Diagonal diagonal, Sequence *sX) {
     if (sX->type != kmer) {
         st_errAbort("dpMatrix_createDiagonal: wrong king of sequence got: %lld\n", sX->type);
@@ -1205,7 +1236,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
     DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
 
     //Initialise forward matrix.
-    dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator), sX), // added sX here
+    dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator), sX),
                                 sM, alignmentHasRaggedLeftEnd ? sM->raggedStartStateProb : sM->startStateProb);
 
     //Backward matrix.
@@ -1844,8 +1875,8 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
 
     for (int64_t i = 0; i <= diagonalNumber; i++) {
         Diagonal d = bandIterator_getNext(bandIt);
-        dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, d, ScX)); // added sX here
-        dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, d, ScX)); // added sX here
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, d, ScX));
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, d, ScX));
     }
 
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(forwardDpMatrix, 0), sM,

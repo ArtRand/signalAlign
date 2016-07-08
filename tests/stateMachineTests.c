@@ -1026,14 +1026,14 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_loadPoreModel);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_stateMachine3_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_r9StateMachineWithBanding);
+    //SUITE_ADD_TEST(suite, test_r9StateMachineWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_DegenerateNucleotides);
     SUITE_ADD_TEST(suite, test_makeAndCheckModels);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
-    SUITE_ADD_TEST(suite, test_continuousPairHmm);
-    SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
-    SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
+    //SUITE_ADD_TEST(suite, test_continuousPairHmm);
+    //SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
+    //SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
 
     return suite;
 }

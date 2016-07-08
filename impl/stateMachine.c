@@ -530,16 +530,16 @@ double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, vo
     double levelMean = emissions_signal_getModelLevelMean(self->model.EMISSION_MATCH_MATRIX, kmerIndex);
     double *normedMean = (double *)st_malloc(sizeof(double));
     *normedMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean,
-                                                                self->scale, self->shift, self->var);
+                                                                self->model.scale, self->model.shift, self->model.var);
 
-    double density = (1 / self->var) * get_nanopore_kmer_density(self->hdpModel, x_i, normedMean);
+    double density = (1 / self->model.var) * get_nanopore_kmer_density(self->hdpModel, x_i, normedMean);
     free(normedMean);
     free(kmer_i);
     return log(density);
 }
 
 
-double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3 *sM,
+double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3 *self,
                                                                    void *x_i, void *e_j, bool match) {
     if (x_i == NULL) {
         return LOG_ZERO;
@@ -557,12 +557,15 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3
     kmer_i[KMER_LENGTH] = '\0';
 
     // get index
-    int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
-    double *eventModel = match ? sM->model.EMISSION_MATCH_MATRIX : sM->model.EMISSION_GAP_Y_MATRIX;
+    //int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
+    int64_t kmerIndex = kmer_id(kmer_i, self->model.alphabet, self->model.alphabetSize, self->model.kmerLength);
+
+    double *eventModel = match ? self->model.EMISSION_MATCH_MATRIX : self->model.EMISSION_GAP_Y_MATRIX;
     // get the µ and σ for the level and noise for the model
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
     double levelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
-    eventMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean, sM->scale, sM->shift, sM->var);
+    eventMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean, self->model.scale,
+                                                              self->model.shift, self->model.var);
 
     double noiseMean = emissions_signal_getModelFluctuationMean(eventModel, kmerIndex);
     //double noiseStdDev = emissions_signal_getModelFluctuationSd(eventModel, kmerIndex);
@@ -1282,7 +1285,8 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
 }
 
 ///////////////////////////////////////////// CORE FUNCTIONS ////////////////////////////////////////////////////////
-StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
+StateMachine *stateMachine3_construct(StateMachineType type,
+                                      const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
                                       void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                       double (*gapXProbFcn)(const double *, void *),
@@ -1303,7 +1307,13 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
 
     // setup the parent class
     sM3->model.type = type;
-    sM3->model.parameterSetSize = parameterSetSize;
+    //sM3->model.parameterSetSize = parameterSetSize;
+    sM3->model.parameterSetSize = intPow(alphabetSize, kmerLength);
+
+    sM3->model.alphabetSize = alphabetSize;
+    sM3->model.alphabet = sequence_prepareAlphabet(alphabet, alphabetSize);
+    sM3->model.kmerLength = kmerLength;
+
     sM3->model.stateNumber = 3;
     sM3->model.matchState = match;
     sM3->model.startStateProb = stateMachine3_startStateProb;
@@ -1322,10 +1332,10 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
     setTransitionsToDefaults((StateMachine *) sM3);
 
     // set emissions to defaults or zeros
-    setEmissionsDefaults((StateMachine *) sM3, parameterSetSize); // mallocs are in here
+    setEmissionsDefaults((StateMachine *) sM3, sM3->model.parameterSetSize); // mallocs are in here
 
     // set gap probs
-    for (int64_t i = 0; i < parameterSetSize; i++) {
+    for (int64_t i = 0; i < sM3->model.parameterSetSize; i++) {
         sM3->model.EMISSION_GAP_X_PROBS[i] = -2.3025850929940455; // log(0.1)
     }
 
@@ -1333,16 +1343,14 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
     return (StateMachine *) sM3;
 }
 
-StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t parameterSetSize,
-                                         void (*setTransitionsToDefaults)(StateMachine *sM),
-                                         void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
+StateMachine *stateMachine3Hdp_construct(StateMachineType type,
+                                         const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
+                                         void (*setTransitionsToDefaults)(StateMachine *),
+                                         void (*setEmissionsDefaults)(StateMachine *, int64_t),
                                          NanoporeHDP *hdpModel,
-                                         //double (*gapXProbFcn)(const double *, void *),
-                                         //double (*gapYProbFcn)(NanoporeHDP *, void *, void *),
                                          double (*matchProbFcn)(StateMachine3_HDP *, void *, void *),
-                                         void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
-                                                                      int64_t from, int64_t to,
-                                                                      double eP, double tP, void *extraArgs)) {
+                                         void (*cellCalcUpdateExpFcn)(double *, double *, int64_t, int64_t,
+                                                                      double , double , void *)) {
     StateMachine3_HDP *sM3 = st_malloc(sizeof(StateMachine3_HDP));
     if (type != threeStateHdp) {
         st_errAbort("Tried to create a three state state-machine with the wrong type");
@@ -1350,7 +1358,13 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t paramete
 
     // setup the parent class
     sM3->model.type = type;
-    sM3->model.parameterSetSize = parameterSetSize;
+    //sM3->model.parameterSetSize = parameterSetSize;
+
+    sM3->model.parameterSetSize = intPow(alphabetSize, kmerLength);
+    sM3->model.alphabetSize = alphabetSize;
+    sM3->model.alphabet = sequence_prepareAlphabet(alphabet, alphabetSize);
+    sM3->model.kmerLength = kmerLength;
+
     sM3->model.stateNumber = 3;
     sM3->model.matchState = match;
     sM3->model.startStateProb = stateMachine3_startStateProb;
@@ -1361,8 +1375,6 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t paramete
     sM3->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
 
     // setup functions
-    //sM3->getXGapProbFcn = gapXProbFcn;
-    //sM3->getYGapProbFcn = gapYProbFcn;
     sM3->getMatchProbFcn = matchProbFcn;
 
     // setup HDP
@@ -1371,10 +1383,10 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t paramete
     // setup transitions
     setTransitionsToDefaults((StateMachine *) sM3);
     // set emissions to defaults or zeros
-    setEmissionsDefaults((StateMachine *) sM3, parameterSetSize);
+    setEmissionsDefaults((StateMachine *) sM3, sM3->model.parameterSetSize);
 
     // initialize kmer emission gap probs
-    for (int64_t i = 0; i < parameterSetSize; i++) {
+    for (int64_t i = 0; i < sM3->model.parameterSetSize; i++) {
         sM3->model.EMISSION_GAP_X_PROBS[i] = -2.3025850929940455; // log(0.1)
     }
     return (StateMachine *) sM3;
@@ -1466,30 +1478,29 @@ StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjus
         st_errAbort("getStateMachine3: Cannot find model file %s\n", modelFile);
     };
 
-    StateMachine *sM = stateMachine3_construct(threeState, NUM_OF_KMERS,
+    StateMachine *sM = stateMachine3_construct(threeState, ALL_BASES, strlen(ALL_BASES), KMER_LENGTH,
                                                 stateMachine3_setTransitionsToNanoporeDefaults,
                                                 emissions_signal_initEmissionsToZero,
                                                 emissions_kmer_getGapProb,
                                                 emissions_signal_strawManGetKmerEventMatchProbWithDescaling,
                                                 emissions_signal_strawManGetKmerEventMatchProbWithDescaling,
                                                 cell_signal_updateExpectations);
-    StateMachine3 *sM3 = (StateMachine3 *)sM;
-    sM3->scale = npp.scale;
-    sM3->shift = npp.shift;
-    sM3->var = npp.var;
 
-    emissions_signal_loadPoreModel((StateMachine *)sM3, modelFile, sM3->model.type);
+    emissions_signal_loadPoreModel(sM, modelFile, sM->type);
 
-    emissions_signal_scaleNoise((StateMachine *)sM3, npp);
+    sM->scale = npp.scale;
+    sM->shift = npp.shift;
+    sM->var = npp.var;
+    emissions_signal_scaleNoise(sM, npp);
 
-    return (StateMachine *)sM3;
+    return sM;
 }
 
 StateMachine *getStateMachine3(const char *modelFile) {
     if (!stFile_exists(modelFile)) {
         st_errAbort("getStateMachine3: Cannot find model file %s\n", modelFile);
     };
-    StateMachine *sM3 = stateMachine3_construct(threeState, NUM_OF_KMERS,
+    StateMachine *sM3 = stateMachine3_construct(threeState, ALL_BASES, strlen(ALL_BASES), KMER_LENGTH,
                                                 stateMachine3_setTransitionsToNanoporeDefaults,
                                                 emissions_signal_initEmissionsToZero,
                                                 emissions_kmer_getGapProb,
@@ -1501,19 +1512,19 @@ StateMachine *getStateMachine3(const char *modelFile) {
 }
 
 StateMachine *getHdpStateMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp) {
-    StateMachine *sM = stateMachine3Hdp_construct(threeStateHdp, NUM_OF_KMERS,
+    StateMachine *sM = stateMachine3Hdp_construct(threeStateHdp, ALL_BASES, strlen(ALL_BASES), KMER_LENGTH,
                                                   stateMachine3_setTransitionsToNanoporeDefaults,
                                                   emissions_signal_initEmissionsToZero,
                                                   hdp,
                                                   emissions_signal_getHdpKmerDensity,
                                                   cell_signal_updateTransAndKmerSkipExpectations2);
-    StateMachine3_HDP *sM3Hdp = (StateMachine3_HDP *)sM;
-    sM3Hdp->scale = npp.scale;
-    sM3Hdp->shift = npp.shift;
-    sM3Hdp->var = npp.var;
 
-    emissions_signal_loadPoreModel((StateMachine *)sM3Hdp, modelFile, sM3Hdp->model.type);
-    return (StateMachine *)sM3Hdp;
+    sM->scale = npp.scale;
+    sM->shift = npp.shift;
+    sM->var = npp.var;
+
+    emissions_signal_loadPoreModel(sM, modelFile, sM->type);
+    return sM;
 }
 
 /*
@@ -1543,6 +1554,7 @@ void stateMachine_destruct(StateMachine *sM) {
     free(sM->EMISSION_GAP_X_PROBS);
     free(sM->EMISSION_GAP_Y_MATRIX);
     free(sM->EMISSION_MATCH_MATRIX);
+    free(sM->alphabet);
     free(sM);
 }
 

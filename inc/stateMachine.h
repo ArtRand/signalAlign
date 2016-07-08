@@ -73,9 +73,18 @@ struct _stateMachine {
     int64_t matchState;
     int64_t parameterSetSize;
 
-    double *EMISSION_MATCH_MATRIX; //Match emission probs
-    double *EMISSION_GAP_X_PROBS;  //Gap emission probs
-    double *EMISSION_GAP_Y_MATRIX; //Gap emission probs
+    // scale, shift, and var variables for MinION alignments
+    double scale;
+    double shift;
+    double var;
+
+    char *alphabet;
+    int64_t alphabetSize;
+    int64_t kmerLength;
+
+    double *EMISSION_MATCH_MATRIX;
+    double *EMISSION_GAP_X_PROBS;
+    double *EMISSION_GAP_Y_MATRIX;
 
     double (*startStateProb)(StateMachine *sM, int64_t state);
 
@@ -137,11 +146,6 @@ struct _StateMachine3 {
     double TRANSITION_GAP_SWITCH_TO_X;
     double TRANSITION_GAP_SWITCH_TO_Y;
 
-    // scale, shift, and var variables for MinION alignments
-    double scale;
-    double shift;
-    double var;
-
     double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
     //double (*getYGapProbFcn)(const double *emissionYGapProbs, void *x, void *y);
     //double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
@@ -166,9 +170,6 @@ struct _StateMachine3_HDP {
     //double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
     //double (*getYGapProbFcn)(StateMachine3_HDP *self, void *x, void *y);
     // scale, shift, and var variables for MinION alignments
-    double scale;
-    double shift;
-    double var;
 
     NanoporeHDP *hdpModel;
     double (*getMatchProbFcn)(StateMachine3_HDP *self, void *x, void *y);
@@ -209,18 +210,18 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
                                                                    int64_t from, int64_t to,
                                                                    double eP, double tP, void *extraArgs));
 
-StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t parameterSetSize,
+StateMachine *stateMachine3Hdp_construct(StateMachineType type,
+                                         const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
                                          void (*setTransitionsToDefaults)(StateMachine *sM),
                                          void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                          NanoporeHDP *hdpModel,
-        //double (*gapXProbFcn)(const double *, void *),
-        //double (*gapYProbFcn)(NanoporeHDP *, void *, void *),
                                          double (*matchProbFcn)(StateMachine3_HDP *, void *, void *),
                                          void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
                                                                       int64_t from, int64_t to,
                                                                       double eP, double tP, void *extraArgs));
 
-StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
+StateMachine *stateMachine3_construct(StateMachineType type,
+                                      const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
                                       void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                       double (*gapXProbFcn)(const double *, void *),

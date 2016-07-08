@@ -63,6 +63,8 @@ struct _sequence {
     Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t);
 };
 
+char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size);
+
 Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t), SequenceType type);
 
 // same as sequence construct, but initializes slice function
@@ -218,6 +220,7 @@ double logAdd(double x, double y);
 // HDCell
 typedef struct _path {
     void *kmer;
+    int64_t kmerLength;
     int64_t stateNumber;
     double *cells;
 } Path;
