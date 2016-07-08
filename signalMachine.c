@@ -701,12 +701,12 @@ int main(int argc, char *argv[]) {
         pairwiseAlignmentBandingParameters_destruct(p);
         destructPairwiseAlignment(pA);
         stList_destruct(anchorPairs);
-        if (nHdpT != NULL) {
-            destroy_nanopore_hdp(nHdpT);
-        }
-        if (nHdpC != NULL) {
-            destroy_nanopore_hdp(nHdpC);
-        }
+        //if (nHdpT != NULL) {
+        //    destroy_nanopore_hdp(nHdpT);
+        //}
+        //if (nHdpC != NULL) {
+        //    destroy_nanopore_hdp(nHdpC);
+        //}
 
         return 0;
     } else {
