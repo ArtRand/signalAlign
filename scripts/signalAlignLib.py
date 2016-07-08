@@ -708,12 +708,13 @@ class NanoporeRead(object):
             self.get_complement_model_adjustments()
 
             # transform events
-            if self.version in ["1.15.0", "1.19.0"]:
-                t_transformed = self.adjust_events_for_drift(self.template_events, self.template_drift)
-                c_transformed = self.adjust_events_for_drift(self.complement_events, self.complement_drift)
+            # drift adjustment happens within signalMachine now
+            #if self.version in ["1.15.0", "1.19.0"]:
+            #    t_transformed = self.adjust_events_for_drift(self.template_events, self.template_drift)
+            #    c_transformed = self.adjust_events_for_drift(self.complement_events, self.complement_drift)
                 # check if that worked
-                if t_transformed is False or c_transformed is False:
-                    return False
+            #    if t_transformed is False or c_transformed is False:
+            #        return False
 
             # Make the npRead
 

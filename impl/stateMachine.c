@@ -582,8 +582,7 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3
     //st_uglyf("MATCHING--x_i:%s (index: %lld), e_j mean: %f, \n modelMean: %f, modelLsd: %f probEvent: %f probNoise: %f, combined: %f\n",
     //         kmer_i, kmerIndex, eventMean, levelMean, levelStdDev, l_probEventMean, l_probEventNoise, prob);
 
-    //return l_probEventMean + l_probEventNoise;
-    return l_probEventMean;
+    return l_probEventMean + l_probEventNoise;
 }
 
 double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x_i, void *e_j, bool match) {
