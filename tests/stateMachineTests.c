@@ -77,6 +77,7 @@ StateMachine *loadDescaledStateMachine3(NanoporeRead *npRead) {
     // load stateMachine from model file
     char *templateModelFile = stString_print("../../signalAlign/models/testModel_template.model");
     StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams);
+
     free(templateModelFile);
     return sM;
 }
@@ -199,11 +200,16 @@ static void test_loadPoreModel(CuTest *testCase) {
 
     int64_t matrixSize = (1 + NUM_OF_KMERS * MODEL_PARAMS);
 
+    // line 0: alphabetSize, alphabet, kmerLength
+    fprintf(fH, "6\tACEGOT\t6\n");
+
+    // line 1: emission match matrix
     for (int64_t i = 0; i < matrixSize; i++) {
         fprintf(fH, "%"PRId64"\t", i);
     }
     fprintf(fH, "\n");
-    //for (int64_t i = matrixSize; i > -1; i--) {
+
+    // line 2: extra event (kmer skip) match matrix
     for (int64_t i = 0; i < matrixSize; i++) {
         fprintf(fH, "%"PRId64"\t", i);
     }
@@ -1017,6 +1023,9 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
+
+
+
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
@@ -1026,7 +1035,7 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_loadPoreModel);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_stateMachine3_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_r9StateMachineWithBanding);
+    SUITE_ADD_TEST(suite, test_r9StateMachineWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_DegenerateNucleotides);
     SUITE_ADD_TEST(suite, test_makeAndCheckModels);

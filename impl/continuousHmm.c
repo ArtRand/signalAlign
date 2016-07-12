@@ -71,11 +71,6 @@ static double continuousPairHmm_descaleEventMean_JordanStyle(ContinuousPairHmm *
     return (eventMean + self->var * levelMean - self->scale * levelMean - self->shift) / self->var;
 }
 
-//static double continuousPairHmm_descaleEventMean(ContinuousPairHmm *self, double eventMean, double levelMean) {
-//    (void) levelMean;
-//    return (eventMean - self->shift) / self->scale;
-//}
-
 Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPseudocount,
                                  int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
                                  double scale, double shift, double var) {
@@ -194,17 +189,39 @@ void continuousPairHmm_destruct(Hmm *hmm) {
 void continuousPairHmm_loadModelFromFile(ContinuousPairHmm *hmm, const char *modelFile) {
     /*
      *  the model file has the format:
+     *  line 0: alphabetSize, alphabet, kmerLength
      *  line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean]
      *              [noise_sd] [noise_lambda ](.../kmer) \n
      *  line 2: [correlation coefficient] [level_mean] [level_sd, scaled]
      *              [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
      */
-
     FILE *fH = fopen(modelFile, "r");
 
-    // Line 1: parse the match emissions line
+    // Line 0: parse the match emissions line
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
+    if (stList_length(tokens) != 3) {
+        st_errAbort("stateMachine3_loadFromFile: Model file %s does not have the correct number of stateMachine "
+                            "parameters should be 3 got %"PRId64"\n", modelFile, stList_length(tokens));
+    }
+    int64_t alphabetSize, kmerLength, j;
+    j = sscanf(stList_get(tokens, 0), "%"SCNd64, &alphabetSize);
+    if (j != 1) {
+        st_errAbort("stateMachine3_loadFromFile: error parsing alphabet size\n");
+    }
+    j = sscanf(stList_get(tokens, 2), "%"SCNd64, &kmerLength);
+    if (j != 1) {
+        st_errAbort("stateMachine3_loadFromFile: error parsing kmer length\n");
+    }
+    if (intPow(alphabetSize, kmerLength) != hmm->baseHmm.symbolSetSize) {
+        st_errAbort("continuousPairHmm_loadModelFromFile: This model won't fit with this HMM.\n");
+    }
+    free(string);
+    stList_destruct(tokens);
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+
+    // Line 1: emissions match matrix
     // check to make sure that the model will fit in the hmm
     if (stList_length(tokens) != 1 + (hmm->baseHmm.symbolSetSize * MODEL_PARAMS)) {
         st_errAbort("cpHMM_setEmissionsDefaults: incorrect for signal model (match emissions) got %lld, should be %llf\n",

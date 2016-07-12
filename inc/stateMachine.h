@@ -172,7 +172,7 @@ struct _StateMachine3_HDP {
     // scale, shift, and var variables for MinION alignments
 
     NanoporeHDP *hdpModel;
-    double (*getMatchProbFcn)(StateMachine3_HDP *self, void *x, void *y);
+    double (*getMatchProbFcn)(StateMachine *self, void *x, void *y, bool ignore);
 };
 
 typedef struct _StateMachineEchelon {
@@ -212,21 +212,20 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
 
 StateMachine *stateMachine3Hdp_construct(StateMachineType type,
                                          const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
-                                         void (*setTransitionsToDefaults)(StateMachine *sM),
-                                         void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
+                                         void (*setTransitionsToDefaults)(StateMachine *),
+                                         void (*setEmissionsDefaults)(StateMachine *, int64_t),
                                          NanoporeHDP *hdpModel,
-                                         double (*matchProbFcn)(StateMachine3_HDP *, void *, void *),
-                                         void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
-                                                                      int64_t from, int64_t to,
-                                                                      double eP, double tP, void *extraArgs));
+                                         double (*matchProbFcn)(StateMachine *, void *, void *, bool),
+                                         void (*cellCalcUpdateExpFcn)(double *, double *, int64_t, int64_t,
+                                                                      double , double , void *));
 
 StateMachine *stateMachine3_construct(StateMachineType type,
                                       const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
-                                      void (*setTransitionsToDefaults)(StateMachine *sM),
-                                      void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
+                                      void (*setTransitionsToDefaults)(StateMachine *),
+                                      void (*setEmissionsDefaults)(StateMachine *, int64_t),
                                       double (*gapXProbFcn)(const double *, void *),
-                                      double (*gapYProbFcn)(StateMachine3 *, void *, void *, bool ),
-                                      double (*matchProbFcn)(StateMachine3 *, void *, void *, bool ),
+                                      double (*gapYProbFcn)(StateMachine *, void *, void *, bool ),
+                                      double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
                                       void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
                                                                    int64_t from, int64_t to,
                                                                    double eP, double tP, void *extraArgs));
@@ -268,7 +267,7 @@ void emissions_discrete_initEmissionsToZero(StateMachine *sM);
 * In the most simple case, with 4 nucleotides the gap matrix is 4x1 matrix and the match matrix is a 4x4 matrix.
 */
 
-double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, void *e_j);
+double emissions_signal_getHdpKmerDensity(StateMachine *sM, void *x_i, void *e_j, bool ignore);
 
 double emissions_signal_descaleEventMean_JordanStyle(double scaledEvent, double levelMean, double scale, double shift, double var);
 
@@ -295,7 +294,9 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
 
 double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, void *kmer, void *event);
 
-double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x_i, void *e_j, bool match);
+double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine *sM, void *x_i, void *e_j, bool match);
+
+double emissions_signal_strawManGetKmerEventMatchProb(StateMachine *sM, void *x_i, void *e_j, bool match);
 
 void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, double var,
                                  double scale_sd, double var_sd);
@@ -305,6 +306,17 @@ void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shif
 void emissions_signal_scaleNoise(StateMachine *sM, NanoporeReadAdjustmentParameters npp);
 
 double emissions_signal_getDurationProb(void *event, int64_t n);
+
+StateMachine *stateMachine3_signalMachineBuilder(StateMachineType type, char *alphabet, int64_t alphabetSize,
+                                                 int64_t kmerLength,
+                                                 double (*gapXProbFcn)(const double *, void *),
+                                                 double (*matchProbFcn)(StateMachine *, void *, void *, bool),
+                                                 NanoporeHDP *nHdp);
+
+StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType type,
+                                         double (*gapXProbFcn)(const double *, void *),
+                                         double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
+                                         NanoporeHDP *nHdp);
 
 StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp);
 

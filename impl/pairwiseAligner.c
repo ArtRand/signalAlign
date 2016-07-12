@@ -261,6 +261,7 @@ double logAdd(double x, double y) {
 static double _NULLEVENT[] = {LOG_ZERO, 0};
 static double *NULLEVENT = _NULLEVENT;
 
+
 char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size) {
     // copy and sort alphabet
     char* internal_alphabet = (char *)malloc(sizeof(char) * (alphabet_size + 1));
@@ -284,7 +285,7 @@ char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size) {
 
     for (int64_t i = 1; i < alphabet_size; i++) {
         if (alphabet[i - 1] == alphabet[i]) {
-            fprintf(stderr, "Characters of alphabet must be distinct.\n");
+            fprintf(stderr, "Characters of alphabet must be distinct. got %s, making internal %s\n", alphabet, internal_alphabet);
             exit(EXIT_FAILURE);
         }
     }

@@ -223,59 +223,6 @@ static inline double emissions_signal_getModelFluctuationLambda(const double *ev
     return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[1 + (kmerIndex * MODEL_PARAMS + 4)];
 }
 
-static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFile, StateMachineType type) {
-    /*
-     *  the model file has the format:
-     *  line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean]
-     *              [noise_sd] [noise_lambda ](.../kmer) \n
-     *  line 2: [correlation coefficient] [level_mean] [level_sd, scaled]
-     *              [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
-     */
-
-    FILE *fH = fopen(modelFile, "r");
-
-    // Line 1: parse the match emissions line
-    char *string = stFile_getLineFromFile(fH);
-    stList *tokens = stString_split(string);
-    // check to make sure that the model will fit in the stateMachine
-    if (stList_length(tokens) != 1 + (sM->parameterSetSize * MODEL_PARAMS)) {
-        st_errAbort("This stateMachine is not correct for signal model (match emissions) got %lld, should be %lld\n",
-                    stList_length(tokens), 1 + (sM->parameterSetSize * MODEL_PARAMS));
-    }
-    // load the model into the state machine emissions
-    for (int64_t i = 0; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i++) {
-        int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_MATCH_MATRIX[i]));
-        if (j != 1) {
-            st_errAbort("emissions_signal_loadPoreModel: error loading pore model (match emissions)\n");
-        }
-    }
-    // clean up match emissions line
-    free(string);
-    stList_destruct(tokens);
-
-    // parse Y Gap emissions line
-    string = stFile_getLineFromFile(fH);
-    tokens = stString_split(string);
-    // check to make sure that the model will fit in the stateMachine
-    if (stList_length(tokens) != 1 + (sM->parameterSetSize * MODEL_PARAMS)) {
-        st_errAbort("This stateMachine is not correct for signal model (dupeEvent - Y emissions) got %lld should be %lld\n",
-                    stList_length(tokens), 1 + (sM->parameterSetSize * MODEL_PARAMS));
-    }
-    // load the model into the state machine emissions
-    for (int64_t i = 0; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i++) {
-        int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_Y_MATRIX[i]));
-        if (j != 1) {
-            st_errAbort("emissions_signal_loadPoreModel: error loading pore model (dupeEvent - Y emissions)\n");
-        }
-    }
-    // clean up match emissions line
-    free(string);
-    stList_destruct(tokens);
-
-    // close file
-    fclose(fH);
-}
-
 static inline double emissions_signal_logInvGaussPdf(double eventNoise, double modelNoiseMean,
                                                      double modelNoiseLambda) {
     double l_twoPi = 1.8378770664093453;  // log(2*pi)
@@ -510,7 +457,9 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
     return c + a;
 }
 
-double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, void *e_j) {
+double emissions_signal_getHdpKmerDensity(StateMachine *sM, void *x_i, void *e_j, bool ignore) {
+    (void) ignore;
+    StateMachine3_HDP *self = (StateMachine3_HDP *)sM;
     if (x_i == NULL) {
         return LOG_ZERO;
     }
@@ -539,8 +488,9 @@ double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, vo
 }
 
 
-double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3 *self,
-                                                                   void *x_i, void *e_j, bool match) {
+double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine *sM, void *x_i, void *e_j, bool match) {
+    StateMachine3 *self = (StateMachine3 *)sM;  // downcast
+
     if (x_i == NULL) {
         return LOG_ZERO;
     }
@@ -588,7 +538,8 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine3
     return l_probEventMean + l_probEventNoise;
 }
 
-double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x_i, void *e_j, bool match) {
+double emissions_signal_strawManGetKmerEventMatchProb(StateMachine *sM, void *x_i, void *e_j, bool match) {
+    StateMachine3 *self = (StateMachine3 *)sM;
     if (x_i == NULL) {
         return LOG_ZERO;
     }
@@ -605,8 +556,10 @@ double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x
     kmer_i[KMER_LENGTH] = '\0';
 
     // get index
-    int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
-    double *eventModel = match ? sM->model.EMISSION_MATCH_MATRIX : sM->model.EMISSION_GAP_Y_MATRIX;
+    //int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
+    int64_t kmerIndex = kmer_id(kmer_i, self->model.alphabet, self->model.alphabetSize, self->model.kmerLength);
+    double *eventModel = match ? self->model.EMISSION_MATCH_MATRIX : self->model.EMISSION_GAP_Y_MATRIX;
+
     // get the µ and σ for the level and noise for the model
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
     double levelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
@@ -1256,7 +1209,7 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
                     //st_uglyf("SENTINAL - legal MIDDLE : pathC kmer %s\n", pathC->kmer);
                     double *middleCells = path_getCell(pathM);
                     double *curentCells = path_getCell(pathC);
-                    double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY);
+                    double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY, TRUE);
                     doTransition(middleCells, curentCells, match, match, eP, sM3->TRANSITION_MATCH_CONTINUE, extraArgs);
                     doTransition(middleCells, curentCells, shortGapX, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_X, extraArgs);
                     doTransition(middleCells, curentCells, shortGapY, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_Y, extraArgs);
@@ -1273,7 +1226,7 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
                     //st_uglyf("SENTINAL - legal UPPER : pathC kmer %s\n", pathC->kmer);
                     double *upperCells = path_getCell(pathU);
                     double *currentCells = path_getCell(pathC);
-                    double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY);
+                    double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY, FALSE);
                     doTransition(upperCells, currentCells, match, shortGapY, eP, sM3->TRANSITION_GAP_OPEN_Y, extraArgs);
                     doTransition(upperCells, currentCells, shortGapY, shortGapY, eP, sM3->TRANSITION_GAP_EXTEND_Y, extraArgs);
                     // shortGapX -> shortGapY not allowed, this would be going from a kmer skip to extra event?
@@ -1285,21 +1238,101 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
 }
 
 ///////////////////////////////////////////// CORE FUNCTIONS ////////////////////////////////////////////////////////
+StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType type,
+                                         double (*gapXProbFcn)(const double *, void *),
+                                         double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
+                                         NanoporeHDP *nHdp) {
+    /*
+     *  the model file has the format:
+     *  line 0: alphabetSize, alphabet, kmerLength
+     *  line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean]
+     *              [noise_sd] [noise_lambda ](.../kmer) \n
+     *  line 2: [correlation coefficient] [level_mean] [level_sd, scaled]
+     *              [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
+     */
+    if (!stFile_exists(modelFile)) {
+        st_errAbort("stateMachine3_loadFromFile: Couldn't find .model file here %s\n", modelFile);
+    }
+
+    FILE *fH = fopen(modelFile, "r");
+
+    // Line 0: parse the stateMachine alphabet, alphabet length, and kmer size parameteres
+    char *string = stFile_getLineFromFile(fH);
+    stList *tokens = stString_split(string);
+    if (stList_length(tokens) != 3) {
+        st_errAbort("stateMachine3_loadFromFile: Model file %s does not have the correct number of stateMachine "
+                            "parameters should be 3 got %"PRId64"\n", modelFile, stList_length(tokens));
+    }
+    char *alphabet;
+    int64_t alphabetSize, kmerLength, j;
+    j = sscanf(stList_get(tokens, 0), "%"SCNd64, &alphabetSize);
+    if (j != 1) {
+        st_errAbort("stateMachine3_loadFromFile: error parsing alphabet size\n");
+    }
+    alphabet = (char *)stList_get(tokens, 1);
+    j = sscanf(stList_get(tokens, 2), "%"SCNd64, &kmerLength);
+    if (j != 1) {
+        st_errAbort("stateMachine3_loadFromFile: error parsing kmer length\n");
+    }
+    StateMachine *sM = stateMachine3_signalMachineBuilder(type, alphabet, alphabetSize, kmerLength, gapXProbFcn,
+                                                          matchProbFcn, nHdp);
+    free(string);
+    stList_destruct(tokens);
+
+    // Line 1: parse the match emissions line
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check to make sure that the model will fit in the stateMachine
+    if (stList_length(tokens) != 1 + (sM->parameterSetSize * MODEL_PARAMS)) {
+        st_errAbort("This stateMachine is not correct for signal model (match emissions) got %lld, should be %lld\n",
+                    stList_length(tokens), 1 + (sM->parameterSetSize * MODEL_PARAMS));
+    }
+    // load the model into the state machine emissions
+    for (int64_t i = 0; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i++) {
+        int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_MATCH_MATRIX[i]));
+        if (j != 1) {
+            st_errAbort("emissions_signal_loadPoreModel: error loading pore model (match emissions)\n");
+        }
+    }
+    // clean up match emissions line
+    free(string);
+    stList_destruct(tokens);
+
+    // parse Y Gap emissions line
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check to make sure that the model will fit in the stateMachine
+    if (stList_length(tokens) != 1 + (sM->parameterSetSize * MODEL_PARAMS)) {
+        st_errAbort("This stateMachine is not correct for signal model (dupeEvent - Y emissions) got %lld should be %lld\n",
+                    stList_length(tokens), 1 + (sM->parameterSetSize * MODEL_PARAMS));
+    }
+    // load the model into the state machine emissions
+    for (int64_t i = 0; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i++) {
+        int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_Y_MATRIX[i]));
+        if (j != 1) {
+            st_errAbort("emissions_signal_loadPoreModel: error loading pore model (dupeEvent - Y emissions)\n");
+        }
+    }
+    // clean up match emissions line
+    free(string);
+    stList_destruct(tokens);
+
+    // close file
+    fclose(fH);
+
+    return sM;
+}
+
 StateMachine *stateMachine3_construct(StateMachineType type,
                                       const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
-                                      void (*setTransitionsToDefaults)(StateMachine *sM),
-                                      void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
+                                      void (*setTransitionsToDefaults)(StateMachine *),
+                                      void (*setEmissionsDefaults)(StateMachine *, int64_t),
                                       double (*gapXProbFcn)(const double *, void *),
-                                      double (*gapYProbFcn)(StateMachine3 *, void *, void *, bool ),
-                                      double (*matchProbFcn)(StateMachine3 *, void *, void *, bool ),
+                                      double (*gapYProbFcn)(StateMachine *, void *, void *, bool ),
+                                      double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
                                       void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
                                                                    int64_t from, int64_t to,
                                                                    double eP, double tP, void *extraArgs)) {
-    /*
-     * Description of (potentially ambiguous) arguments:
-     * parameterSetSize = the number of kmers that we are using, of len(kmer) = 1, then the number is 4 (or 5 if we're
-     * including N). It's 25 if len(kmer) = 2, it's 4096 in the 6-mer model.
-     */
     StateMachine3 *sM3 = st_malloc(sizeof(StateMachine3));
     if (type != threeState && type != threeStateAsymmetric) {
         st_errAbort("Tried to create a three state state-machine with the wrong type");
@@ -1339,7 +1372,6 @@ StateMachine *stateMachine3_construct(StateMachineType type,
         sM3->model.EMISSION_GAP_X_PROBS[i] = -2.3025850929940455; // log(0.1)
     }
 
-
     return (StateMachine *) sM3;
 }
 
@@ -1348,7 +1380,7 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type,
                                          void (*setTransitionsToDefaults)(StateMachine *),
                                          void (*setEmissionsDefaults)(StateMachine *, int64_t),
                                          NanoporeHDP *hdpModel,
-                                         double (*matchProbFcn)(StateMachine3_HDP *, void *, void *),
+                                         double (*matchProbFcn)(StateMachine *, void *, void *, bool),
                                          void (*cellCalcUpdateExpFcn)(double *, double *, int64_t, int64_t,
                                                                       double , double , void *)) {
     StateMachine3_HDP *sM3 = st_malloc(sizeof(StateMachine3_HDP));
@@ -1390,6 +1422,29 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type,
         sM3->model.EMISSION_GAP_X_PROBS[i] = -2.3025850929940455; // log(0.1)
     }
     return (StateMachine *) sM3;
+}
+
+StateMachine *stateMachine3_signalMachineBuilder(StateMachineType type, char *alphabet, int64_t alphabetSize,
+                                                 int64_t kmerLength,
+                                                 double (*gapXProbFcn)(const double *, void *),
+                                                 double (*matchProbFcn)(StateMachine *, void *, void *, bool),
+                                                 NanoporeHDP *nHdp) {
+    StateMachine *sM;
+    switch (type) {
+        case threeStateHdp:
+            sM = stateMachine3Hdp_construct(threeStateHdp, alphabet, alphabetSize, KMER_LENGTH,
+                                            stateMachine3_setTransitionsToNanoporeDefaults,
+                                            emissions_signal_initEmissionsToZero,
+                                            nHdp, matchProbFcn, cell_signal_updateTransAndKmerSkipExpectations2);
+            return sM;
+        default:
+            sM = stateMachine3_construct(threeState, alphabet, alphabetSize, kmerLength,
+                                         stateMachine3_setTransitionsToNanoporeDefaults,
+                                         emissions_signal_initEmissionsToZero,
+                                         gapXProbFcn, matchProbFcn, matchProbFcn,
+                                         cell_signal_updateExpectations);
+            return sM;
+    }
 }
 
 /*
@@ -1444,7 +1499,6 @@ static void stateMachine3_loadSymmetric(StateMachine3 *sM3, Hmm *hmm) {
 //Public functions
 ///////////////////////////////////
 ///////////////////////////////////
-
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
     st_errAbort("5-state stateMachine not implemented\n");
     if (hmmD->type == fiveState) {
@@ -1468,25 +1522,16 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
         return (StateMachine *) sM5;
     }
     else {
-        st_uglyf("SENTINAL - getStateMachine5 --> something didn't work\n");
         return 0;
     }
 }
 
 StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp) {
     if (!stFile_exists(modelFile)) {
-        st_errAbort("getStateMachine3: Cannot find model file %s\n", modelFile);
+        st_errAbort("getStateMachine3_descaled: Cannot find model file %s\n", modelFile);
     };
-
-    StateMachine *sM = stateMachine3_construct(threeState, ALL_BASES, strlen(ALL_BASES), KMER_LENGTH,
-                                                stateMachine3_setTransitionsToNanoporeDefaults,
-                                                emissions_signal_initEmissionsToZero,
-                                                emissions_kmer_getGapProb,
-                                                emissions_signal_strawManGetKmerEventMatchProbWithDescaling,
-                                                emissions_signal_strawManGetKmerEventMatchProbWithDescaling,
-                                                cell_signal_updateExpectations);
-
-    emissions_signal_loadPoreModel(sM, modelFile, sM->type);
+    StateMachine *sM = stateMachine3_loadFromFile(modelFile, threeState, emissions_kmer_getGapProb,
+                                                  emissions_signal_strawManGetKmerEventMatchProbWithDescaling, NULL);
 
     sM->scale = npp.scale;
     sM->shift = npp.shift;
@@ -1500,47 +1545,23 @@ StateMachine *getStateMachine3(const char *modelFile) {
     if (!stFile_exists(modelFile)) {
         st_errAbort("getStateMachine3: Cannot find model file %s\n", modelFile);
     };
-    StateMachine *sM3 = stateMachine3_construct(threeState, ALL_BASES, strlen(ALL_BASES), KMER_LENGTH,
-                                                stateMachine3_setTransitionsToNanoporeDefaults,
-                                                emissions_signal_initEmissionsToZero,
-                                                emissions_kmer_getGapProb,
-                                                emissions_signal_strawManGetKmerEventMatchProb,
-                                                emissions_signal_strawManGetKmerEventMatchProb,
-                                                cell_signal_updateExpectations);
-    emissions_signal_loadPoreModel(sM3, modelFile, sM3->type);
-    return sM3;
+    StateMachine *sM = stateMachine3_loadFromFile(modelFile, threeState, emissions_kmer_getGapProb,
+                                                  emissions_signal_strawManGetKmerEventMatchProb, NULL);
+    return sM;
 }
 
 StateMachine *getHdpStateMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp) {
-    StateMachine *sM = stateMachine3Hdp_construct(threeStateHdp, ALL_BASES, strlen(ALL_BASES), KMER_LENGTH,
-                                                  stateMachine3_setTransitionsToNanoporeDefaults,
-                                                  emissions_signal_initEmissionsToZero,
-                                                  hdp,
-                                                  emissions_signal_getHdpKmerDensity,
-                                                  cell_signal_updateTransAndKmerSkipExpectations2);
-
+    if (!stFile_exists(modelFile)) {
+        st_errAbort("getHdpStateMachine: Cannot find model file %s\n", modelFile);
+    };
+    StateMachine *sM = stateMachine3_loadFromFile(modelFile, threeStateHdp, NULL, emissions_signal_getHdpKmerDensity,
+                                                  hdp);
     sM->scale = npp.scale;
     sM->shift = npp.shift;
     sM->var = npp.var;
 
-    emissions_signal_loadPoreModel(sM, modelFile, sM->type);
     return sM;
 }
-
-/*
-StateMachine *getHdpStateMachine3(NanoporeHDP *hdp, const char *modelFile) {
-    StateMachine *sM3Hdp = stateMachine3Hdp_construct(threeStateHdp, NUM_OF_KMERS,
-                                                      stateMachine3_setTransitionsToNanoporeDefaults,
-                                                      emissions_signal_initEmissionsToZero,
-                                                      hdp,
-                                                      //emissions_kmer_getGapProb,
-                                                      //get_nanopore_kmer_density,
-                                                      emissions_signal_getHdpKmerDensity,
-                                                      cell_signal_updateTransAndKmerSkipExpectations2);
-    emissions_signal_loadPoreModel(sM3Hdp, modelFile, sM3Hdp->type);
-    return sM3Hdp;
-}
-*/
 
 static void stateMachine_destructHdpModel(StateMachine *sM) {
     StateMachine3_HDP *sMHdp = (StateMachine3_HDP *)sM;

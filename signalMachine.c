@@ -165,7 +165,7 @@ void writePosteriorProbsSparse(char *posteriorProbsFile, char *readFile, char *t
 StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentParameters npp, StateMachineType type,
                                 Strand strand, NanoporeHDP *nHdp) {
     if ((type != threeState) && (type != threeStateHdp)) {
-        st_errAbort("signalAlign - incompatable stateMachine type request");
+        st_errAbort("signalAlign - incompatible stateMachine type request");
     }
 
     if (type == threeState) {

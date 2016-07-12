@@ -16,7 +16,7 @@ from serviceCourse.file_handlers import FolderHandler
 
 # Globals
 NORM_DIST_PARAMS = 2
-
+NB_MODEL_PARAMS = 5
 
 def kmer_iterator(dna, k):
     for i in xrange(len(dna)):
@@ -1103,7 +1103,7 @@ class ContinuousPairHmm(SignalHmm):
     def add_expectations_file(self, expectations_file):
         fH = open(expectations_file, 'r')
 
-        # line 0: smType stateNumber, symbolSetSize
+        # line 0: smType, stateNumber, symbolSetSize
         line = map(float, fH.readline().split())
         if len(line) != 4:
             print("cpHMM: check_file - bad file (param line): {}".format(expectations_file), file=sys.stderr)
@@ -1210,9 +1210,13 @@ class ContinuousPairHmm(SignalHmm):
 
     def parse_lookup_table(self, table_file):
         assert os.path.exists(table_file), "cpHMM::parse_lookup_table - Didn't find lookup table"
-
         fH = open(table_file, 'r')
-        NB_MODEL_PARAMS = 5
+
+        line = fH.readline().split()
+        print(line)
+        assert len(line) == 3, "cpHMM::parse_lookup_table - Didn't find correct number of stateMachine parameters"
+        assert int(line[0])**int(line[2]) == self.symbol_set_size, "cpHMM::parse_lookup_table - This model will not " \
+                                                                   "fit with this HMM model"
 
         line = map(float, fH.readline().split())
         line = line[1:]  # disregard the correlation param
