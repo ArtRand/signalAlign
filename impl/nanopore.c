@@ -824,3 +824,31 @@ void nanopore_compute_noise_scale_params(double *model, stList *kmerToEventMap,
     free(beta);
 }
 
+void nanopore_convert_to_lognormal_params(int64_t alphabet_size, int64_t kmer_length, double *model,
+                                          stList *kmerToEventMap) {
+    int64_t num_kmers = 1;
+    for (int64_t i = 0; i < alphabet_size; i++) {
+        num_kmers *= kmer_length;
+    }
+
+    for (int64_t i = 0; i < num_kmers; i++) {
+        double noise_sd = model[1 + (i * MODEL_PARAMS + 3)];
+        double untrans_var = noise_sd * noise_sd;
+        double untrans_mean = model[1 + (i * MODEL_PARAMS + 2)];
+
+        double trans_var = log(1.0 + untrans_var / (untrans_mean * untrans_mean));
+        double trans_mean = log(untrans_mean - trans_var / 2.0);
+
+        //noise_sds[i] = sqrt(trans_var);
+        model[1 + (i * MODEL_PARAMS + 3)] = sqrt(trans_var);
+
+        //noise_means[i] = trans_mean;
+        model[1 + (i * MODEL_PARAMS + 2)] = trans_mean;
+    }
+
+    for (int i = 0; i < stList_length(kmerToEventMap); i ++) {
+        EventKmerTuple *t = stList_get(kmerToEventMap, i);
+        t->eventSd = log(t->eventSd);
+        //read_noises[i] = log(read_noises[i]);
+    }
+}

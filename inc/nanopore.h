@@ -100,6 +100,9 @@ void nanopore_compute_mean_scale_params(double *model, stList *kmerToEventMap, N
 
 void nanopore_compute_noise_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params);
 
+void nanopore_convert_to_lognormal_params(int64_t alphabet_size, int64_t kmer_length, double *model,
+                                          stList *kmerToEventMap);
+
 void nanopore_lineq_solve(double *A, double *b, double *x_out, int64_t n);
 
 double rand_uniform2(double a, double b);

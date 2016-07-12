@@ -175,8 +175,6 @@ void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
                                         NanoporeReadAdjustmentParameters *params, double assignmentThreshold,
                                         stList *(*assignmentFunction)(NanoporeRead *, double),
                                         void (*driftAdjustmentFunction)(NanoporeRead *)) {
-    //StateMachine3 *sM3 = (StateMachine3 *)sM;
-
     st_uglyf("SENTINEL - Re-estimating parameters\n");
     st_uglyf("SENTINEL - Before: scale: %f shift: %f var: %f drift %f\n", params->scale, params->shift, params->var,
              params->drift);

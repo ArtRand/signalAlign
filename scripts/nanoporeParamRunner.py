@@ -14,7 +14,7 @@ def parse_args():
 
     parser.add_argument('--file_directory', '-d', action='store',
                         dest='files_dir', required=True, type=str, default=None,
-                        help="directory with MinION fast5 reads to align")
+                        help="directory with MinION files to estimate parameters from")
     #parser.add_argument('--ref', '-r', action='store',
     #                    dest='ref', required=True, type=str,
     #                    help="reference sequence to align to, in FASTA")
@@ -38,7 +38,7 @@ def parse_args():
 
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
-                        help="directory to put the alignments")
+                        help="directory to put temp files")
 
     args = parser.parse_args()
     return args

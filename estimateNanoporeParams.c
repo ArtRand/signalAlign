@@ -25,22 +25,6 @@ Sequence *initializeSequenceFromNpReadFile(NanoporeRead *npRead, bool templateSt
             sequence_getEvent, sequence_sliceEventSequence, event);
 }
 
-Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t queryStart, int64_t queryEnd,
-                                                 int64_t *eventMap) {
-    // find the event mapped to the start and end of the 2D read alignment
-    int64_t startIdx = eventMap[queryStart];
-    int64_t endIdx = eventMap[queryEnd];
-
-    // move the event pointer to the first event
-    size_t elementSize = sizeof(double);
-    void *elements = (char *)events + ((startIdx * NB_EVENT_PARAMS) * elementSize);
-
-    // make the eventSequence
-    Sequence *eventS = sequence_constructEventSequence(endIdx - startIdx, elements);
-
-    return eventS;
-}
-
 stList *lineTokensFromFile(const char *filePath, int64_t getLine) {
     FILE *fH = fopen(filePath, "r");
     int64_t lineCount = 1;
@@ -79,14 +63,13 @@ void printEstimateOfParams(NanoporeRead *npRead, StateMachine *sM, double thresh
             threshold, strand, readLabel);
 }
 
-void printEventsAndParams(NanoporeRead *npRead, stList *templateKmers, stList *complementKmers) {
+void printEventMeansAndParams(NanoporeRead *npRead, stList *templateKmers, stList *complementKmers) {
     char *t_modelState, *c_modelState;
     // kmer | mean | stDev | start | prob | scale | shift | var | drift | strand
     for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
         int64_t index = i * NB_EVENT_PARAMS;
         t_modelState = (char *)stList_get(templateKmers, i);
         fprintf(stdout, "%s\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
-                //npRead->templateModelState[i],
                 t_modelState,
                 npRead->templateEvents[index], // mean
                 npRead->templateEvents[index + 1], // st_dev
@@ -102,7 +85,6 @@ void printEventsAndParams(NanoporeRead *npRead, stList *templateKmers, stList *c
         int64_t index = i * NB_EVENT_PARAMS;
         c_modelState = (char *)stList_get(complementKmers, i);
         fprintf(stdout, "%s\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n",
-                //npRead->complementModelState[i],
                 c_modelState,
                 npRead->complementEvents[index], // mean
                 npRead->complementEvents[index + 1], // st_dev
@@ -112,6 +94,33 @@ void printEventsAndParams(NanoporeRead *npRead, stList *templateKmers, stList *c
                 npRead->complementParams.shift,
                 npRead->complementParams.var,
                 npRead->complementParams.drift,
+                "c");
+    }
+}
+
+void printEventNoisesAndParams(NanoporeRead *npRead, stList *templateKmers, stList *complementKmers) {
+    char *t_modelState, *c_modelState;
+    // kmer | stDev | scale_sd | shift_sd | var_sd | strand
+    for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
+        int64_t index = i * NB_EVENT_PARAMS;
+        t_modelState = (char *)stList_get(templateKmers, i);
+        fprintf(stdout, "%s\t%f\t%f\t%f\t%f\t%s\n",
+                t_modelState,
+                npRead->templateEvents[index + 1], // st_dev
+                npRead->templateParams.scale_sd,
+                npRead->templateParams.shift_sd,
+                npRead->templateParams.var_sd,
+                "t");
+    }
+    for (int64_t i = 0; i < npRead->nbComplementEvents; i++) {
+        int64_t index = i * NB_EVENT_PARAMS;
+        c_modelState = (char *)stList_get(complementKmers, i);
+        fprintf(stdout, "%s\t%f\t%f\t%f\t%f\t%s\n",
+                c_modelState,
+                npRead->complementEvents[index + 1], // st_dev
+                npRead->complementParams.scale_sd,
+                npRead->complementParams.shift_sd,
+                npRead->complementParams.var_sd,
                 "c");
     }
 }
@@ -169,20 +178,54 @@ int main(int argc, char *argv[]) {
     if (!stFile_exists(npReadFile)) {
         st_errAbort("Could not find npRead here: %s\n", npReadFile);
     }
-
+    // read in the .npRead file
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+
+    // build state machines (to use the look up table)
     StateMachine *sMt = getStateMachine3(templateModelFile);
     StateMachine *sMc = getStateMachine3(complementModelFile);
-    signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
-                                       nanopore_templateOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
-    signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
-                                       nanopore_complementOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
+
+    // make 1D map of events (mean, noise) to kmers
+    stList *templateMap = nanopore_templateOneDAssignmentsFromRead(npRead, ASSIGNMENT_THRESHOLD);
+    stList *complementMap = nanopore_complementOneDAssignmentsFromRead(npRead, ASSIGNMENT_THRESHOLD);
+
+    // convert template to log normal
+    nanopore_convert_to_lognormal_params(sMt->alphabetSize, sMt->kmerLength, sMt->EMISSION_MATCH_MATRIX, templateMap);
+    // convert complement to log normal
+    nanopore_convert_to_lognormal_params(sMc->alphabetSize, sMc->kmerLength, sMc->EMISSION_MATCH_MATRIX, complementMap);
+
+    // error log report
+    st_uglyf("SENTINEL - Before: shift_sd: %f scale_sd: %f var_sd: %f [template]\n",
+             npRead->templateParams.shift_sd, npRead->templateParams.scale_sd, npRead->templateParams.var_sd);
+    st_uglyf("SENTINEL - Before: shift_sd: %f scale_sd: %f var_sd: %f [template]\n",
+             npRead->complementParams.shift_sd, npRead->complementParams.scale_sd, npRead->complementParams.var_sd);
+
+    // compute template params
+    nanopore_compute_noise_scale_params(sMt->EMISSION_MATCH_MATRIX, templateMap, &npRead->templateParams);
+    // compute complement params
+    nanopore_compute_noise_scale_params(sMc->EMISSION_MATCH_MATRIX, complementMap, &npRead->complementParams);
+
+    // error log report
+    st_uglyf("SENTINEL - After: shift_sd: %f scale_sd: %f var_sd: %f [template]\n",
+             npRead->templateParams.shift_sd, npRead->templateParams.scale_sd, npRead->templateParams.var_sd);
+    st_uglyf("SENTINEL - After: shift_sd: %f scale_sd: %f var_sd: %f [template]\n",
+             npRead->complementParams.shift_sd, npRead->complementParams.scale_sd, npRead->complementParams.var_sd);
+
+
+    //signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
+    //                                   nanopore_templateOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
+    //signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
+    //                                   nanopore_complementOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
+
     stList *templateKmers = lineTokensFromFile(npReadFile, 10);
     stList *complementKmers = lineTokensFromFile(npReadFile, 12);
-    printEventsAndParams(npRead, templateKmers, complementKmers);
+    printEventNoisesAndParams(npRead, templateKmers, complementKmers);
+    //printEventMeansAndParams(npRead, templateKmers, complementKmers);
 
     stList_destruct(templateKmers);
     stList_destruct(complementKmers);
+    stList_destruct(templateMap);
+    stList_destruct(complementMap);
     nanopore_nanoporeReadDestruct(npRead);
     stateMachine_destruct(sMt);
     stateMachine_destruct(sMc);
