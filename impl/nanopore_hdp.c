@@ -117,11 +117,23 @@ void finalize_nhdp_distributions(NanoporeHDP* nhdp) {
 
 void normal_inverse_gamma_params_from_minION(const char* model_filepath, double* mu_out, double* nu_out,
                                              double* alpha_out, double* beta_out) {
-    
+    // model format:
+    // alphabetSize \t alphabet \t kmerSize
+    // correlation coefficient \t eventModel..[level_mean, level_stdv, noise_mean, noise_stdv, noise_lambda]
     FILE* model_file = fopen(model_filepath, "r");
     
     char* line = stFile_getLineFromFile(model_file);
     stList* tokens = stString_split(line);
+
+    if (stList_length(tokens) != 3) {
+        st_errAbort("normal_inverse_gamma_params_from_minION: Model format has changed invalid model"
+                            "found here %s\n", model_filepath);
+    }
+    free(line);
+    stList_destruct(tokens);
+
+    line = stFile_getLineFromFile(model_file);
+    tokens = stString_split(line);
     
     int64_t table_length = (stList_length(tokens) - MODEL_ROW_HEADER_LENGTH) / MODEL_ENTRY_LENGTH;
     double* means = (double*) malloc(sizeof(double) * table_length);

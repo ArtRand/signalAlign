@@ -16,6 +16,7 @@ from serviceCourse.file_handlers import FolderHandler
 
 # Globals
 NORM_DIST_PARAMS = 2
+
 NB_MODEL_PARAMS = 5
 
 def kmer_iterator(dna, k):
