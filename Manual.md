@@ -86,7 +86,8 @@ An example command that would produce 2-way methylation probabilities in _E. col
 > --twoWay \
 > -smt=threeStateHdp \
 > -q ../tests/test_regions/test_sites_bal_1.tgt
-> -x ../tests/test_regions/test_labels_bal_1.tsv
+> -p ../tests/test_regions/test_labels_bal_1.tsv
+> -x twoWay
 > -s \
 > -o ../../ \
 > 2> ../../a.err
