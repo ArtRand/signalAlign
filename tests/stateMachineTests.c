@@ -193,15 +193,17 @@ static void test_checkTestNanoporeReads(CuTest *testCase) {
     CuAssertIntEquals(testCase, npRead->complementReadLength, 766);
 }
 
-static void test_loadPoreModel(CuTest *testCase) {
+static void test_poreModel(CuTest *testCase, int64_t kmerLength, char *alphabet, int64_t alphabetSize) {
     char *tempFile = stString_print("./tempModel.model");
     CuAssertTrue(testCase, !stFile_exists(tempFile));
     FILE *fH = fopen(tempFile, "w");
 
-    int64_t matrixSize = (1 + NUM_OF_KMERS * MODEL_PARAMS);
+    int64_t numOfKmers = intPow(alphabetSize, kmerLength);
+
+    int64_t matrixSize = (1 + numOfKmers * MODEL_PARAMS);
 
     // line 0: alphabetSize, alphabet, kmerLength
-    fprintf(fH, "6\tACEGOT\t6\n");
+    fprintf(fH, "%"PRId64"\t%s\t%"PRId64"\n", alphabetSize, alphabet, kmerLength);
 
     // line 1: emission match matrix
     for (int64_t i = 0; i < matrixSize; i++) {
@@ -218,6 +220,10 @@ static void test_loadPoreModel(CuTest *testCase) {
 
     StateMachine *sM = getStateMachine3(tempFile);
 
+    CuAssertIntEquals(testCase, sM->alphabetSize, alphabetSize);
+    CuAssertIntEquals(testCase, sM->kmerLength, kmerLength);
+    CuAssertStrEquals(testCase, sM->alphabet, alphabet);
+
     for (int64_t i = 0; i < matrixSize; i++) {
         double x = sM->EMISSION_MATCH_MATRIX[i];
         double y = sM->EMISSION_GAP_Y_MATRIX[i];
@@ -228,6 +234,15 @@ static void test_loadPoreModel(CuTest *testCase) {
     stFile_rmrf(tempFile);
     free(tempFile);
     stateMachine_destruct(sM);
+}
+
+static void test_loadPoreModel(CuTest *testCase) {
+    test_poreModel(testCase, 6, "ACGT", 4);
+    test_poreModel(testCase, 5, "ACGT", 4);
+    test_poreModel(testCase, 6, "ACEGT", 5);
+    test_poreModel(testCase, 5, "ACEGT", 5);
+    test_poreModel(testCase, 6, "ACEGOT", 6);
+    test_poreModel(testCase, 5, "ACEGOT", 6);
 }
 
 static void test_stateMachineModel(CuTest *testCase, StateMachine *sM) {
@@ -1023,16 +1038,15 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-
-
-
+    SUITE_ADD_TEST(suite, test_loadPoreModel);
+    /*
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromStrandRead);
     SUITE_ADD_TEST(suite, test_adjustForDrift);
-    SUITE_ADD_TEST(suite, test_models);
     SUITE_ADD_TEST(suite, test_loadPoreModel);
+    SUITE_ADD_TEST(suite, test_models);
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_stateMachine3_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_r9StateMachineWithBanding);
@@ -1043,6 +1057,6 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_continuousPairHmm);
     //SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     //SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
-
+    */
     return suite;
 }
