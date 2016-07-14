@@ -1,5 +1,4 @@
 // Tests for stateMachine and alignments
-
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -90,6 +89,13 @@ StateMachine *loadR9DescaledStateMachine3(NanoporeRead *npRead) {
     return sM;
 }
 
+StateMachine *load5merR9DescaledStateMachine3(NanoporeRead *npRead) {
+    // load stateMachine from model file
+    char *templateModelFile = stString_print("../../signalAlign/models/testModelR9_5mer_template.model");
+    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams);
+    free(templateModelFile);
+    return sM;
+}
 
 StateMachine *loadStateMachineHdp(NanoporeRead *npRead) {
     char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
@@ -260,6 +266,9 @@ static void test_models(CuTest *testCase) {
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_template.model"));
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_complement.model"));
 
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_template.model"));
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_complement.model"));
+
     StateMachine *sM = getStateMachine3("../models/testModel_template.model");
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
@@ -277,6 +286,14 @@ static void test_models(CuTest *testCase) {
     stateMachine_destruct(sM);
 
     sM = getStateMachine3("../models/testModelR9_complement.model");
+    test_stateMachineModel(testCase, sM);
+    stateMachine_destruct(sM);
+
+    sM = getStateMachine3("../models/testModelR9_5mer_template.model");
+    test_stateMachineModel(testCase, sM);
+    stateMachine_destruct(sM);
+
+    sM = getStateMachine3("../models/testModelR9_5mer_complement.model");
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 }
@@ -567,6 +584,20 @@ static void test_r9StateMachineWithBanding(CuTest *testCase) {
 
     stateMachine_destruct(sM);
     stateMachine_destruct(sM_2);
+    nanopore_nanoporeReadDestruct(npRead);
+    sequence_destruct(refSeq);
+}
+
+static void test_r9_5merModel(CuTest *testCase) {
+    Sequence *refSeq = getEcoliReferenceSequence();
+    NanoporeRead *npRead = loadTestR9NanoporeRead();
+    StateMachine *sM = load5merR9DescaledStateMachine3(npRead);
+    signalUtils_estimateNanoporeParams(sM, npRead, &npRead->templateParams, 0.0,
+                                       nanopore_templateOneDAssignmentsFromRead,
+                                       nanopore_adjustTemplateEventsForDrift);
+    test_stateMachine(testCase, sM, npRead, refSeq, 3441, 0.01);
+
+    stateMachine_destruct(sM);
     nanopore_nanoporeReadDestruct(npRead);
     sequence_destruct(refSeq);
 }
@@ -1038,7 +1069,7 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, test_loadPoreModel);
+    SUITE_ADD_TEST(suite, test_r9_5merModel);
     /*
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);

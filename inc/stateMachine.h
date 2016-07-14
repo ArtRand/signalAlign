@@ -149,8 +149,8 @@ struct _StateMachine3 {
     double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
     //double (*getYGapProbFcn)(const double *emissionYGapProbs, void *x, void *y);
     //double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
-    double (*getYGapProbFcn)(StateMachine3 *sM, void *x, void *y, bool match);
-    double (*getMatchProbFcn)(StateMachine3 *sM, void *x, void *y, bool match);
+    double (*getYGapProbFcn)(StateMachine *self, void *x, void *y, bool match);
+    double (*getMatchProbFcn)(StateMachine *self, void *x, void *y, bool match);
 };
 
 typedef struct _StateMachine3_HDP StateMachine3_HDP;
