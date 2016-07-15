@@ -363,11 +363,14 @@ static void test_nanoporeScaleParamsFromOneDAssignments(CuTest *testCase) {
 
 static void test_nanoporeScaleParamsFromStrandRead(CuTest *testCase) {
     NanoporeRead *npRead = loadTestNanoporeRead();
-    stList *map = nanopore_getOneDAssignmentsFromRead(npRead->templateStrandEventMap, npRead->templateEvents,
-                                                      npRead->templateRead, npRead->templateReadLength);
-    st_uglyf("Map has %lld assignments\n", stList_length(map));
-    NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
     StateMachine *sM = loadDescaledStateMachine3(npRead);
+    stList *map = nanopore_getOneDAssignmentsFromRead(npRead->templateStrandEventMap, npRead->templateEvents,
+                                                      npRead->templateRead, npRead->templateReadLength,
+                                                      sM->alphabet, sM->alphabetSize, sM->kmerLength);
+    st_uglyf("Map has %lld assignments\n", stList_length(map));
+
+    NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
+
     nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, TRUE, TRUE);
     nanopore_compute_noise_scale_params(sM->EMISSION_MATCH_MATRIX, map, params);
 
@@ -395,7 +398,7 @@ static void test_adjustForDrift(CuTest *testCase) {
     NanoporeRead *npRead = loadTestR9NanoporeRead();
     StateMachine *sM = loadR9DescaledStateMachine3(npRead);
     signalUtils_estimateNanoporeParams(sM, npRead, &npRead->templateParams, 0.0,
-                                       nanopore_templateOneDAssignmentsFromRead,
+                                       signalUtils_templateOneDAssignmentsFromRead,
                                        nanopore_adjustTemplateEventsForDrift);
     //nanopore_adjustEventsForDrift(npRead);
     NanoporeRead *npRead_unadjusted = loadTestR9NanoporeRead();
@@ -553,7 +556,8 @@ static inline void test_stateMachine(CuTest *testCase, StateMachine *sM, Nanopor
     checkAlignedPairs(testCase, alignedPairs, refSeq->length, npRead->nbTemplateEvents);
 
     st_uglyf("got %lld alignedPairs \n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == targetAlignedPairs);
+
+    CuAssertIntEquals(testCase, stList_length(alignedPairs), targetAlignedPairs);
     stList_destruct(filteredRemappedAnchors);
     sequence_destruct(eventSequence);
     stList_destruct(alignedPairs);
@@ -566,7 +570,7 @@ static void test_r9StateMachineWithBanding(CuTest *testCase) {
     StateMachine *sM = loadR9DescaledStateMachine3(npRead);
     StateMachine *sM_2 = loadR9DescaledStateMachine3(npRead);
     signalUtils_estimateNanoporeParams(sM, npRead, &npRead->templateParams, 0.0,
-                                       nanopore_templateOneDAssignmentsFromRead,
+                                       signalUtils_templateOneDAssignmentsFromRead,
                                        nanopore_adjustTemplateEventsForDrift);
     test_stateMachine(testCase, sM, npRead, refSeq, 3441, 0.01);
 
@@ -593,9 +597,9 @@ static void test_r9_5merModel(CuTest *testCase) {
     NanoporeRead *npRead = loadTestR9NanoporeRead();
     StateMachine *sM = load5merR9DescaledStateMachine3(npRead);
     signalUtils_estimateNanoporeParams(sM, npRead, &npRead->templateParams, 0.0,
-                                       nanopore_templateOneDAssignmentsFromRead,
+                                       signalUtils_templateOneDAssignmentsFromRead,
                                        nanopore_adjustTemplateEventsForDrift);
-    test_stateMachine(testCase, sM, npRead, refSeq, 3441, 0.01);
+    test_stateMachine(testCase, sM, npRead, refSeq, 1570, 0.01);
 
     stateMachine_destruct(sM);
     nanopore_nanoporeReadDestruct(npRead);
@@ -1069,8 +1073,6 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, test_r9_5merModel);
-    /*
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
@@ -1081,13 +1083,14 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_stateMachine3_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_r9StateMachineWithBanding);
+    //SUITE_ADD_TEST(suite, test_r9_5merModel); // todo still need to refactor path, HDcell
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_DegenerateNucleotides);
     SUITE_ADD_TEST(suite, test_makeAndCheckModels);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
-    //SUITE_ADD_TEST(suite, test_continuousPairHmm);
-    //SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
-    //SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
-    */
+    SUITE_ADD_TEST(suite, test_continuousPairHmm);
+    SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
+    SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
+
     return suite;
 }

@@ -637,7 +637,7 @@ int main(int argc, char *argv[]) {
         // temporary way to 'turn off' estimates if I want to
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
-                                               nanopore_templateOneDAssignmentsFromRead,
+                                               signalUtils_templateOneDAssignmentsFromRead,
                                                nanopore_adjustTemplateEventsForDrift);
         }
 
@@ -672,7 +672,7 @@ int main(int argc, char *argv[]) {
 
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
-                                               nanopore_complementOneDAssignmentsFromRead,
+                                               signalUtils_complementOneDAssignmentsFromRead,
                                                nanopore_adjustComplementEventsForDrift);
         }
 
@@ -721,7 +721,7 @@ int main(int argc, char *argv[]) {
         // re-estimate the nanoporeAdjustment parameters
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
-                                               nanopore_templateOneDAssignmentsFromRead,
+                                               signalUtils_templateOneDAssignmentsFromRead,
                                                nanopore_adjustTemplateEventsForDrift);
         }
 
@@ -756,7 +756,7 @@ int main(int argc, char *argv[]) {
 
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
-                                               nanopore_complementOneDAssignmentsFromRead,
+                                               signalUtils_complementOneDAssignmentsFromRead,
                                                nanopore_adjustComplementEventsForDrift);
         }
 

@@ -476,37 +476,35 @@ stList *nanopore_getComplementOneDAssignments(NanoporeRead *npRead, double thres
 }
 
 stList *nanopore_getOneDAssignmentsFromRead(int64_t *strandEventMap, double *events, char *strandRead,
-                                            int64_t readLength) {
+                                            int64_t readLength, char *alphabet, int64_t alphabetSize,
+                                            int64_t kmerLength) {
+    // map of event<>kmerIndex
     stList *map = stList_construct3(0, &free);
-    int64_t rows = sequence_correctSeqLength(readLength, kmer);
-    int64_t pE = INT64_MIN;
+
+    // number of kmers there will be (this appears as rows in the .fast5 files, so I called it rows)
+    int64_t rows = readLength - (kmerLength - 1);
+
+    // see note below
+    int64_t previousEventIndex = -1;
     for (int64_t i = 0; i < rows; i++) {
         int64_t eventIndex = strandEventMap[i];
-        int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(strandRead + i);
+        int64_t kmerIndex = kmer_id(strandRead + i, alphabet, alphabetSize, kmerLength);
         double eventMean = nanopore_getEventMean(events, eventIndex);
         double eventSd = nanopore_getEventSd(events, eventIndex);
         double eventDeltaTime = nanopore_getEventDeltaTime(events, eventIndex);
-        if (eventIndex > pE) {
+
+        // every event is mapped to it's highest probability position in the read so repeat events are just to fill in
+        // skipped kmers (which will have lower prob). so only collect event<>kmer matches for the first event (highest
+        // prob)
+        if (eventIndex > previousEventIndex) {
             //st_uglyf("seqIndex: %lld eventIndex: %lld mean: %f sd: %f dur: %f kmerIndex: %lld\n",
             //         i, eventIndex, eventMean, eventSd, eventDeltaTime, kmerIndex);
             EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDeltaTime, kmerIndex);
             stList_append(map, t);
-            pE = eventIndex;
+            previousEventIndex = eventIndex;
         }
     }
     return map;
-}
-
-stList *nanopore_templateOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore) {
-    (void) ignore;
-    return nanopore_getOneDAssignmentsFromRead(npRead->templateStrandEventMap, npRead->templateEvents,
-                                               npRead->templateRead, npRead->templateReadLength);
-}
-
-stList *nanopore_complementOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore) {
-    (void) ignore;
-    return nanopore_getOneDAssignmentsFromRead(npRead->complementStrandEventMap, npRead->complementEvents,
-                                               npRead->complementRead, npRead->complementReadLength);
 }
 
 static void nanopore_adjustEventsForDriftP(double *events, double drift, int64_t nbEvents) {

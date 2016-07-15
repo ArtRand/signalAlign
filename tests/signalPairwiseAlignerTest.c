@@ -798,8 +798,8 @@ CuSuite *signalPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
-    //SUITE_ADD_TEST(suite, test_getBlastPairs);
-    //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+    SUITE_ADD_TEST(suite, test_getBlastPairs);
+    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
 
     //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);  // wonky
 

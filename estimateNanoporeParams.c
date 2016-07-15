@@ -186,8 +186,8 @@ int main(int argc, char *argv[]) {
     StateMachine *sMc = getStateMachine3(complementModelFile);
 
     // make 1D map of events (mean, noise) to kmers
-    stList *templateMap = nanopore_templateOneDAssignmentsFromRead(npRead, ASSIGNMENT_THRESHOLD);
-    stList *complementMap = nanopore_complementOneDAssignmentsFromRead(npRead, ASSIGNMENT_THRESHOLD);
+    stList *templateMap = signalUtils_templateOneDAssignmentsFromRead(npRead, sMt, ASSIGNMENT_THRESHOLD);
+    stList *complementMap = signalUtils_complementOneDAssignmentsFromRead(npRead, sMc, ASSIGNMENT_THRESHOLD);
 
     // convert template to log normal
     nanopore_convert_to_lognormal_params(sMt->alphabetSize, sMt->kmerLength, sMt->EMISSION_MATCH_MATRIX, templateMap);
@@ -213,9 +213,9 @@ int main(int argc, char *argv[]) {
 
 
     //signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
-    //                                   nanopore_templateOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
+    //                                   signalUtils_templateOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
     //signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
-    //                                   nanopore_complementOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
+    //                                   signalUtils_complementOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
 
     stList *templateKmers = lineTokensFromFile(npReadFile, 10);
     stList *complementKmers = lineTokensFromFile(npReadFile, 12);

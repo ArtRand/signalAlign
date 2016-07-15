@@ -171,15 +171,29 @@ stList *signalUtils_getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eve
     return filteredRemappedAnchors;
 }
 
+stList *signalUtils_templateOneDAssignmentsFromRead(NanoporeRead *npRead, StateMachine *sM, double ignore) {
+    (void) ignore;
+    return nanopore_getOneDAssignmentsFromRead(npRead->templateStrandEventMap, npRead->templateEvents,
+                                               npRead->templateRead, npRead->templateReadLength,
+                                               sM->alphabet, sM->alphabetSize, sM->kmerLength);
+}
+
+stList *signalUtils_complementOneDAssignmentsFromRead(NanoporeRead *npRead, StateMachine *sM, double ignore) {
+    (void) ignore;
+    return nanopore_getOneDAssignmentsFromRead(npRead->complementStrandEventMap, npRead->complementEvents,
+                                               npRead->complementRead, npRead->complementReadLength,
+                                               sM->alphabet, sM->alphabetSize, sM->kmerLength);
+}
+
 void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
                                         NanoporeReadAdjustmentParameters *params, double assignmentThreshold,
-                                        stList *(*assignmentFunction)(NanoporeRead *, double),
+                                        stList *(*assignmentFunction)(NanoporeRead *, StateMachine *, double),
                                         void (*driftAdjustmentFunction)(NanoporeRead *)) {
     st_uglyf("SENTINEL - Re-estimating parameters\n");
     st_uglyf("SENTINEL - Before: scale: %f shift: %f var: %f drift %f\n", params->scale, params->shift, params->var,
              params->drift);
     st_uglyf("SENTINEL - Before: scale_sd: %f var_sd: %f\n", params->scale_sd, params->var_sd);
-    stList *map = assignmentFunction(npRead, assignmentThreshold);
+    stList *map = assignmentFunction(npRead, sM, assignmentThreshold);
     st_uglyf("SENTINEL - Map is %lld long\n", stList_length(map));
 
     nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, TRUE, TRUE);

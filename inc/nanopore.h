@@ -78,11 +78,8 @@ stList *nanopore_getTemplateOneDAssignments(NanoporeRead *npRead, double thresho
 stList *nanopore_getComplementOneDAssignments(NanoporeRead *npRead, double threshold);
 
 stList *nanopore_getOneDAssignmentsFromRead(int64_t *strandEventMap, double *events, char *strandRead,
-                                            int64_t readLength);
-
-stList *nanopore_complementOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore);
-
-stList *nanopore_templateOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore);
+                                            int64_t readLength, char *alphabet, int64_t alphabetSize,
+                                            int64_t kmerLength);
 
 void nanopore_adjustEventsForDrift(NanoporeRead *npRead);
 
