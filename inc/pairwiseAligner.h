@@ -102,7 +102,7 @@ void *sequence_getEventSafe(void *s, int64_t index);
 
 Sequence *sequence_constructEventSequence(int64_t length, void *events);
 
-int64_t sequence_correctSeqLength(int64_t length, SequenceType type);
+int64_t sequence_correctSeqLength(int64_t length, SequenceType type, int64_t kmerLength);
 
 // Pairwise alignment
 typedef struct _pairwiseAlignmentBandingParameters {
@@ -220,19 +220,19 @@ double logAdd(double x, double y);
 // HDCell
 typedef struct _path {
     void *kmer;
-    int64_t kmerLength;
     int64_t stateNumber;
+    int64_t kmerLength;
     double *cells;
 } Path;
 
 
 int64_t intPow(int64_t base, int64_t exp);
 
-Path *path_construct(char *kmer, int64_t stateNumber);
+Path *path_construct(char *kmer, int64_t stateNumber, int64_t kmerLength);
 
 bool path_checkLegal(Path *path1, Path *path2);
 
-stList *path_findDegeneratePositions(char *kmer);
+stList *path_findDegeneratePositions(char *kmer, int64_t kmerLength);
 
 stList *path_listPotentialKmers(int64_t nbDegeneratePositions, int64_t nbBaseOptions, char *baseOptions);
 
@@ -251,7 +251,8 @@ typedef struct _hdcell {
     bool init;
 } HDCell;
 
-HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbBaseOptions, char *baseOptions);
+HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbBaseOptions, char *baseOptions,
+                         int64_t kmerLength);
 
 double hdCell_totalProbability(HDCell *cell1, HDCell *cell2);
 
@@ -278,12 +279,13 @@ double cell_dotProduct2(double *cell1, StateMachine *sM, double (*getStateValue)
 typedef struct _dpDiagonal {
     Diagonal diagonal;
     int64_t stateNumber;
+    int64_t kmerLength;
     int64_t totalPaths;
     Sequence *sequence;
     HDCell **cells;
 } DpDiagonal;
 
-DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequence *nucleotideSequence);
+DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, int64_t kmerLength, Sequence *nucleotideSequence);
 
 DpDiagonal *dpDiagonal_clone(DpDiagonal *diagonal);
 
@@ -309,7 +311,7 @@ void dpDiagonal_initialiseValues(DpDiagonal *diagonal, StateMachine *sM,
 
 typedef struct _dpMatrix DpMatrix;
 
-DpMatrix *dpMatrix_construct(int64_t diagonalNumber, int64_t stateNumber);
+DpMatrix *dpMatrix_construct(int64_t diagonalNumber, int64_t stateNumber, int64_t kmerLength);
 
 void dpMatrix_destruct(DpMatrix *dpMatrix);
 

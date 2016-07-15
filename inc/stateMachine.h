@@ -146,7 +146,7 @@ struct _StateMachine3 {
     double TRANSITION_GAP_SWITCH_TO_X;
     double TRANSITION_GAP_SWITCH_TO_Y;
 
-    double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
+    double (*getXGapProbFcn)(StateMachine *self, const double *emissionXGapProbs, void *i);
     //double (*getYGapProbFcn)(const double *emissionYGapProbs, void *x, void *y);
     //double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
     double (*getYGapProbFcn)(StateMachine *self, void *x, void *y, bool match);
@@ -223,7 +223,7 @@ StateMachine *stateMachine3_construct(StateMachineType type,
                                       const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
                                       void (*setTransitionsToDefaults)(StateMachine *),
                                       void (*setEmissionsDefaults)(StateMachine *, int64_t),
-                                      double (*gapXProbFcn)(const double *, void *),
+                                      double (*gapXProbFcn)(StateMachine *, const double *, void *),
                                       double (*gapYProbFcn)(StateMachine *, void *, void *, bool ),
                                       double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
                                       void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
@@ -277,7 +277,7 @@ double emissions_symbol_getGapProb(const double *emissionGapProbs, void *base);
 
 double emissions_symbol_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
 
-double emissions_kmer_getGapProb(const double *emissionGapProbs, void *x_i);
+double emissions_kmer_getGapProb(StateMachine *sM, const double *emissionGapProbs, void *x_i);
 
 double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
 
@@ -309,12 +309,12 @@ double emissions_signal_getDurationProb(void *event, int64_t n);
 
 StateMachine *stateMachine3_signalMachineBuilder(StateMachineType type, char *alphabet, int64_t alphabetSize,
                                                  int64_t kmerLength,
-                                                 double (*gapXProbFcn)(const double *, void *),
+                                                 double (*gapXProbFcn)(StateMachine *, const double *, void *),
                                                  double (*matchProbFcn)(StateMachine *, void *, void *, bool),
                                                  NanoporeHDP *nHdp);
 
 StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType type,
-                                         double (*gapXProbFcn)(const double *, void *),
+                                         double (*gapXProbFcn)(StateMachine *, const double *, void *),
                                          double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
                                          NanoporeHDP *nHdp);
 

@@ -236,7 +236,7 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
         st_errAbort("signalAlign - You're trying to do the wrong king of alignment");
     }
 
-    int64_t lX = sequence_correctSeqLength(strlen(target), kmer);
+    int64_t lX = sequence_correctSeqLength(strlen(target), kmer, sM->kmerLength);
 
     // remap anchor pairs
     stList *filteredRemappedAnchors = signalUtils_getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
@@ -279,7 +279,7 @@ void getSignalExpectations(StateMachine *sM, const char *model, const char *inpu
                            int64_t *eventMap, int64_t mapOffset, char *trainingTarget, PairwiseAlignmentParameters *p,
                            stList *unmappedAnchors, Strand strand, DegenerateType degenerate) {
     // correct sequence length
-    int64_t lX = sequence_correctSeqLength(strlen(trainingTarget), event);
+    int64_t lX = sequence_correctSeqLength(strlen(trainingTarget), event, sM->kmerLength);
 
     // remap the anchors
     stList *filteredRemappedAnchors = signalUtils_getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);

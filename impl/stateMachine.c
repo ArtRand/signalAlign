@@ -152,18 +152,19 @@ double emissions_symbol_getMatchProb(const double *emissionMatchProbs, void *x, 
     return emissionMatchProbs[iX * SYMBOL_NUMBER_NO_N + iY];
 }
 
-double emissions_kmer_getGapProb(const double *emissionGapProbs, void *x_i) {
+double emissions_kmer_getGapProb(StateMachine *sM, const double *emissionGapProbs, void *x_i) {
     // even though this shouldn't happen, check for null x_i and return logzero
     if (x_i == NULL) {
         return LOG_ZERO;
     }
     // make temp x_i meant to work with getKmer
-    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
-    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+    char *kmer_i = malloc((sM->kmerLength) * sizeof(char));
+    for (int64_t x = 0; x < sM->kmerLength; x++) {
         kmer_i[x] = *((char *) x_i + x);
     }
-    kmer_i[KMER_LENGTH] = '\0';
-    int64_t i = emissions_discrete_getKmerIndexFromKmer(kmer_i);
+    kmer_i[sM->kmerLength] = '\0';
+
+    int64_t i = kmer_id(kmer_i, sM->alphabet, sM->alphabetSize, sM->kmerLength);
     //index_check(i);
     free(kmer_i);
     double p = i > NUM_OF_KMERS ? LOG_ZERO : emissionGapProbs[i];
@@ -465,11 +466,11 @@ double emissions_signal_getHdpKmerDensity(StateMachine *sM, void *x_i, void *e_j
     }
 
     // make temp x_i
-    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
-    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+    char *kmer_i = malloc((self->model.kmerLength) * sizeof(char));
+    for (int64_t x = 0; x < self->model.kmerLength; x++) {
         kmer_i[x] = *((char *) x_i + x);
     }
-    kmer_i[KMER_LENGTH] = '\0';
+    kmer_i[self->model.kmerLength] = '\0';
 
     // wrangle e_j data
     double eventMean = *(double *) e_j;
@@ -500,11 +501,11 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine 
     double eventNoise = *(double *) ((char *) e_j + sizeof(double)); // aaah pointers
 
     // make temp x_i
-    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
-    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+    char *kmer_i = malloc((self->model.kmerLength) * sizeof(char));
+    for (int64_t x = 0; x < self->model.kmerLength; x++) {
         kmer_i[x] = *((char *) x_i + x);
     }
-    kmer_i[KMER_LENGTH] = '\0';
+    kmer_i[self->model.kmerLength] = '\0';
 
     // get index
     //int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
@@ -549,11 +550,11 @@ double emissions_signal_strawManGetKmerEventMatchProb(StateMachine *sM, void *x_
     double eventNoise = *(double *) ((char *) e_j + sizeof(double)); // aaah pointers
 
     // make temp x_i
-    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
-    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+    char *kmer_i = malloc((self->model.kmerLength) * sizeof(char));
+    for (int64_t x = 0; x < self->model.kmerLength; x++) {
         kmer_i[x] = *((char *) x_i + x);
     }
-    kmer_i[KMER_LENGTH] = '\0';
+    kmer_i[self->model.kmerLength] = '\0';
 
     // get index
     //int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(kmer_i);
@@ -1112,7 +1113,7 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
                                                              double, double,
                                                              void *),
                                         void *extraArgs) {
-    StateMachine3 *sM3 = (StateMachine3 *) sM;
+    StateMachine3 *sM3 = (StateMachine3 *)sM;
     HDCell *hdCurrent = current == NULL ? NULL : (HDCell *)current;
     HDCell *hdLower = lower == NULL ? NULL : (HDCell *)lower;
     HDCell *hdMiddle = middle == NULL ? NULL : (HDCell *)middle;
@@ -1126,7 +1127,7 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
                 if (path_checkLegal(pathL, pathC)) {
                     double *lowerCells = path_getCell(pathL);
                     double *currentCells = path_getCell(pathC);
-                    double eP = sM3->getXGapProbFcn(sM3->model.EMISSION_GAP_X_PROBS, pathC->kmer);
+                    double eP = sM3->getXGapProbFcn(sM, sM3->model.EMISSION_GAP_X_PROBS, pathC->kmer);
                     doTransition(lowerCells, currentCells, match, shortGapX, eP, sM3->TRANSITION_GAP_OPEN_X, extraArgs);
                     doTransition(lowerCells, currentCells, shortGapX, shortGapX, eP, sM3->TRANSITION_GAP_EXTEND_X, extraArgs);
                     doTransition(lowerCells, currentCells, shortGapY, shortGapX, eP, sM3->TRANSITION_GAP_SWITCH_TO_X, extraArgs);
@@ -1142,7 +1143,7 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
                 if (path_checkLegal(pathM, pathC)) {
                     double *middleCells = path_getCell(pathM);
                     double *currentCells = path_getCell(pathC);
-                    double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY, TRUE);
+                    double eP = sM3->getMatchProbFcn(sM, pathC->kmer, cY, TRUE);
                     doTransition(middleCells, currentCells, match, match, eP, sM3->TRANSITION_MATCH_CONTINUE, extraArgs);
                     doTransition(middleCells, currentCells, shortGapX, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_X, extraArgs);
                     doTransition(middleCells, currentCells, shortGapY, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_Y, extraArgs);
@@ -1158,7 +1159,7 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
                 if (stString_eq(pathC->kmer, pathU->kmer)) {
                     double *upperCells = path_getCell(pathU);
                     double *currentCells = path_getCell(pathC);
-                    double eP = sM3->getYGapProbFcn(sM3, pathC->kmer, cY, FALSE);
+                    double eP = sM3->getYGapProbFcn(sM, pathC->kmer, cY, FALSE);
                     doTransition(upperCells, currentCells, match, shortGapY, eP, sM3->TRANSITION_GAP_OPEN_Y, extraArgs);
                     doTransition(upperCells, currentCells, shortGapY, shortGapY, eP, sM3->TRANSITION_GAP_EXTEND_Y, extraArgs);
                     // shortGapX -> shortGapY not allowed, this would be going from a kmer skip to extra event?
@@ -1209,7 +1210,7 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
                     //st_uglyf("SENTINAL - legal MIDDLE : pathC kmer %s\n", pathC->kmer);
                     double *middleCells = path_getCell(pathM);
                     double *curentCells = path_getCell(pathC);
-                    double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY, TRUE);
+                    double eP = sM3->getMatchProbFcn(sM, pathC->kmer, cY, TRUE);
                     doTransition(middleCells, curentCells, match, match, eP, sM3->TRANSITION_MATCH_CONTINUE, extraArgs);
                     doTransition(middleCells, curentCells, shortGapX, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_X, extraArgs);
                     doTransition(middleCells, curentCells, shortGapY, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_Y, extraArgs);
@@ -1226,7 +1227,7 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
                     //st_uglyf("SENTINAL - legal UPPER : pathC kmer %s\n", pathC->kmer);
                     double *upperCells = path_getCell(pathU);
                     double *currentCells = path_getCell(pathC);
-                    double eP = sM3->getMatchProbFcn(sM3, pathC->kmer, cY, FALSE);
+                    double eP = sM3->getMatchProbFcn(sM, pathC->kmer, cY, FALSE);
                     doTransition(upperCells, currentCells, match, shortGapY, eP, sM3->TRANSITION_GAP_OPEN_Y, extraArgs);
                     doTransition(upperCells, currentCells, shortGapY, shortGapY, eP, sM3->TRANSITION_GAP_EXTEND_Y, extraArgs);
                     // shortGapX -> shortGapY not allowed, this would be going from a kmer skip to extra event?
@@ -1239,7 +1240,7 @@ static void stateMachine3HDP_cellCalculate(StateMachine *sM,
 
 ///////////////////////////////////////////// CORE FUNCTIONS ////////////////////////////////////////////////////////
 StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType type,
-                                         double (*gapXProbFcn)(const double *, void *),
+                                         double (*gapXProbFcn)(StateMachine *, const double *, void *),
                                          double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
                                          NanoporeHDP *nHdp) {
     /*
@@ -1327,7 +1328,7 @@ StateMachine *stateMachine3_construct(StateMachineType type,
                                       const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
                                       void (*setTransitionsToDefaults)(StateMachine *),
                                       void (*setEmissionsDefaults)(StateMachine *, int64_t),
-                                      double (*gapXProbFcn)(const double *, void *),
+                                      double (*gapXProbFcn)(StateMachine *, const double *, void *),
                                       double (*gapYProbFcn)(StateMachine *, void *, void *, bool ),
                                       double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
                                       void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
@@ -1426,7 +1427,7 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type,
 
 StateMachine *stateMachine3_signalMachineBuilder(StateMachineType type, char *alphabet, int64_t alphabetSize,
                                                  int64_t kmerLength,
-                                                 double (*gapXProbFcn)(const double *, void *),
+                                                 double (*gapXProbFcn)(StateMachine *, const double *, void *),
                                                  double (*matchProbFcn)(StateMachine *, void *, void *, bool),
                                                  NanoporeHDP *nHdp) {
     StateMachine *sM;

@@ -44,7 +44,7 @@ static double test_inverseGaussianPdf(double x, double mu, double lambda) {
 
 Sequence *makeTestKmerSequence() {
     char *s = "ATGXAXA"; // has 2 6mers
-    int64_t lX = sequence_correctSeqLength(strlen(s), kmer);
+    int64_t lX = sequence_correctSeqLength(strlen(s), kmer, KMER_LENGTH);
     Sequence *seq = sequence_construct(lX, s, sequence_getKmer, kmer);
     seq->degenerateBases = "CEO";
     seq->nbDegenerateBases = 3;
@@ -52,7 +52,7 @@ Sequence *makeTestKmerSequence() {
 }
 
 Sequence *makeKmerSequence(char *nucleotides) {
-    int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer);
+    int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer, KMER_LENGTH);
     Sequence *seq = sequence_constructKmerSequence(lX, nucleotides,
                                                    sequence_getKmer, sequence_sliceNucleotideSequence,
                                                    THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
@@ -210,7 +210,7 @@ static void test_referenceSequence(CuTest *testCase) {
     // test slicing
     int64_t r = st_randomInt(0, length);
     Sequence *slice = testSequence->sliceFcn(testSequence, 10, length - r);
-    CuAssertStrEquals(testCase, (char *)(testSequence->elements + 10), slice->elements);
+    CuAssertStrEquals(testCase, ((char *)testSequence->elements + 10), slice->elements);
     CuAssertStrEquals(testCase, testSequence->degenerateBases, slice->degenerateBases);
     CuAssert(testCase, "slice sequence type fail",testSequence->type == slice->type);
 
@@ -550,9 +550,9 @@ static void test_hdCellConstruct(CuTest *testCase) {
     char *ambigKmer = "ATGXAXAAAAAA";
     int64_t nbCytosines = 3;
     char *cytosines = "CEO";
-    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines);
-    Path *path2 = hdCell_getPath(cell, 8);
+    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines, KMER_LENGTH);
     Path *path = hdCell_getPath(cell, 0);
+    Path *path2 = hdCell_getPath(cell, 8);
     CuAssertTrue(testCase, hdCell_getPath(cell, 9) == NULL);
     CuAssertIntEquals(testCase, 9, (int )cell->numberOfPaths);
     CuAssertStrEquals(testCase, path->kmer, "ATGCAC");
@@ -564,7 +564,7 @@ static void test_hdCellConstructWorstCase(CuTest *testCase) {
     char *ambigKmer = "XXXXXX";
     int64_t nbCytosines = 3;
     char *cytosines = "CEO";
-    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines);
+    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines, KMER_LENGTH);
     Path *path = hdCell_getPath(cell, 0);
     Path *path2 = hdCell_getPath(cell, 728);
     CuAssertIntEquals(testCase, 729, (int )cell->numberOfPaths);
@@ -582,7 +582,7 @@ static void test_dpDiagonal(CuTest *testCase) {
 
     Sequence *seq = makeTestKmerSequence();  // ATGXAXA
 
-    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber, seq);
+    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber, sM->kmerLength, seq);
 
     //Get cell
     HDCell *c1 = dpDiagonal_getCell(dpDiagonal, -1);
@@ -626,7 +626,7 @@ static void test_dpMatrix(CuTest *testCase) {
     //           GCAATT 2
     Sequence *sX = makeKmerSequence(s);
 
-    DpMatrix *dpMatrix = dpMatrix_construct(lX + lY, 5);
+    DpMatrix *dpMatrix = dpMatrix_construct(lX + lY, 5, KMER_LENGTH);
 
     // check initialization
     CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), 0);
