@@ -75,7 +75,7 @@ StateMachine *loadScaledStateMachine3(NanoporeRead *npRead) {
 StateMachine *loadDescaledStateMachine3(NanoporeRead *npRead) {
     // load stateMachine from model file
     char *templateModelFile = stString_print("../../signalAlign/models/testModel_template.model");
-    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams);
+    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams, TRUE);
 
     free(templateModelFile);
     return sM;
@@ -84,7 +84,7 @@ StateMachine *loadDescaledStateMachine3(NanoporeRead *npRead) {
 StateMachine *loadR9DescaledStateMachine3(NanoporeRead *npRead) {
     // load stateMachine from model file
     char *templateModelFile = stString_print("../../signalAlign/models/testModelR9_template.model");
-    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams);
+    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams, FALSE);
     free(templateModelFile);
     return sM;
 }
@@ -92,7 +92,7 @@ StateMachine *loadR9DescaledStateMachine3(NanoporeRead *npRead) {
 StateMachine *load5merR9DescaledStateMachine3(NanoporeRead *npRead) {
     // load stateMachine from model file
     char *templateModelFile = stString_print("../../signalAlign/models/testModelR9_5mer_template.model");
-    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams);
+    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams, FALSE);
     free(templateModelFile);
     return sM;
 }
@@ -1201,8 +1201,6 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-
-
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
@@ -1220,8 +1218,8 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_makeAndCheckModels);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
-    //SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
-    //SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
+    SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
+    SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
 
     return suite;
 }

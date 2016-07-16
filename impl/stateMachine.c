@@ -1494,12 +1494,9 @@ static void stateMachine3_loadSymmetric(StateMachine3 *sM3, Hmm *hmm) {
     emissions_em_loadGapProbs(sM3->EMISSION_GAP_Y_MATRIX, hmm, xGapStates, 1, yGapStates, 1);
 }
 */
-
-///////////////////////////////////
-///////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Public functions
-///////////////////////////////////
-///////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
     st_errAbort("5-state stateMachine not implemented\n");
     if (hmmD->type == fiveState) {
@@ -1527,7 +1524,7 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
     }
 }
 
-StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp) {
+StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp, bool scaleNoise) {
     if (!stFile_exists(modelFile)) {
         st_errAbort("getStateMachine3_descaled: Cannot find model file %s\n", modelFile);
     };
@@ -1537,8 +1534,10 @@ StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjus
     sM->scale = npp.scale;
     sM->shift = npp.shift;
     sM->var = npp.var;
-    emissions_signal_scaleNoise(sM, npp);
 
+    if (scaleNoise) {
+        emissions_signal_scaleNoise(sM, npp);
+    }
     return sM;
 }
 

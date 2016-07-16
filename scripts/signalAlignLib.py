@@ -926,10 +926,13 @@ class SignalAlignment(object):
         r7_complement_lookup_table = "../models/testModel_complement.model" if def_complement_model else \
             "../models/testModel_complement_pop1.model"
 
-        r9_template_lookup_table = "../models/testModelR9_template.model"
-        #r9_complement_lookup_table = "../models/testModelR9_complement_pop2.model"
-        r9_complement_lookup_table = "../models/testModelR9_complement.model"
-        #r9_complement_lookup_table = "../models/testModelR9_template.model"
+        # screwing around with different R9 models
+        #r9_template_lookup_table = "../models/testModelR9_template.model"  # 'default' 6-mer template model
+        r9_template_lookup_table = "../models/testModelR9_5mer_template.model"  # 5-mer model
+
+        #r9_complement_lookup_table = "../models/testModelR9_complement.model"  # default 6-mer complement model
+        r9_complement_lookup_table = "../models/testModelR9_5mer_complement.model"  # default 5-mer complement model
+        #r9_complement_lookup_table = "../models/testModelR9_complement_pop2.model"  # extra 6-mer model for complement
 
         if def_template_model is not None:
             assert (os.path.exists(r7_template_lookup_table)), "Didn't find default template look-up table"

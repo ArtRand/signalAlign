@@ -318,7 +318,7 @@ StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType
                                          double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
                                          NanoporeHDP *nHdp);
 
-StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp);
+StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp, bool scaleNoise);
 
 StateMachine *getHdpStateMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp);
 
