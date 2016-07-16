@@ -299,7 +299,6 @@ void getSignalExpectations(StateMachine *sM, const char *model, const char *inpu
 
 int main(int argc, char *argv[]) {
     StateMachineType sMtype = threeState;
-
     int64_t j = 0;
     int64_t diagExpansion = 50;
     double threshold = 0.01;
@@ -453,7 +452,7 @@ int main(int argc, char *argv[]) {
     p->threshold = threshold;
     p->constraintDiagonalTrim = constraintTrim;
     p->diagonalExpansion = diagExpansion;
-
+    st_uglyf("contstructed pA\n");
     // HDP routines //
     // load HDPs
     NanoporeHDP *nHdpT, *nHdpC;
@@ -490,11 +489,11 @@ int main(int argc, char *argv[]) {
     } else {
         R = signalUtils_ReferenceSequenceConstructEmpty(pA);
     }
-
+    st_uglyf("constructed reference sequences\n");
     // Nanopore Read //
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
-
+    st_uglyf("Loaded nanoporeRead\n:");
     // constrain the event sequence to the positions given by the guide alignment
     Sequence *tEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->templateEvents,
                                                                       pA->start2, pA->end2,
@@ -503,7 +502,7 @@ int main(int argc, char *argv[]) {
     Sequence *cEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->complementEvents,
                                                                       pA->start2, pA->end2,
                                                                       npRead->complementEventMap);
-
+    st_uglyf("Constructed event sequences\n");
     // the aligned pairs start at (0,0) so we need to correct them based on the guide alignment later.
     // record the pre-zeroed alignment start and end coordinates here
     // for the events:
@@ -615,6 +614,7 @@ int main(int argc, char *argv[]) {
         }
         return 0;
     } else if ((templateExpectationsFile != NULL) && (complementExpectationsFile != NULL)) {
+        st_uglyf("Starting expectations routine\n");
         // Expectation Routine //
         // make empty HMM to collect expectations
         Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold,
@@ -701,13 +701,6 @@ int main(int argc, char *argv[]) {
         pairwiseAlignmentBandingParameters_destruct(p);
         destructPairwiseAlignment(pA);
         stList_destruct(anchorPairs);
-        //if (nHdpT != NULL) {
-        //    destroy_nanopore_hdp(nHdpT);
-        //}
-        //if (nHdpC != NULL) {
-        //    destroy_nanopore_hdp(nHdpC);
-        //}
-
         return 0;
     } else {
         // Alignment Procedure //
