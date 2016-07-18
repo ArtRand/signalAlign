@@ -640,8 +640,8 @@ void nanopore_compute_mean_scale_params(double *model, stList *kmerToEventMap, N
             double time = t->deltaTime;
             int64_t id = t->kmerIndex;
 
-            double level_mean = model[1 + (id * MODEL_PARAMS)];
-            double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
+            double level_mean = model[(id * MODEL_PARAMS)];
+            double level_sd = model[(id * MODEL_PARAMS + 1)];
 
             // weights should technically include variance parameter, but will only results in
             // some inefficiency, no bias
@@ -680,8 +680,8 @@ void nanopore_compute_mean_scale_params(double *model, stList *kmerToEventMap, N
 
                 int64_t id = t->kmerIndex;
 
-                double level_mean = model[1 + (id * MODEL_PARAMS)];
-                double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
+                double level_mean = model[(id * MODEL_PARAMS)];
+                double level_sd = model[(id * MODEL_PARAMS + 1)];
                 double level_var = level_sd * level_sd;
 
                 double event = t->eventMean;
@@ -704,9 +704,9 @@ void nanopore_compute_mean_scale_params(double *model, stList *kmerToEventMap, N
             double event = t->eventMean;
             int64_t id = t->kmerIndex;
 
-            double level_mean = model[1 + (id * MODEL_PARAMS)];
+            double level_mean = model[(id * MODEL_PARAMS)];
 
-            double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
+            double level_sd = model[(id * MODEL_PARAMS + 1)];
             // weights should technically include variance parameter, but will only results in
             // some inefficiency, no bias
             double inv_var = 1.0 / (level_sd * level_sd);
@@ -736,9 +736,9 @@ void nanopore_compute_mean_scale_params(double *model, stList *kmerToEventMap, N
 
                 int64_t id = t->kmerIndex;
 
-                double level_mean = model[1 + (id * MODEL_PARAMS)];
+                double level_mean = model[(id * MODEL_PARAMS)];
 
-                double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
+                double level_sd = model[(id * MODEL_PARAMS + 1)];
                 double level_var = level_sd * level_sd;
 
                 double event = t->eventMean;
@@ -773,9 +773,9 @@ void nanopore_compute_noise_scale_params(double *model, stList *kmerToEventMap,
         double noise = t->eventSd;
         int64_t id = t->kmerIndex;
 
-        double noise_mean = model[1 + (id * MODEL_PARAMS + 2)];
+        double noise_mean = model[(id * MODEL_PARAMS + 2)];
 
-        double noise_sd = model[1 + (id * MODEL_PARAMS + 3)];
+        double noise_sd = model[(id * MODEL_PARAMS + 3)];
         // weights should technically include variance parameter, but will only results in
         // some inefficiency, no bias
         double inv_var = 1.0 / (noise_sd * noise_sd);
@@ -804,8 +804,8 @@ void nanopore_compute_noise_scale_params(double *model, stList *kmerToEventMap,
 
         int64_t id = t->kmerIndex;
 
-        double nosie_mean = model[1 + (id * MODEL_PARAMS + 2)];
-        double noise_sd = model[1 + (id * MODEL_PARAMS + 3)];
+        double nosie_mean = model[(id * MODEL_PARAMS + 2)];
+        double noise_sd = model[(id * MODEL_PARAMS + 3)];
 
         double level_var = noise_sd * noise_sd;
 
@@ -830,18 +830,18 @@ void nanopore_convert_to_lognormal_params(int64_t alphabet_size, int64_t kmer_le
     }
 
     for (int64_t i = 0; i < num_kmers; i++) {
-        double noise_sd = model[1 + (i * MODEL_PARAMS + 3)];
+        double noise_sd = model[(i * MODEL_PARAMS + 3)];
         double untrans_var = noise_sd * noise_sd;
-        double untrans_mean = model[1 + (i * MODEL_PARAMS + 2)];
+        double untrans_mean = model[(i * MODEL_PARAMS + 2)];
 
         double trans_var = log(1.0 + untrans_var / (untrans_mean * untrans_mean));
         double trans_mean = log(untrans_mean - trans_var / 2.0);
 
         //noise_sds[i] = sqrt(trans_var);
-        model[1 + (i * MODEL_PARAMS + 3)] = sqrt(trans_var);
+        model[(i * MODEL_PARAMS + 3)] = sqrt(trans_var);
 
         //noise_means[i] = trans_mean;
-        model[1 + (i * MODEL_PARAMS + 2)] = trans_mean;
+        model[(i * MODEL_PARAMS + 2)] = trans_mean;
     }
 
     for (int i = 0; i < stList_length(kmerToEventMap); i ++) {

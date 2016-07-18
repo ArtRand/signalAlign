@@ -39,8 +39,7 @@ static inline Hmm *hmmContinuous_loadSignalHmmFromFile(const char *fileName, Sta
 static inline void hmmContinuous_loadIntoStateMachine(StateMachine *sM, Hmm *hmm, StateMachineType type) {
     if (type == threeState) {
         continuousPairHmm_loadTransitionsIntoStateMachine(sM, hmm);
-        // NOTE: 7/16 diabled loading emissions into state machine bc. I only have R7.3 default HMMs
-        //continuousPairHmm_loadEmissionsIntoStateMachine(sM, hmm);
+        continuousPairHmm_loadEmissionsIntoStateMachine(sM, hmm);
     }
     if (type == threeStateHdp) {
         continuousPairHmm_loadTransitionsIntoStateMachine(sM, hmm);

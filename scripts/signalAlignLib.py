@@ -927,12 +927,12 @@ class SignalAlignment(object):
             "../models/testModel_complement_pop1.model"
 
         # screwing around with different R9 models
-        r9_template_lookup_table = "../models/testModelR9_template.model"  # 'default' 6-mer template model
-        #r9_template_lookup_table = "../models/testModelR9_5mer_template.model"  # 5-mer model
+        #r9_template_lookup_table = "../models/testModelR9_template.model"  # 'default' 6-mer template model
+        r9_template_lookup_table = "../models/testModelR9_5mer_template.model"  # 5-mer model
 
-        r9_complement_lookup_table = "../models/testModelR9_complement.model"  # default 6-mer complement model
-        #r9_complement_lookup_table = "../models/testModelR9_5mer_complement.model"  # default 5-mer complement model
+        #r9_complement_lookup_table = "../models/testModelR9_complement.model"  # default 6-mer complement model
         #r9_complement_lookup_table = "../models/testModelR9_complement_pop2.model"  # extra 6-mer model for complement
+        r9_complement_lookup_table = "../models/testModelR9_5mer_complement.model"  # default 5-mer complement model
 
         if def_template_model is not None:
             assert (os.path.exists(r7_template_lookup_table)), "Didn't find default template look-up table"
@@ -1121,7 +1121,8 @@ class ContinuousPairHmm(SignalHmm):
 
         # check if valid
         if len(line) != (len(self.transitions) + 1):
-            print("cpHMM: check_file - bad file (transitions expectations): {}".format(expectations_file), file=sys.stderr)
+            print("cpHMM: check_file - bad file (transitions expectations): {}".format(expectations_file),
+                  file=sys.stderr)
             return
 
         self.likelihood += line[-1]

@@ -206,22 +206,25 @@ static void test_poreModel(CuTest *testCase, int64_t kmerLength, char *alphabet,
 
     int64_t numOfKmers = intPow(alphabetSize, kmerLength);
 
-    int64_t matrixSize = (1 + numOfKmers * MODEL_PARAMS);
+    int64_t matrixSize = (numOfKmers * MODEL_PARAMS);
+
+    int64_t stateNumber = 3; // mainly testing 3-state Hmm right now
 
     // line 0: alphabetSize, alphabet, kmerLength
-    fprintf(fH, "%"PRId64"\t%s\t%"PRId64"\n", alphabetSize, alphabet, kmerLength);
+    fprintf(fH, "%"PRId64"\t%"PRId64"\t%s\t%"PRId64"\n", stateNumber, alphabetSize, alphabet, kmerLength);
 
-    // line 1: emission match matrix
+    // line 1: Transitions
+    for (int64_t i = 0; i < (stateNumber * stateNumber) + 1; i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // line 2: emission match matrix
     for (int64_t i = 0; i < matrixSize; i++) {
         fprintf(fH, "%"PRId64"\t", i);
     }
     fprintf(fH, "\n");
 
-    // line 2: extra event (kmer skip) match matrix
-    for (int64_t i = 0; i < matrixSize; i++) {
-        fprintf(fH, "%"PRId64"\t", i);
-    }
-    fprintf(fH, "\n");
     fclose(fH);
 
     StateMachine *sM = getStateMachine3(tempFile);
@@ -234,7 +237,6 @@ static void test_poreModel(CuTest *testCase, int64_t kmerLength, char *alphabet,
         double x = sM->EMISSION_MATCH_MATRIX[i];
         double y = sM->EMISSION_GAP_Y_MATRIX[i];
         CuAssertDblEquals(testCase, x, (double )i, 0.0);
-        CuAssertDblEquals(testCase, y, (double )i, 0.0);
     }
 
     stFile_rmrf(tempFile);
@@ -252,9 +254,11 @@ static void test_loadPoreModel(CuTest *testCase) {
 }
 
 static void test_stateMachineModel(CuTest *testCase, StateMachine *sM) {
-    for (int64_t i = 1; i < sM->parameterSetSize * MODEL_PARAMS; i++) {
+    for (int64_t i = 0; i < sM->parameterSetSize * MODEL_PARAMS; i++) {
         CuAssertTrue(testCase, sM->EMISSION_MATCH_MATRIX[i] > 0.0);
         CuAssertTrue(testCase, sM->EMISSION_MATCH_MATRIX[i] < INT64_MAX);
+        CuAssertTrue(testCase, sM->EMISSION_GAP_Y_MATRIX[i] > 0.0);
+        CuAssertTrue(testCase, sM->EMISSION_GAP_Y_MATRIX[i] < INT64_MAX);
     }
 }
 
@@ -705,8 +709,8 @@ static void test_r9StateMachineWithBanding(CuTest *testCase) {
 
     // test noise scaling
     for (int64_t i = 0; i < NUM_OF_KMERS; i++) {
-        int64_t noiseMeanIndex = 1 + (i * MODEL_PARAMS + 2);
-        int64_t noiseLambdaIndex = 1 + (i * MODEL_PARAMS + 4);
+        int64_t noiseMeanIndex = (i * MODEL_PARAMS + 2);
+        int64_t noiseLambdaIndex = (i * MODEL_PARAMS + 4);
         CuAssertTrue(testCase,
                      sM->EMISSION_MATCH_MATRIX[noiseMeanIndex] ==
                              sM_2->EMISSION_MATCH_MATRIX[noiseMeanIndex] * npRead->templateParams.scale_sd);
@@ -1220,6 +1224,5 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
-
     return suite;
 }

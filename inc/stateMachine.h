@@ -20,7 +20,7 @@
 #define FIVE_LETTER_ALPHA "ACEGT"
 #define PURINES "AG"
 #define PYRIMIDINES "CEOT"
-
+#define EXTRA_EVENT_NOISE_MULTIPLIER 1.75
 
 
 typedef enum {
@@ -316,6 +316,7 @@ StateMachine *stateMachine3_signalMachineBuilder(StateMachineType type, char *al
 StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType type,
                                          double (*gapXProbFcn)(StateMachine *, const double *, void *),
                                          double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
+                                         void (*loadTransitionsFcn)(StateMachine *, stList *),
                                          NanoporeHDP *nHdp);
 
 StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp, bool scaleNoise);
