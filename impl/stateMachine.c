@@ -667,9 +667,9 @@ void emissions_signal_scaleModel(StateMachine *sM,
 static void emissions_em_loadMatchProbs(double *emissionMatchProbs, Hmm *hmm, int64_t matchState) {
     //Load the matches
     HmmDiscrete *hmmD = (HmmDiscrete *)hmm;
-    for(int64_t x = 0; x < hmm->symbolSetSize; x++) {
-        for(int64_t y = 0; y < hmm->symbolSetSize; y++) {
-            emissionMatchProbs[x * hmm->symbolSetSize + y] = log(hmmD->getEmissionExpFcn(hmm, matchState, x, y));
+    for(int64_t x = 0; x < hmm->parameterSetSize; x++) {
+        for(int64_t y = 0; y < hmm->parameterSetSize; y++) {
+            emissionMatchProbs[x * hmm->parameterSetSize + y] = log(hmmD->getEmissionExpFcn(hmm, matchState, x, y));
         }
     }
 }
@@ -677,21 +677,21 @@ static void emissions_em_loadMatchProbs(double *emissionMatchProbs, Hmm *hmm, in
 static void emissions_em_loadMatchProbsSymmetrically(double *emissionMatchProbs, Hmm *hmm, int64_t matchState) {
     //Load the matches
     HmmDiscrete *hmmD = (HmmDiscrete *)hmm;
-    for(int64_t x = 0; x < hmm->symbolSetSize; x++) {
-        emissionMatchProbs[x * hmm->symbolSetSize + x] = log(hmmD->getEmissionExpFcn(hmm, matchState, x, x));
-        for(int64_t y=x+1; y<hmm->symbolSetSize; y++) {
+    for(int64_t x = 0; x < hmm->parameterSetSize; x++) {
+        emissionMatchProbs[x * hmm->parameterSetSize + x] = log(hmmD->getEmissionExpFcn(hmm, matchState, x, x));
+        for(int64_t y=x+1; y<hmm->parameterSetSize; y++) {
             double d = log((hmmD->getEmissionExpFcn(hmm, matchState, x, y) +
                     hmmD->getEmissionExpFcn(hmm, matchState, y, x)) / 2.0);
-            emissionMatchProbs[x * hmm->symbolSetSize + y] = d;
-            emissionMatchProbs[y * hmm->symbolSetSize + x] = d;
+            emissionMatchProbs[x * hmm->parameterSetSize + y] = d;
+            emissionMatchProbs[y * hmm->parameterSetSize + x] = d;
         }
     }
 }
 
 static void emissions_em_collapseMatrixEmissions(Hmm *hmm, int64_t state, double *gapEmissions, bool collapseToX) {
     HmmDiscrete *hmmD = (HmmDiscrete *)hmm;
-    for(int64_t x=0; x<hmm->symbolSetSize; x++) {
-        for(int64_t y=0; y<hmm->symbolSetSize; y++) {
+    for(int64_t x=0; x<hmm->parameterSetSize; x++) {
+        for(int64_t y=0; y<hmm->parameterSetSize; y++) {
             gapEmissions[collapseToX ? x : y] += hmmD->getEmissionExpFcn(hmm, state, x, y);
         }
     }
@@ -702,7 +702,7 @@ static void emissions_em_loadGapProbs(double *emissionGapProbs, Hmm *hmm,
                                       int64_t *xGapStates, int64_t xGapStateNo,
                                       int64_t *yGapStates, int64_t yGapStateNo) {
     //Initialise to 0.0
-    for(int64_t i=0; i < hmm->symbolSetSize; i++) {
+    for(int64_t i=0; i < hmm->parameterSetSize; i++) {
         emissionGapProbs[i] = 0.0;
     }
     //Load the probs taking the average over all the gap states
@@ -714,10 +714,10 @@ static void emissions_em_loadGapProbs(double *emissionGapProbs, Hmm *hmm,
     }
     //Now normalise
     double total = 0.0;
-    for(int64_t i=0; i < hmm->symbolSetSize; i++) {
+    for(int64_t i=0; i < hmm->parameterSetSize; i++) {
         total += emissionGapProbs[i];
     }
-    for(int64_t i=0; i< hmm->symbolSetSize; i++) {
+    for(int64_t i=0; i< hmm->parameterSetSize; i++) {
         emissionGapProbs[i] = log(emissionGapProbs[i]/total);
     }
 }
@@ -1425,7 +1425,6 @@ StateMachine *stateMachine3_construct(StateMachineType type,
 
     // setup the parent class
     sM3->model.type = type;
-    //sM3->model.parameterSetSize = parameterSetSize;
     sM3->model.parameterSetSize = intPow(alphabetSize, kmerLength);
 
     sM3->model.alphabetSize = alphabetSize;
@@ -1517,10 +1516,10 @@ StateMachine *stateMachine3_signalMachineBuilder(StateMachineType type, char *al
     StateMachine *sM;
     switch (type) {
         case threeStateHdp:
-            sM = stateMachine3Hdp_construct(threeStateHdp, alphabet, alphabetSize, KMER_LENGTH,
+            sM = stateMachine3Hdp_construct(threeStateHdp, alphabet, alphabetSize, kmerLength,
                                             stateMachine3_setTransitionsToNanoporeDefaults,
                                             emissions_signal_initEmissionsToZero,
-                                            nHdp, matchProbFcn, cell_signal_updateTransAndKmerSkipExpectations2);
+                                            nHdp, matchProbFcn, cell_signal_updateExpectationsAndAssignments);
             return sM;
         default:
             sM = stateMachine3_construct(threeState, alphabet, alphabetSize, kmerLength,
@@ -1584,7 +1583,7 @@ static void stateMachine3_loadSymmetric(StateMachine3 *sM3, Hmm *hmm) {
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
     st_errAbort("5-state stateMachine not implemented\n");
     if (hmmD->type == fiveState) {
-        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState, hmmD->symbolSetSize,
+        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState, hmmD->parameterSetSize,
                                                                        emissions_discrete_initEmissionsToZero,
                                                                        sMfs->gapXProbFcn,
                                                                        sMfs->gapYProbFcn,
@@ -1594,7 +1593,7 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
         return (StateMachine *) sM5;
     }
     if (hmmD->type == fiveStateAsymmetric) {
-        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState, hmmD->symbolSetSize,
+        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState, hmmD->parameterSetSize,
                                                                        emissions_discrete_initEmissionsToZero,
                                                                        sMfs->gapXProbFcn,
                                                                        sMfs->gapYProbFcn,

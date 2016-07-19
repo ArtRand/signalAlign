@@ -163,7 +163,7 @@ void writePosteriorProbsSparse(char *posteriorProbsFile, char *readFile, char *t
 }
 
 StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentParameters npp, StateMachineType type,
-                                Strand strand, NanoporeHDP *nHdp) {
+                                NanoporeHDP *nHdp) {
     if ((type != threeState) && (type != threeStateHdp)) {
         st_errAbort("signalAlign - incompatible stateMachine type request");
     }
@@ -190,18 +190,19 @@ inline void loadHmmRoutine(const char *hmmFile, StateMachine *sM, StateMachineTy
 }
 
 StateMachine *buildStateMachineAndLoadHmm(const char *modelFile, NanoporeReadAdjustmentParameters npp,
-                                          StateMachineType type, Strand strand, NanoporeHDP *nHdp,
-                                          const char *HmmFile, Hmm *hmmExpectations) {
-    StateMachine *sM = buildStateMachine(modelFile, npp, type, strand, nHdp);
-    if (HmmFile != NULL) {
-        loadHmmRoutine(HmmFile, sM, sM->type, hmmExpectations);
-    }
+                                          StateMachineType type, NanoporeHDP *nHdp) {
+    StateMachine *sM = buildStateMachine(modelFile, npp, type, nHdp);
+    // commented out because now the model file has the transitions and the event model, so no longer need to
+    // load the .hmm into the stateMachine
+    //if (HmmFile != NULL) {
+    //    loadHmmRoutine(HmmFile, sM, sM->type, hmmExpectations);
+    //}
     return sM;
 }
 
 void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile, const char *nHdpOutFile) {
     NanoporeHDP *nHdp = deserialize_nhdp(nHdpFile);
-    Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, nHdp);
+    Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, threeStateHdp, nHdp);
     hmmContinuous_destruct(hdpHmm, hdpHmm->type);
 
     fprintf(stderr, "signalAlign - Running Gibbs on HDP\n");
@@ -524,10 +525,10 @@ int main(int argc, char *argv[]) {
         //stList *templateAlignedPairs, *complementAlignedPairs;
 //        #pragma omp parallel for
         for (int64_t i = 0; i < STEP; i++) {
-            StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams, sMtype,
-                                                            template, nHdpT, templateHmmFile, NULL);
-            StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
-                                                            sMtype, complement, nHdpC, complementHmmFile, NULL);
+
+            StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, nHdpT);
+            StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, nHdpC);
+
             if (posteriorProbsFile == NULL) {
                 st_errAbort("SignalAlign - didn't find output file path\n");
             }
@@ -616,30 +617,21 @@ int main(int argc, char *argv[]) {
     } else if ((templateExpectationsFile != NULL) && (complementExpectationsFile != NULL)) {
         st_uglyf("Starting expectations routine\n");
         // Expectation Routine //
-        // make empty HMM to collect expectations
-        Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold,
-                                                              npRead->templateParams.scale,
-                                                              npRead->templateParams.shift,
-                                                              npRead->templateParams.var);
-        Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold,
-                                                                npRead->complementParams.scale,
-                                                                npRead->complementParams.shift,
-                                                                npRead->complementParams.var);
 
         if (templateHmmFile == NULL) {
             st_errAbort("[signalMachine] ERROR: need to have input HMMs\n");
         }
 
-        StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams,
-                                                        sMtype, template, nHdpT, templateHmmFile,
-                                                        templateExpectations);
+        StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, nHdpT);
 
         // temporary way to 'turn off' estimates if I want to
-        if (ESTIMATE_PARAMS) {
+        if (ESTIMATE_PARAMS) {                                                     //todo remove threshold, not used
             signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
                                                signalUtils_templateOneDAssignmentsFromRead,
                                                nanopore_adjustTemplateEventsForDrift);
         }
+        // make empty HMM to collect expectations
+        Hmm *templateExpectations = hmmContinuous_getExpectationsHmm(sMt, p->threshold);
 
         // get expectations for template
         fprintf(stderr, "signalAlign - getting expectations for template\n");
@@ -666,15 +658,15 @@ int main(int argc, char *argv[]) {
             st_errAbort("[signalMachine] ERROR: need to have input HMMs\n");
         }
 
-        StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
-                                                        sMtype, complement, nHdpC, complementHmmFile,
-                                                        complementExpectations);
+        StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, nHdpC);
 
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
                                                signalUtils_complementOneDAssignmentsFromRead,
                                                nanopore_adjustComplementEventsForDrift);
         }
+
+        Hmm *complementExpectations = hmmContinuous_getExpectationsHmm(sMc, p->threshold);
 
         getSignalExpectations(sMc, complementModelFile, complementHmmFile, nHdpC,
                               complementExpectations, sMtype,
@@ -708,8 +700,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "signalAlign - starting template alignment\n");
 
         // make template stateMachine
-        StateMachine *sMt = buildStateMachineAndLoadHmm(templateModelFile, npRead->templateParams,
-                                                        sMtype, template, nHdpT, templateHmmFile, NULL);
+        StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, nHdpT);
 
         // re-estimate the nanoporeAdjustment parameters
         if (ESTIMATE_PARAMS) {
@@ -744,8 +735,7 @@ int main(int argc, char *argv[]) {
 
         // Complement alignment
         fprintf(stderr, "signalAlign - starting complement alignment\n");
-        StateMachine *sMc = buildStateMachineAndLoadHmm(complementModelFile, npRead->complementParams,
-                                                        sMtype, complement, nHdpC, complementHmmFile, NULL);
+        StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, nHdpC);
 
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,

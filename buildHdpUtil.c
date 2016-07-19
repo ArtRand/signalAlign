@@ -23,7 +23,7 @@ void printStartMessage(int64_t hdpType, char *alignmentsFile, char *templateHdpO
 void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile, const char *nHdpOutFile,
                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose) {
     NanoporeHDP *nHdp = deserialize_nhdp(nHdpFile);
-    Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, nHdp);
+    Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, threeStateHdp, nHdp);
     hmmContinuous_destruct(hdpHmm, hdpHmm->type);
 
     fprintf(stderr, "signalAlign - Running Gibbs on HDP doing %"PRId64" samples %"PRId64"burn in %"PRId64"thinning\n",

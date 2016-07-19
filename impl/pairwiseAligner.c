@@ -702,7 +702,7 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
     hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
 
-    if(x < hmmExpectations->baseHmm.symbolSetSize && y < hmmExpectations->baseHmm.symbolSetSize) { //Ignore gaps involving Ns.
+    if(x < hmmExpectations->baseHmm.parameterSetSize && y < hmmExpectations->baseHmm.parameterSetSize) { //Ignore gaps involving Ns.
         hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, to, x, y, p);
     }
 }
@@ -715,11 +715,17 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     if (!hmmExpectations->hasModel) {
         st_errAbort("cell_signal_updateExpectations: HMM needs to have model\n");
     }
+    // this gives you the kmer index
 
-    int64_t kmerIndex = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the kmer index
+    int64_t kmerIndex = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2],
+                                                            hmmExpectations->baseHmm.alphabet,
+                                                            hmmExpectations->baseHmm.alphabetSize,
+                                                            hmmExpectations->baseHmm.kmerLength);
+
     double eventMean = *(double *)((void **) extraArgs)[3];
     double descaledEventMean = hmmExpectations->getDescaledEvent(
-            hmmExpectations, eventMean, *(hmmExpectations->getEventModelEntry((Hmm *)hmmExpectations, kmerIndex)));
+            eventMean, *(hmmExpectations->getEventModelEntry((Hmm *)hmmExpectations, kmerIndex)),
+            hmmExpectations->scale, hmmExpectations->shift, hmmExpectations->var);
 
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
@@ -732,8 +738,8 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     }
 }
 
-void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *toCells, int64_t from, int64_t to,
-                                                    double eP, double tP, void *extraArgs) {
+void cell_signal_updateExpectationsAndAssignments(double *fromCells, double *toCells, int64_t from, int64_t to,
+                                                  double eP, double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     // unpack the extraArgs thing
     double totalProbability = *((double *) ((void **) extraArgs)[0]);

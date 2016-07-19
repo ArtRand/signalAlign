@@ -20,7 +20,7 @@ Hmm *hmmDiscrete_constructEmpty(double pseudocount, int64_t stateNumber, int64_t
 
     // Set up constants
     hmmD->baseHmm.stateNumber = stateNumber;
-    hmmD->baseHmm.symbolSetSize = symbolSetSize;
+    hmmD->baseHmm.parameterSetSize = symbolSetSize;
     hmmD->baseHmm.matrixSize = symbolSetSize*symbolSetSize; // working with symmetric matrices
     hmmD->baseHmm.type = type;
 
@@ -72,19 +72,19 @@ double hmmDiscrete_getTransitionExpectation(Hmm *hmm, int64_t from, int64_t to) 
 // Emissions
 void hmmDiscrete_addToEmissionExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p) {
     HmmDiscrete *hmmD = (HmmDiscrete *) hmm;
-    int64_t tableIndex = x * hmmD->baseHmm.symbolSetSize + y;
+    int64_t tableIndex = x * hmmD->baseHmm.parameterSetSize + y;
     hmmD->emissions[(state * hmmD->baseHmm.matrixSize) + tableIndex] += p;
 }
 
 void hmmDiscrete_setEmissionExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p) {
     HmmDiscrete *hmmD = (HmmDiscrete *) hmm;
-    int64_t tableIndex = x * hmmD->baseHmm.symbolSetSize + y;
+    int64_t tableIndex = x * hmmD->baseHmm.parameterSetSize + y;
     hmmD->emissions[(state * hmmD->baseHmm.matrixSize) + tableIndex] = p;
 }
 
 double hmmDiscrete_getEmissionExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y) {
     HmmDiscrete *hmmD = (HmmDiscrete *) hmm;
-    int64_t tableIndex = x * hmmD->baseHmm.symbolSetSize + y;
+    int64_t tableIndex = x * hmmD->baseHmm.parameterSetSize + y;
     return hmmD->emissions[(state * hmmD->baseHmm.matrixSize) + tableIndex];
 }
 
@@ -100,12 +100,12 @@ void hmmDiscrete_randomizeTransitions(Hmm *hmm) {
 
 void hmmDiscrete_randomizeEmissions(Hmm *hmm) {
     HmmDiscrete *hmmD = (HmmDiscrete *)hmm;
-    if (hmmD->baseHmm.symbolSetSize <= 0) {
-        st_errAbort("hmmDiscrete_randomizeEmissions: got 0 for symbolSetSize\n");
+    if (hmmD->baseHmm.parameterSetSize <= 0) {
+        st_errAbort("hmmDiscrete_randomizeEmissions: got 0 for parameterSetSize\n");
     }
     for (int64_t state = 0; state < hmmD->baseHmm.stateNumber; state++) {
-        for (int64_t x = 0; x < hmmD->baseHmm.symbolSetSize; x++) {
-            for (int64_t y = 0; y < hmmD->baseHmm.symbolSetSize; y++) {
+        for (int64_t x = 0; x < hmmD->baseHmm.parameterSetSize; x++) {
+            for (int64_t y = 0; y < hmmD->baseHmm.parameterSetSize; y++) {
                 hmmD->setEmissionExpectationFcn(hmm, state, x, y, st_random());
             }
         }
@@ -140,13 +140,13 @@ void hmmDiscrete_normalize(Hmm *hmm) {
     HmmDiscrete *hmmD = (HmmDiscrete *)hmm;
     for (int64_t state = 0; state < hmmD->baseHmm.stateNumber; state++) {
         double total = 0.0;
-        for (int64_t x = 0; x < hmmD->baseHmm.symbolSetSize; x++) {
-            for (int64_t y = 0; y < hmmD->baseHmm.symbolSetSize; y++) {
+        for (int64_t x = 0; x < hmmD->baseHmm.parameterSetSize; x++) {
+            for (int64_t y = 0; y < hmmD->baseHmm.parameterSetSize; y++) {
                 total += hmmD->getEmissionExpFcn((Hmm *)hmmD, state, x, y);
             }
         }
-        for (int64_t x = 0; x < hmmD->baseHmm.symbolSetSize; x ++) {
-            for (int64_t y = 0; y < hmmD->baseHmm.symbolSetSize; y++) {
+        for (int64_t x = 0; x < hmmD->baseHmm.parameterSetSize; x ++) {
+            for (int64_t y = 0; y < hmmD->baseHmm.parameterSetSize; y++) {
                 double newProb = hmmD->getEmissionExpFcn((Hmm *)hmmD, state, x, y) / total;
                 hmmD->setEmissionExpectationFcn((Hmm *)hmmD, state, x, y, newProb);
             }
@@ -159,7 +159,7 @@ void hmmDiscrete_normalize(Hmm *hmm) {
 void hmmDiscrete_write(Hmm *hmm, FILE *fileHandle) {
     /*
      * Format:
-     * type \t stateNumber \t symbolSetSize \n
+     * type \t stateNumber \t parameterSetSize \n
      * transition \t transition ... likelihood \n
      * emission \t emission \t ... \n
      */
@@ -167,7 +167,7 @@ void hmmDiscrete_write(Hmm *hmm, FILE *fileHandle) {
     // basics
     fprintf(fileHandle, "%i\t", hmmD->baseHmm.type); // 0
     fprintf(fileHandle, "%"PRId64"\t", hmmD->baseHmm.stateNumber); // 1
-    fprintf(fileHandle, "%"PRId64"\t", hmmD->baseHmm.symbolSetSize); // 2
+    fprintf(fileHandle, "%"PRId64"\t", hmmD->baseHmm.parameterSetSize); // 2
     fprintf(fileHandle, "\n");
     // transitions
     for (int64_t i = 0; i < hmmD->baseHmm.stateNumber * hmmD->baseHmm.stateNumber; i++) {

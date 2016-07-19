@@ -54,8 +54,12 @@ struct _hmm {
     double likelihood;
     StateMachineType type;
     int64_t stateNumber;
-    int64_t symbolSetSize;
+    int64_t parameterSetSize;
     int64_t matrixSize;
+
+    char *alphabet;
+    int64_t alphabetSize;
+    int64_t kmerLength;
 
     double *transitions;
 
