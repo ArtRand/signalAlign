@@ -107,7 +107,7 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
 Hmm *continuousPairHmm_loadFromFile(const char *fileName, StateMachineType type,
                                     double transitionPseudocount, double emissionPseudocount);
 
-Hmm *continuousPairHmm_makeExpectationsHmm(StateMachine *sM);
+Hmm *continuousPairHmm_makeExpectationsHmm(StateMachine *sM, double transitionsPseudocount, double emissionsPseudocount);
 
 void continuousPairHmm_loadModelFromFile(ContinuousPairHmm *hmm, const char *modelFile);
 
@@ -116,7 +116,7 @@ Hmm *hdpHmm_constructEmpty(double transitionPseudocount,
                            StateMachineType type,
                            double threshold, double scale, double shift, double var);
 
-Hmm *hdpHmm_makeExpectationsHmm(StateMachine *sM, double threshold);
+Hmm *hdpHmm_makeExpectationsHmm(StateMachine *sM, double threshold, double transitionsPseudocount);
 
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
 
@@ -129,7 +129,7 @@ void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMac
 
 void hmmContinuous_destruct(Hmm *hmm, StateMachineType type);
 
-Hmm *hmmContinuous_getExpectationsHmm(StateMachine *sM, double threshold);
+Hmm *hmmContinuous_getExpectationsHmm(StateMachine *sM, double threshold, double transitionsPseudocount, double emissionsPseudocount);
 
 void hmmContinuous_normalize(Hmm *hmm, StateMachineType type);
 

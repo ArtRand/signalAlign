@@ -12,7 +12,7 @@
 static bool hmmContinuous_checkTransitions(double *transitions, int64_t nbTransitions) {
     for (int64_t i = 0; i < nbTransitions; i++) {
         if (isnan(transitions[i])) {
-            fprintf(stdout, "GOT NaN TRANS\n");
+            fprintf(stderr, "GOT NaN TRANS\n");
             return FALSE;
         } else {
             continue;
@@ -46,11 +46,11 @@ static inline void hmmContinuous_loadIntoStateMachine(StateMachine *sM, Hmm *hmm
 
 static void hmmContinuous_loadEventModel(double *stateMachineEventModel, double *hmmEventModel,
                                          int64_t parameterSetSize) {
-    for (int64_t i = 0; i < parameterSetSize; i += NORMAL_DISTRIBUTION_PARAMS) {
+    for (int64_t i = 0; i < parameterSetSize; i++) {
         int64_t eventMeanIdx = i * MODEL_PARAMS;
         int64_t eventSdIdx = (i * MODEL_PARAMS) + 1;
-        hmmEventModel[i] = stateMachineEventModel[eventMeanIdx];
-        hmmEventModel[i + 1] = stateMachineEventModel[eventSdIdx];
+        hmmEventModel[i * NORMAL_DISTRIBUTION_PARAMS] = stateMachineEventModel[eventMeanIdx];
+        hmmEventModel[i * NORMAL_DISTRIBUTION_PARAMS+ 1] = stateMachineEventModel[eventSdIdx];
     }
 }
 
@@ -199,19 +199,15 @@ void continuousPairHmm_destruct(Hmm *hmm) {
     free(cpHmm);
 }
 
-Hmm *continuousPairHmm_makeExpectationsHmm(StateMachine *sM) {
-    // make a hmm object that 'fits' with the stateMachine
-    Hmm *hmm = continuousPairHmm_construct(0.0, 0.0, sM->stateNumber, sM->alphabetSize, sM->alphabet, sM->kmerLength,
+Hmm *continuousPairHmm_makeExpectationsHmm(StateMachine *sM,
+                                           double transitionsPseudocount, double emissionsPseudocount) {
+    // make a hmm object that 'fits' with the stateMachine add pseudocount
+    Hmm *hmm = continuousPairHmm_construct(transitionsPseudocount, emissionsPseudocount,
+                                           sM->stateNumber, sM->alphabetSize, sM->alphabet, sM->kmerLength,
                                            sM->type, sM->scale, sM->shift, sM->var);
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
     // load the event model into the HMM
     hmmContinuous_loadEventModel(sM->EMISSION_MATCH_MATRIX, cpHmm->eventModel, cpHmm->baseHmm.parameterSetSize);
-    //for (int64_t i = 0; i < hmm->parameterSetSize; i += NORMAL_DISTRIBUTION_PARAMS) {
-    //    int64_t eventMeanIdx = i * MODEL_PARAMS;
-    //    int64_t eventSdIdx = (i * MODEL_PARAMS) + 1;
-    //    cpHmm->eventModel[i] = sM->EMISSION_MATCH_MATRIX[eventMeanIdx];  // load the level (event) mean
-    //    cpHmm->eventModel[i + 1] = sM->EMISSION_MATCH_MATRIX[eventSdIdx]; // load the level (event) SD
-    //}
     cpHmm->hasModel = TRUE;
     return (Hmm *)cpHmm;
 }
@@ -358,22 +354,21 @@ void continuousPairHmm_loadEmissionsIntoStateMachine(StateMachine *sM, Hmm *hmm)
 
 void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     /*
-     * Format:
-   0 * type \t stateNumber \t parameterSetSize \t hasModel \n
-   1 * [transitions... \t] likelihood \n
-   2 * [Event Model] \n
-   3 * [Event Expectations] \n
-   4 * [Event Posteriors] \n
-   5 * [Observed] \n
+     *  the model file has the format:
+     *  line 0: stateNumber \t alphabetSize \t alphabet \t kmerLength
+     *  line 1: match->match \t match->gapX \t match->gapY \t
+     *          gapX->match \t gapX->gapX \t gapX->gapY \t
+     *          gapY->match \t gapY->gapX \t gapY->gapY \n
+     *  line 1: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
      */
-    // downcast
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
 
     // write the basic stuff to disk (positions are line:item#, not line:col)
-    fprintf(fileHandle, "%i\t", cpHmm->baseHmm.type); // type 0:0
-    fprintf(fileHandle, "%"PRId64"\t", cpHmm->baseHmm.stateNumber); // stateNumber 0:1
-    fprintf(fileHandle, "%"PRId64"\t", cpHmm->baseHmm.parameterSetSize); // parameterSetSize 0:2
-    fprintf(fileHandle, "%i\n", cpHmm->hasModel);
+    fprintf(fileHandle, "%"PRId64"\t", cpHmm->baseHmm.stateNumber); // stateNumber 0:0
+    fprintf(fileHandle, "%"PRId64"\t", cpHmm->baseHmm.alphabetSize); // alphabetSize 0:1
+    fprintf(fileHandle, "%s\t", cpHmm->baseHmm.alphabet); // alphabet
+    fprintf(fileHandle, "%"PRId64"\t", cpHmm->baseHmm.kmerLength); // parameterSetSize 0:2
+    fprintf(fileHandle, "\n");
 
     int64_t nb_transitions = (cpHmm->baseHmm.stateNumber * cpHmm->baseHmm.stateNumber);
 
@@ -389,19 +384,19 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
 
         // write out event model
         for (int64_t i = 0; i < (cpHmm->baseHmm.parameterSetSize * NORMAL_DISTRIBUTION_PARAMS); i++) {
-            fprintf(fileHandle, "%f\t", cpHmm->eventModel[i]);
+            fprintf(fileHandle, "%lf\t", cpHmm->eventModel[i]);
         }
         fprintf(fileHandle, "\n"); // newLine
 
         // write out event expectations
         for (int64_t i = 0; i < (cpHmm->baseHmm.parameterSetSize * NORMAL_DISTRIBUTION_PARAMS); i++) {
-            fprintf(fileHandle, "%f\t", cpHmm->eventExpectations[i]);
+            fprintf(fileHandle, "%lf\t", cpHmm->eventExpectations[i]);
         }
         fprintf(fileHandle, "\n");
 
         // write out event posteriors
         for (int64_t i = 0; i < cpHmm->baseHmm.parameterSetSize; i++) {
-            fprintf(fileHandle, "%f\t", cpHmm->posteriors[i]);
+            fprintf(fileHandle, "%lf\t", cpHmm->posteriors[i]);
         }
         fprintf(fileHandle, "\n");
 
@@ -493,24 +488,23 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName, StateMachineType type,
     stList_destruct(tokens);
 
     // Event Model
-    if (cpHmm->hasModel) {
-        string = stFile_getLineFromFile(fH);
-        if (string == NULL) {
-            st_errAbort("cpHmm_loadFromFile: Got to end of file when looking for event model\n");
-        }
-        tokens = stString_split(string);
-        if (stList_length(tokens) != cpHmm->baseHmm.parameterSetSize * NORMAL_DISTRIBUTION_PARAMS) {
-            st_errAbort("cpHmm_loadFromFile: Didn't find the correct number of tokens for event model\n");
-        }
-        for (int64_t i = 0; i < cpHmm->baseHmm.parameterSetSize * NORMAL_DISTRIBUTION_PARAMS; i++) {
-            j = sscanf(stList_get(tokens, i), "%lf", &(cpHmm->eventModel[i]));
-            if (j != 1) {
-                st_errAbort("cpHmm_loadFromFile: error parsing event model\n");
-            }
-        }
-        free(string);
-        stList_destruct(tokens);
+    string = stFile_getLineFromFile(fH);
+    if (string == NULL) {
+        st_errAbort("cpHmm_loadFromFile: Got to end of file when looking for event model\n");
     }
+    tokens = stString_split(string);
+    if (stList_length(tokens) != cpHmm->baseHmm.parameterSetSize * NORMAL_DISTRIBUTION_PARAMS) {
+        st_errAbort("cpHmm_loadFromFile: Didn't find the correct number of tokens for event model\n");
+    }
+
+    for (int64_t i = 0; i < cpHmm->baseHmm.parameterSetSize * NORMAL_DISTRIBUTION_PARAMS; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(cpHmm->eventModel[i]));
+        if (j != 1) {
+            st_errAbort("cpHmm_loadFromFile: error parsing event model for event %lld\n", i);
+        }
+    }
+    free(string);
+    stList_destruct(tokens);
     return (Hmm *)cpHmm;
 }
 
@@ -522,9 +516,9 @@ static void hdpHmm_addToAssignment(HdpHmm *self, void *kmer, void *event) {
 }
 
 static bool hdpHmm_checkAssignments(HdpHmm *hdpHmm) {
-    int64_t nb_kmerAssignmebts = stList_length(hdpHmm->kmerAssignments);
-    int64_t nb_eventAssignmebts = stList_length(hdpHmm->kmerAssignments);
-    return nb_eventAssignmebts == nb_kmerAssignmebts;
+    int64_t nb_kmerAssignments = stList_length(hdpHmm->kmerAssignments);
+    int64_t nb_eventAssignments = stList_length(hdpHmm->kmerAssignments);
+    return nb_eventAssignments == nb_kmerAssignments;
 }
 
 Hmm *hdpHmm_constructEmpty(double transitionPseudocount,
@@ -577,20 +571,21 @@ Hmm *hdpHmm_constructEmpty(double transitionPseudocount,
 }
 
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
-    /* todo todo this needs to be updated!
-     * Format:
-     * type \t stateNumber \t threshold \t numberOfAssignments \n
-     * [transitions... \t] likelihood \n
-     * event assignments (mean currents) tab-seperated
-     * kmer assignments tab-seperated \n
+    /*
+     *  the model file has the format:
+     *  line 0: stateNumber \t alphabetSize \t alphabet \t kmerLength
+     *  line 1: match->match \t match->gapX \t match->gapY \t
+     *          gapX->match \t gapX->gapX \t gapX->gapY \t
+     *          gapY->match \t gapY->gapX \t gapY->gapY \n
+     *  line 1: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
      */
     HdpHmm *hdpHmm = (HdpHmm *)hmm;
     // write the basic stuff to disk (positions are line:item#, not line:col)
-    fprintf(fileHandle, "%i\t", hdpHmm->baseHmm.type); // type 0:0
-    fprintf(fileHandle, "%"PRId64"\t", hdpHmm->baseHmm.stateNumber); // stateNumber 0:1
-    fprintf(fileHandle, "%lf\t", hdpHmm->threshold); // threshold 0:2
-    fprintf(fileHandle, "%"PRId64"\t", hdpHmm->numberOfAssignments); // number of assignments 0:3
-    fprintf(fileHandle, "\n"); // newLine
+    fprintf(fileHandle, "%"PRId64"\t", hdpHmm->baseHmm.stateNumber); // stateNumber 0:0
+    fprintf(fileHandle, "%"PRId64"\t", hdpHmm->baseHmm.alphabetSize); // alphabetSize 0:1
+    fprintf(fileHandle, "%s\t", hdpHmm->baseHmm.alphabet); // alphabet
+    fprintf(fileHandle, "%"PRId64"\t", hdpHmm->baseHmm.kmerLength); // parameterSetSize 0:2
+    fprintf(fileHandle, "\n");
 
     // write the transitions to disk
     int64_t nb_transitions = (hdpHmm->baseHmm.stateNumber * hdpHmm->baseHmm.stateNumber);
@@ -606,6 +601,12 @@ void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
 
         // likelihood 1:10, newLine
         fprintf(fileHandle, "%f\n", hdpHmm->baseHmm.likelihood);
+
+        // write out event model
+        for (int64_t i = 0; i < (hdpHmm->baseHmm.parameterSetSize * NORMAL_DISTRIBUTION_PARAMS); i++) {
+            fprintf(fileHandle, "%lf\t", hdpHmm->eventModel[i]);
+        }
+        fprintf(fileHandle, "\n"); // newLine
 
         // write out the assignment events
         for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
@@ -661,9 +662,9 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, StateMachineType type, NanoporeHD
     if (j != 1) {
         st_errAbort("Failed to parse state number (int) from string: %s\n", string);
     }
-    alphabet = (char *)stList_get(tokens, 2);
+    alphabet = (char *)stList_get(tokens, 2);  // alphabet
 
-    j = sscanf(stList_get(tokens, 3), "%"SCNd64, &kmerLength); // number of assignments
+    j = sscanf(stList_get(tokens, 3), "%"SCNd64, &kmerLength); // kmerLength
     if (j != 1) {
         st_errAbort("Failed to parse number of assignments (int) from string: %s\n", string);
     }
@@ -708,6 +709,25 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, StateMachineType type, NanoporeHD
     }
 
     // Cleanup transitions line
+    free(string);
+    stList_destruct(tokens);
+
+    // Event Model
+    string = stFile_getLineFromFile(fH);
+    if (string == NULL) {
+        st_errAbort("hdpHmm_loadFromFile: Got to end of file when looking for event model\n");
+    }
+    tokens = stString_split(string);
+    if (stList_length(tokens) != hdpHmm->baseHmm.parameterSetSize * NORMAL_DISTRIBUTION_PARAMS) {
+        st_errAbort("hdpHmm_loadFromFile: Didn't find the correct number of tokens for event model\n");
+    }
+
+    for (int64_t i = 0; i < hdpHmm->baseHmm.parameterSetSize * NORMAL_DISTRIBUTION_PARAMS; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(hdpHmm->eventModel[i]));
+        if (j != 1) {
+            st_errAbort("hdpHmm_loadFromFile: error parsing event model for event %lld\n", i);
+        }
+    }
     free(string);
     stList_destruct(tokens);
 
@@ -766,8 +786,9 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, StateMachineType type, NanoporeHD
     return (Hmm *)hdpHmm;
 }
 
-Hmm *hdpHmm_makeExpectationsHmm(StateMachine *sM, double threshold) {
-    Hmm *hmm = hdpHmm_constructEmpty(0.0, sM->stateNumber, sM->alphabetSize, sM->alphabet, sM->kmerLength,
+Hmm *hdpHmm_makeExpectationsHmm(StateMachine *sM, double threshold, double transitionsPseudocount) {
+    Hmm *hmm = hdpHmm_constructEmpty(transitionsPseudocount,
+                                     sM->stateNumber, sM->alphabetSize, sM->alphabet, sM->kmerLength,
                                      sM->type, threshold, sM->scale, sM->shift, sM->var);
     HdpHmm *hdpHmm = (HdpHmm *)hmm;
     hmmContinuous_loadEventModel(sM->EMISSION_MATCH_MATRIX, hdpHmm->eventModel, hdpHmm->baseHmm.parameterSetSize);
@@ -819,17 +840,17 @@ void hmmContinuous_loadModelPrior(Hmm *prior, Hmm *expectations) {
     newHmm->hasModel = TRUE;
 }
 
-Hmm *hmmContinuous_getExpectationsHmm(StateMachine *sM, double threshold) {
+Hmm *hmmContinuous_getExpectationsHmm(StateMachine *sM, double threshold,
+                                      double transitionsPseudocount, double emissionsPseudocount) {
     if ((sM->type != threeStateHdp) && (sM->type != threeState)) {
         st_errAbort("hmmContinuous_getExpectationsHmm - ERROR: got unsupported HMM type %i\n", sM->type);
     }
     if (sM->type == threeState) {
-        Hmm *hmm = continuousPairHmm_makeExpectationsHmm(sM);
+        Hmm *hmm = continuousPairHmm_makeExpectationsHmm(sM, transitionsPseudocount, emissionsPseudocount);
         return hmm;
     }
     if (sM->type == threeStateHdp) {
-        //Hmm *hmm = hdpHmm_constructEmpty(pseudocount, 3, threeStateHdp, threshold);
-        Hmm *hmm = hdpHmm_makeExpectationsHmm(sM, threshold);
+        Hmm *hmm = hdpHmm_makeExpectationsHmm(sM, threshold, transitionsPseudocount);
         return hmm;
     }
     return 0;

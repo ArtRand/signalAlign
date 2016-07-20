@@ -1316,10 +1316,7 @@ StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType
      *  line 1: match->match \t match->gapX \t match->gapY \t
      *          gapX->match \t gapX->gapX \t gapX->gapY \t
      *          gapY->match \t gapY->gapX \t gapY->gapY \n
-     *  line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean]
-     *              [noise_sd] [noise_lambda ](.../kmer) \n
-     *  line 2: [correlation coefficient] [level_mean] [level_sd, scaled]
-     *              [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
+     *  line 1: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
      */
     if (!stFile_exists(modelFile)) {
         st_errAbort("stateMachine3_loadFromFile: Couldn't find .model file here %s\n", modelFile);
@@ -1398,7 +1395,7 @@ StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType
 
     // increase the level_sd for the GapY state by 75% see Simpson et al.
     // start at 1 bc. the level_sd is the second param in MODEL PRAMS
-    for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS); i += MODEL_PARAMS) {
+    for (int64_t i = 0; i < (sM->parameterSetSize * MODEL_PARAMS); i += MODEL_PARAMS) {
         sM->EMISSION_GAP_Y_MATRIX[i] *= EXTRA_EVENT_NOISE_MULTIPLIER;
     }
 

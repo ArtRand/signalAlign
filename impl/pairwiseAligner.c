@@ -734,6 +734,7 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
     //
     if (to == match) {
+        //st_uglyf("adding to expectations kmerIndex %lld, event mean %f, p %f\n", kmerIndex, descaledEventMean, p);
         hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, kmerIndex, descaledEventMean, p);
     }
 }

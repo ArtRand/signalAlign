@@ -237,8 +237,14 @@ static void test_poreModel(CuTest *testCase, int64_t kmerLength, char *alphabet,
 
     for (int64_t i = 0; i < matrixSize; i++) {
         double x = sM->EMISSION_MATCH_MATRIX[i];
-        double y = sM->EMISSION_GAP_Y_MATRIX[i];
         CuAssertDblEquals(testCase, x, (double )i, 0.0);
+        //CuAssertDblEquals(testCase, x * EXTRA_EVENT_NOISE_MULTIPLIER, y, 0.0);
+    }
+
+    for (int64_t i = 0; i < matrixSize; i += MODEL_PARAMS) {
+        double x = sM->EMISSION_MATCH_MATRIX[i];
+        double y = sM->EMISSION_GAP_Y_MATRIX[i];
+        CuAssertDblEquals(testCase, x * EXTRA_EVENT_NOISE_MULTIPLIER, y, 0.0);
     }
 
     stFile_rmrf(tempFile);
@@ -856,15 +862,15 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
 }
 
 static void test_cpHmmEmissionsAgainstStateMachine(CuTest *testCase, StateMachine *sM, ContinuousPairHmm *cpHmm) {
-    for (int64_t i = 0; i < NUM_OF_KMERS; i++) {
+    for (int64_t i = 0; i < sM->parameterSetSize; i++) {
         double E_mean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
         double E_noise = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i) + 1);
-        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)],
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS)],
                           cpHmm->eventModel[i * NORMAL_DISTRIBUTION_PARAMS], 0.0);
-        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS + 1)],
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS + 1)],
                           cpHmm->eventModel[i * NORMAL_DISTRIBUTION_PARAMS + 1], 0.0);
-        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)], E_mean, 0.0);
-        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS + 1)], E_noise, 0.0);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS)], E_mean, 0.0);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS + 1)], E_noise, 0.0);
     }
 }
 
@@ -878,7 +884,7 @@ static void test_makeAndCheckModels(CuTest *testCase) {
     StateMachine *sM = getStateMachine3(templateLookupTableFile);
 
     // load the table into the HMM emissions
-    Hmm *hmm = continuousPairHmm_makeExpectationsHmm(sM);
+    Hmm *hmm = continuousPairHmm_makeExpectationsHmm(sM, 0.0, 0.0);
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
     if (!cpHmm->hasModel) {
         st_errAbort("Problem loading match model\n");
@@ -899,7 +905,7 @@ static void test_continuousPairHmm(CuTest *testCase) {
     StateMachine *sM = getStateMachine3(model);
 
     // construct the empty hmm
-    Hmm *hmm = continuousPairHmm_makeExpectationsHmm(sM);
+    Hmm *hmm = continuousPairHmm_makeExpectationsHmm(sM, 0.0, 0.0);
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
 
     // Add event model
@@ -922,13 +928,14 @@ static void test_continuousPairHmm(CuTest *testCase) {
     CuAssertTrue(testCase, !stFile_exists(tempFile));  // Quick check that we don't write over anything.
     FILE *fH = fopen(tempFile, "w");
     continuousPairHmm_writeToFile((Hmm *) cpHmm, fH);
+    fclose(fH);
+
     continuousPairHmm_destruct((Hmm *)cpHmm);
 
-    // load
     hmm = continuousPairHmm_loadFromFile(tempFile, threeState, 0.0, 0.0);
+
     stFile_rmrf(tempFile);
     cpHmm = (ContinuousPairHmm *)hmm;
-    CuAssertTrue(testCase, cpHmm->hasModel);
 
     // (re)check the transitions
     for (int64_t from = 0; from < nStates; from++) {
@@ -1010,11 +1017,11 @@ static void test_continuousPairHmm(CuTest *testCase) {
 
     // check the emissions
     for (int64_t i = 0; i < cpHmm->baseHmm.parameterSetSize; i++) {
-        double origMean = sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)];
+        double origMean = sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS)];
         double newMean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
 
-        double twoX = 2 * sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)];
-        double onePointFiveX = 1.5 * sM->EMISSION_MATCH_MATRIX[1 + (i * MODEL_PARAMS)];
+        double twoX = 2 * sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS)];
+        double onePointFiveX = 1.5 * sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS)];
         double sq = (twoX - onePointFiveX) * (twoX - onePointFiveX);
         double E_sd = sqrt(sq / 2);
 
@@ -1035,7 +1042,7 @@ static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     StateMachine *sM = getStateMachine3(model);
 
     // make the hmm expectations object (it doesn't matter that it's not an HDP stateMachine)
-    Hmm *hmm = hdpHmm_makeExpectationsHmm(sM, 0.0);
+    Hmm *hmm = hdpHmm_makeExpectationsHmm(sM, 0.0, 0.0);
     HdpHmm *hdpHmm = (HdpHmm *) hmm;
 
     // Add some transition expectations
@@ -1109,18 +1116,10 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
                                                   sequence_sliceEventSequence, event);
 
     for (int64_t iter = 0; iter < 10; iter++) {
-        //Hmm *hmm = continuousPairHmm_construct(0.001, 0.001, 3, NUM_OF_KMERS, threeState,
-        //                                       npRead->templateParams.scale,
-        //                                       npRead->templateParams.shift,
-        //                                       npRead->templateParams.var);
-
-        //print_stateMachine_transitions(sM);
-        //ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
         // load the table into the HMM emissions
-        Hmm *hmm = continuousPairHmm_makeExpectationsHmm(sM);
-        ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
+        Hmm *hmm = continuousPairHmm_makeExpectationsHmm(sM, 0.001, 0.001);
 
-        //implantModelFromStateMachineIntoHmm(sM, cpHmm);
+        ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
 
         // get expectations
         getExpectationsUsingAnchors(sM, (Hmm *)cpHmm, refSeq, eventSequence, filteredRemappedAnchors,
@@ -1129,7 +1128,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
         // normalize
         continuousPairHmm_normalize((Hmm *)cpHmm);
 
-        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->baseHmm.likelihood, iter);
+        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->baseHmm.likelihood, iter);
         // M step
         continuousPairHmm_loadTransitionsIntoStateMachine(sM, (Hmm *)cpHmm);
         continuousPairHmm_loadEmissionsIntoStateMachine(sM, (Hmm *)cpHmm);
@@ -1170,7 +1169,7 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
     for (int64_t iter = 0; iter < 10; iter++) {
         //Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold);
-        Hmm *hmmExpectations = hdpHmm_makeExpectationsHmm(sM, p->threshold);
+        Hmm *hmmExpectations = hdpHmm_makeExpectationsHmm(sM, p->threshold, 0.0);
 
         getExpectationsUsingAnchors(sM, hmmExpectations, refSeq, templateSeq, filteredRemappedAnchors,
                                     p, diagonalCalculation_Expectations, 0, 0);
@@ -1179,7 +1178,7 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
         hmmDiscrete_normalizeTransitions(hmmExpectations);
 
         // for debugging
-        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
+        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
 
         // M step
         continuousPairHmm_loadTransitionsIntoStateMachine(sM, hmmExpectations);
@@ -1196,7 +1195,6 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
         //continuousPairHmm_destruct(hmmExpectations);
         hdpHmm_destruct(hmmExpectations);
     }
-
     sequence_destruct(refSeq);
     sequence_destruct(templateSeq);
     stList_destruct(filteredRemappedAnchors);
@@ -1207,11 +1205,6 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, test_makeAndCheckModels);
-    SUITE_ADD_TEST(suite, test_continuousPairHmm);
-    SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
-    SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
-    /*
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
@@ -1227,10 +1220,9 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_DegenerateNucleotides);
     SUITE_ADD_TEST(suite, test_makeAndCheckModels);
-    //SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
+    SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
-     */
     return suite;
 }

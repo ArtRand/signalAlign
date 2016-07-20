@@ -631,7 +631,7 @@ int main(int argc, char *argv[]) {
                                                nanopore_adjustTemplateEventsForDrift);
         }
         // make empty HMM to collect expectations
-        Hmm *templateExpectations = hmmContinuous_getExpectationsHmm(sMt, p->threshold);
+        Hmm *templateExpectations = hmmContinuous_getExpectationsHmm(sMt, p->threshold, 0.001, 0.001);
 
         // get expectations for template
         fprintf(stderr, "signalAlign - getting expectations for template\n");
@@ -666,7 +666,7 @@ int main(int argc, char *argv[]) {
                                                nanopore_adjustComplementEventsForDrift);
         }
 
-        Hmm *complementExpectations = hmmContinuous_getExpectationsHmm(sMc, p->threshold);
+        Hmm *complementExpectations = hmmContinuous_getExpectationsHmm(sMc, p->threshold, 0.001, 0.001);
 
         getSignalExpectations(sMc, complementModelFile, complementHmmFile, nHdpC,
                               complementExpectations, sMtype,
