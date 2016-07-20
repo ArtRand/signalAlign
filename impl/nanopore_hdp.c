@@ -12,7 +12,7 @@
 #define ALIGNMENT_SIGNAL_COL 13
 #define NUM_ALIGNMENT_COLS 15
 
-#define MODEL_ROW_HEADER_LENGTH 1
+#define MODEL_ROW_HEADER_LENGTH 0
 #define MODEL_MEAN_ENTRY 0
 #define MODEL_NOISE_ENTRY 1
 #define MODEL_ENTRY_LENGTH 5
@@ -125,12 +125,19 @@ void normal_inverse_gamma_params_from_minION(const char* model_filepath, double*
     char* line = stFile_getLineFromFile(model_file);
     stList* tokens = stString_split(line);
 
-    if (stList_length(tokens) != 3) {
+    if (stList_length(tokens) != 4) {
         st_errAbort("normal_inverse_gamma_params_from_minION: Model format has changed invalid model"
                             "found here %s\n", model_filepath);
     }
     free(line);
     stList_destruct(tokens);
+
+    // ignore transitions line
+    line = stFile_getLineFromFile(model_file);
+    tokens = stString_split(line);
+    if (stList_length(tokens) != 10) {
+        st_errnoAbort("More than 3-state hmm transitions parameters found\n");
+    }
 
     line = stFile_getLineFromFile(model_file);
     tokens = stString_split(line);

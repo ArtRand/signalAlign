@@ -1395,7 +1395,7 @@ StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType
 
     // increase the level_sd for the GapY state by 75% see Simpson et al.
     // start at 1 bc. the level_sd is the second param in MODEL PRAMS
-    for (int64_t i = 0; i < (sM->parameterSetSize * MODEL_PARAMS); i += MODEL_PARAMS) {
+    for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS); i += MODEL_PARAMS) {
         sM->EMISSION_GAP_Y_MATRIX[i] *= EXTRA_EVENT_NOISE_MULTIPLIER;
     }
 

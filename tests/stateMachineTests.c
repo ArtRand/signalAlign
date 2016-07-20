@@ -241,7 +241,7 @@ static void test_poreModel(CuTest *testCase, int64_t kmerLength, char *alphabet,
         //CuAssertDblEquals(testCase, x * EXTRA_EVENT_NOISE_MULTIPLIER, y, 0.0);
     }
 
-    for (int64_t i = 0; i < matrixSize; i += MODEL_PARAMS) {
+    for (int64_t i = 1; i < matrixSize; i += MODEL_PARAMS) {
         double x = sM->EMISSION_MATCH_MATRIX[i];
         double y = sM->EMISSION_GAP_Y_MATRIX[i];
         CuAssertDblEquals(testCase, x * EXTRA_EVENT_NOISE_MULTIPLIER, y, 0.0);
