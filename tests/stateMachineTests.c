@@ -866,9 +866,9 @@ static void test_cpHmmEmissionsAgainstStateMachine(CuTest *testCase, StateMachin
         double E_mean = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i));
         double E_noise = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i) + 1);
         CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS)],
-                          cpHmm->eventModel[i * NORMAL_DISTRIBUTION_PARAMS], 0.0);
+                          cpHmm->eventModel[i * MODEL_PARAMS], 0.0);
         CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS + 1)],
-                          cpHmm->eventModel[i * NORMAL_DISTRIBUTION_PARAMS + 1], 0.0);
+                          cpHmm->eventModel[i * MODEL_PARAMS + 1], 0.0);
         CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS)], E_mean, 0.0);
         CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[(i * MODEL_PARAMS + 1)], E_noise, 0.0);
     }
@@ -1026,8 +1026,8 @@ static void test_continuousPairHmm(CuTest *testCase) {
         double E_sd = sqrt(sq / 2);
 
         double sd = *(cpHmm->getEventModelEntry((Hmm *)cpHmm, i) + 1);
-        CuAssertDblEquals(testCase, 1.5 * origMean, newMean, 0.0); // todo fails
-        CuAssertDblEquals(testCase, E_sd, sd, 0.0); // todo fails
+        CuAssertDblEquals(testCase, 1.5 * origMean, newMean, 0.0);
+        CuAssertDblEquals(testCase, E_sd, sd, 0.0);
 
     }
     continuousPairHmm_destruct((Hmm *)cpHmm);
@@ -1098,6 +1098,14 @@ static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
             CuAssertDblEquals(testCase, (from * nStates + to) / z, retrievedNormedProb, 0.0);
         }
     }
+
+    // check against stateMachine
+    CuAssertIntEquals(testCase, hdpHmm->baseHmm.parameterSetSize, sM->parameterSetSize);
+
+    for (int64_t i = 0; i < hdpHmm->baseHmm.parameterSetSize * MODEL_PARAMS; i++) {
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_MATRIX[i], hdpHmm->eventModel[i], 0.0001);
+    }
+
     hdpHmm_destruct((Hmm *) hdpHmm);
 }
 

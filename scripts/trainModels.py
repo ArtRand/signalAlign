@@ -127,20 +127,17 @@ def get_expectations(work_queue, done_queue):
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
-def get_model(type, symbol_set_size, threshold, table_file=None, premade_model=None):
+def get_model(type, threshold, model_file):
     assert (type in ["threeState", "threeStateHdp"]), "Unsupported StateMachine type"
+    # todo clean this up
     if type == "threeState":
-        assert table_file is not None, "Need to have starting lookup table for {} HMM".format(type)
-        model = ContinuousPairHmm(model_type=type, symbol_set_size=symbol_set_size)
-        if premade_model is not None:
-            model.load_model(premade_model)
-        else:
-            model.parse_lookup_table(table_file=table_file)
+        assert model_file is not None, "Need to have starting lookup table for {} HMM".format(type)
+        model = ContinuousPairHmm(model_type=type)
+        model.load_model(model_file=model_file)
         return model
     if type == "threeStateHdp":
         model = HdpSignalHmm(model_type=type, threshold=threshold)
-        if premade_model is not None:
-            model.load_model(premade_model)
+        model.load_model(model_file=model_file)
         return model
 
 
@@ -246,17 +243,19 @@ def main(args):
     print("signalAlign - indexing reference, done", file=sys.stderr)
 
     # the default lookup tables are the starting conditions for the model if we're starting from scratch
-    default_template_table_path = "../../signalAlign/models/testModel_template.model"
-    default_complement_table_path = "../../signalAlign/models/testModel_complement.model"
-    assert os.path.exists(default_template_table_path) and os.path.exists(default_complement_table_path), \
+    # todo next make get default model function based on version inferred from reads
+    template_model_path = "../../signalAlign/models/testModel_template.model" if \
+        args.in_T_Hmm is None else args.in_T_Hmm
+    complement_model_path = "../../signalAlign/models/testModel_complement.model" if \
+        args.in_C_Hmm is None else args.in_C_Hmm
+
+    assert os.path.exists(template_model_path) and os.path.exists(complement_model_path), \
         "Missing default lookup tables"
 
     # make the model objects, for the threeState model, we're going to parse the lookup table or the premade
     # model, for the HDP model, we just load the transitions
-    template_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
-                               table_file=default_template_table_path, premade_model=args.in_T_Hmm)
-    complement_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
-                                 table_file=default_complement_table_path, premade_model=args.in_C_Hmm)
+    template_model = get_model(type=args.stateMachineType, threshold=args.threshold, model_file=template_model_path)
+    complement_model = get_model(type=args.stateMachineType, threshold=args.threshold, model_file=complement_model_path)
 
     # get the input HDP, if we're using it
     if args.stateMachineType == "threeStateHdp":
@@ -288,7 +287,7 @@ def main(args):
         copyfile(default_model, trained_model)
         assert os.path.exists(trained_model), "Problem copying default model to {}".format(trained_model)
 
-    print("Starting {iterations} iterations.\n\n\t    Running likelihoods\ni\tTempalte\tComplement".format(
+    print("Starting {iterations} iterations.\n\n\t    Running likelihoods\ni\tTemplate\tComplement".format(
         iterations=args.iter), file=sys.stdout)
 
     # start iterating

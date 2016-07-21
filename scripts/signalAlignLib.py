@@ -16,7 +16,6 @@ from serviceCourse.file_handlers import FolderHandler
 
 # Globals
 NORM_DIST_PARAMS = 2
-
 NB_MODEL_PARAMS = 5
 
 def kmer_iterator(dna, k):
@@ -1051,15 +1050,27 @@ class SignalAlignment(object):
 
 
 class SignalHmm(object):
-    def __init__(self, model_type, symbol_set_size):
+    def __init__(self, model_type):
         self.match_model_params = 5  # level_mean, level_sd, noise_mean, noise_sd, noise_lambda
         self.model_type = model_type  # ID of model type
         self.state_number = {"threeState": 3, "threeStateHdp": 3}[model_type]
-        self.symbol_set_size = symbol_set_size
+        self.symbol_set_size = 0
         self.transitions = np.zeros(self.state_number**2)
         self.transitions_expectations = np.zeros(self.state_number**2)
         self.likelihood = 0.0
         self.running_likelihoods = []
+        self.alphabet_size = 0
+        self.alphabet = ""
+        self.kmer_length = 0
+        self.has_model = False
+        self.normalized = False
+
+        # event model for describing normal distributions for each kmer
+        self.event_model = {"means": np.zeros(self.symbol_set_size),
+                            "SDs": np.zeros(self.symbol_set_size),
+                            "noise_means": np.zeros(self.symbol_set_size),
+                            "noise_SDs": np.zeros(self.symbol_set_size),
+                            "noise_lambdas": np.zeros(self.symbol_set_size)}
 
     def normalize_transitions_expectations(self):
         # normalize transitions
@@ -1086,15 +1097,90 @@ class SignalHmm(object):
         ]
         return
 
+    def load_model(self, model_file):
+        # the model file has the format:
+        # line 0: stateNumber \t alphabetSize \t alphabet \t kmerLength
+        # line 1: match->match \t match->gapX \t match->gapY \t
+        #         gapX->match \t gapX->gapX \t gapX->gapY \t
+        #         gapY->match \t gapY->gapX \t gapY->gapY \n
+        # line 2: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
+        assert os.path.exists(model_file), "signalHmm.load_model - didn't find model here{}?".format(model_file)
+
+        fH = open(model_file, 'r')
+
+        line = fH.readline().split()
+        # check for correct header length
+        assert len(line) == 4, "signalHmm.load_model - incorrect line length line:{}".format(''.join(line))
+        # check stateNumber
+        assert int(line[0]) == self.state_number, "signalHmm.load_model - incorrect stateNumber got {got} should be {exp}" \
+                                                  "".format(got=int(line[0]), exp=self.state_number)
+        # load model parameters
+        self.alphabet_size = int(line[1])
+        self.alphabet = line[2]
+        self.kmer_length = int(line[3])
+        print("Loaded HMM has alphabet size {aS} alphabet {al} and kmer length {kl}"
+              "".format(aS=self.alphabet_size, al=self.alphabet, kl=self.kmer_length))
+        self.symbol_set_size = self.alphabet_size**self.kmer_length
+        assert self.symbol_set_size > 0, "signalHmm.load_model - Got 0 for symbol_set_size"
+        assert self.symbol_set_size < 6**6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size"
+
+        line = map(float, fH.readline().split())
+        assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
+        self.transitions = line[:-1]
+        self.likelihood = line[-1]
+
+        line = map(float, fH.readline().split())
+        assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, \
+            "signalHmm.load_model incorrect event model line"
+        self.event_model["means"] = line[::NB_MODEL_PARAMS]
+        self.event_model["SDs"] = line[1::NB_MODEL_PARAMS]
+        self.event_model["noise_means"] = line[2::NB_MODEL_PARAMS]
+        self.event_model["noise_SDs"] = line[3::NB_MODEL_PARAMS]
+        self.event_model["noise_lambdas"] = line[4::NB_MODEL_PARAMS]
+
+        assert not np.any(self.event_model["means"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
+        assert not np.any(self.event_model["SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
+        assert not np.any(self.event_model["noise_means"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_means"
+        assert not np.any(self.event_model["noise_SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_SDs"
+        self.has_model = True
+
+    def write(self, out_file):
+        # the model file has the format:
+        # line 0: stateNumber \t alphabetSize \t alphabet \t kmerLength
+        # line 1: match->match \t match->gapX \t match->gapY \t
+        #         gapX->match \t gapX->gapX \t gapX->gapY \t
+        #         gapY->match \t gapY->gapX \t gapY->gapY \n
+        # line 2: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
+        assert self.has_model, "Shouldn't be writing down a Hmm that has no Model"
+        assert self.normalized, "Shouldn't be writing down a not normalized HMM"
+
+        f = open(out_file, 'w')
+
+        # line 0
+        f.write("{stateNumber}\t{alphabetSize}\t{alphabet}\t{kmerLength}\n"
+                "".format(stateNumber=self.state_number, alphabetSize=self.alphabet_size,
+                          alphabet=self.alphabet, kmerLength=self.kmer_length))
+        # line 1 transitions
+        for i in xrange(self.state_number * self.state_number):
+            f.write("{transition}\t".format(transition=str(self.transitions[i])))
+        # likelihood
+        f.write("{}\n".format(str(self.likelihood)))
+
+        # line 2 Event Model
+        for k in xrange(self.symbol_set_size):
+            f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}"
+                    "".format(level_mean=self.event_model["means"][k], level_sd=self.event_model["SDs"][k],
+                              noise_mean=self.event_model["noise_means"][k], noise_sd=self.event_model["noise_SDs"][k],
+                              noise_lambda=self.event_model["noise_lambdas"][k]))
+        f.write("\n")
+
+        f.close()
+
 
 class ContinuousPairHmm(SignalHmm):
-    def __init__(self, model_type, symbol_set_size):
-        super(ContinuousPairHmm, self).__init__(model_type=model_type, symbol_set_size=symbol_set_size)
+    def __init__(self, model_type):
+        super(ContinuousPairHmm, self).__init__(model_type=model_type)
         self.set_default_transitions()
-
-        # event model for describing normal distributions for each kmer
-        self.event_model = {"means": np.zeros(self.symbol_set_size),
-                            "SDs": np.zeros(self.symbol_set_size)}
 
         # bins for expectations
         self.mean_expectations = np.zeros(self.symbol_set_size)
@@ -1105,24 +1191,42 @@ class ContinuousPairHmm(SignalHmm):
         self.normalized = False
 
     def add_expectations_file(self, expectations_file):
+        # expectations files have the format:
+        # line 0: stateNumber \t alphabetSize \t alphabet \t kmerLength
+        # line 1: match->match \t match->gapX \t match->gapY \t
+        #         gapX->match \t gapX->gapX \t gapX->gapY \t
+        #         gapY->match \t gapY->gapX \t gapY->gapY \n
+        # line 2: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
+        # line 3: event expectations [mean] [sd] / kmer \n
+        # line 4: posteriors 1 per kmer \n
+        # line 5: observed 1 per kmer \n
+        if not os.path.exists(expectations_file) or os.stat(expectations_file).st_size == 0:
+            print("Empty or missing file {}".format(expectations_file))
+            return
+
         fH = open(expectations_file, 'r')
 
-        # line 0: smType, stateNumber, symbolSetSize
-        line = map(float, fH.readline().split())
+        # line 0
+        line = fH.readline().split()
         if len(line) != 4:
             print("cpHMM: check_file - bad file (param line): {}".format(expectations_file), file=sys.stderr)
+            fH.close()
             return
-        if line[0] != 2 or line[1] != self.state_number or line[2] != self.symbol_set_size:
+        if line[0] != self.state_number or \
+                        int(line[1]) != self.alphabet_size or \
+                        line[2] != self.alphabet or \
+                        int(line[3]) != self.kmer_length:
             print("cpHMM: check_file - bad file (Hmm params): {}".format(expectations_file), file=sys.stderr)
+            fH.close()
             return
 
         # line 1: transitions, likelihood
         line = map(float, fH.readline().split())
-
         # check if valid
         if len(line) != (len(self.transitions) + 1):
             print("cpHMM: check_file - bad file (transitions expectations): {}".format(expectations_file),
                   file=sys.stderr)
+            fH.close()
             return
 
         self.likelihood += line[-1]
@@ -1130,14 +1234,16 @@ class ContinuousPairHmm(SignalHmm):
 
         # line 2: event model
         line = map(float, fH.readline().split())
-        if len(line) != self.symbol_set_size * NORM_DIST_PARAMS:
+        if len(line) != self.symbol_set_size * NB_MODEL_PARAMS:
             print("cpHMM: check_file - bad file (event model): {}".format(expectations_file), file=sys.stderr)
+            fH.close()
             return
 
         # line 3 event expectations [E_mean, E_sd]
         line = map(float, fH.readline().split())
         if len(line) != self.symbol_set_size * NORM_DIST_PARAMS:
             print("cpHMM: check_file - bad file (event expectations): {}".format(expectations_file), file=sys.stderr)
+            fH.close()
             return
 
         self.mean_expectations = [i + j for i, j in izip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
@@ -1147,6 +1253,7 @@ class ContinuousPairHmm(SignalHmm):
         line = map(float, fH.readline().split())
         if len(line) != self.symbol_set_size:
             print("cpHMM: check_file - bad file (posteriors): {}".format(expectations_file), file=sys.stderr)
+            fH.close()
             return
 
         self.posteriors = map(lambda x: sum(x), zip(self.posteriors, line))
@@ -1154,6 +1261,7 @@ class ContinuousPairHmm(SignalHmm):
         line = map(bool, fH.readline().split())
         if len(line) != self.symbol_set_size:
             print("cpHMM: check_file - bad file (observations): {}".format(expectations_file), file=sys.stderr)
+            fH.close()
             return
 
         self.observed = [any(b) for b in zip(self.observed, line)]
@@ -1170,115 +1278,57 @@ class ContinuousPairHmm(SignalHmm):
                 self.transitions[i] = self.transitions_expectations[i]
 
         # calculate the new expected mean and standard deviation for the kmer normal distributions
-        for k in xrange(self.symbol_set_size):  # TODO implement learning rate
-            if self.observed[k] is True:
-                u_k = self.mean_expectations[k] / self.posteriors[k]
-                o_k = np.sqrt(self.sd_expectations[k] / self.posteriors[k])
-                if u_k > 0 and update_emissions is True:
-                    self.event_model["means"][k] = u_k
-                    self.event_model["SDs"][k] = o_k
-            else:
-                continue
-
+        if update_emissions:
+            for k in xrange(self.symbol_set_size):  # TODO implement learning rate
+                if self.observed[k] is True:
+                    u_k = self.mean_expectations[k] / self.posteriors[k]
+                    o_k = np.sqrt(self.sd_expectations[k] / self.posteriors[k])
+                    if u_k > 0:
+                        self.event_model["means"][k] = u_k
+                        self.event_model["SDs"][k] = o_k
+                else:
+                    continue
         self.normalized = True
-        self.has_model = True
-
-    def write(self, out_file):
-        # Format:
-        # 0 * type \t stateNumber \t symbolSetSize \t hasModel \n
-        # 1 * [transitions... \t] likelihood \n
-        # 2 * [Event Model] \n
-        # 3 * [Event Expectations] \n
-        # 4 * [Event Posteriors] \n
-        # 5 * [Observed] \n
-        assert self.has_model, "Shouldn't be writing down a Hmm that has no Model"
-        assert self.normalized, "Shouldn't be writing down a not normalized HMM"
-
-        f = open(out_file, 'w')
-
-        # line 0
-        f.write("2\t{stateNumber}\t{symbolSetSize}\t{hasModel}\n".format(stateNumber=self.state_number,
-                                                                         symbolSetSize=self.symbol_set_size,
-                                                                         hasModel=int(self.has_model)))
-        # line 1 transitions
-        for i in xrange(self.state_number * self.state_number):
-            f.write("{transition}\t".format(transition=str(self.transitions[i])))
-        # likelihood
-        f.write("{}\n".format(str(self.likelihood)))
-
-        # line 2 Event Model
-        for k in xrange(self.symbol_set_size):
-            f.write("{mean}\t{sd}\t".format(mean=self.event_model["means"][k], sd=self.event_model["SDs"][k]))
-        f.write("\n")
-
-        f.close()
-
-    def parse_lookup_table(self, table_file):
-        assert os.path.exists(table_file), "cpHMM::parse_lookup_table - Didn't find lookup table"
-        fH = open(table_file, 'r')
-
-        line = fH.readline().split()
-        print(line)
-        assert len(line) == 3, "cpHMM::parse_lookup_table - Didn't find correct number of stateMachine parameters"
-        assert int(line[0])**int(line[2]) == self.symbol_set_size, "cpHMM::parse_lookup_table - This model will not " \
-                                                                   "fit with this HMM model"
-
-        line = map(float, fH.readline().split())
-        line = line[1:]  # disregard the correlation param
-        assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, "Model {} has incorrect line length" \
-                                                                    "".format(table_file)
-
-        self.event_model["means"] = [x for x in line[::NB_MODEL_PARAMS]]
-        self.event_model["SDs"] = [x for x in line[1::NB_MODEL_PARAMS]]
-        self.has_model = True
-
-    def load_model(self, path_to_model):
-        assert os.path.exists(path_to_model), "cpHmm::load_model - didn't find model here{}?".format(path_to_model)
-
-        fH = open(path_to_model, 'r')
-
-        line = map(float, fH.readline().split())
-        assert len(line) == 4, "cpHmm::load_model - incorrect line length line:{}".format(''.join(line))
-        assert line[0] == 2
-        assert line[1] == self.state_number
-        assert line[2] == self.symbol_set_size
-        assert bool(line[3]) == True
-
-        line = map(float, fH.readline().split())
-        assert len(line) == len(self.transitions) + 1, "cpHmm::load_model incorrect transitions line"
-        self.transitions = line[:-1]
-        self.likelihood = line[-1]
-
-        line = map(float, fH.readline().split())
-        assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, \
-            "cpHmm::load_model incorrect event model line"
-        self.event_model["means"] = line[::NORM_DIST_PARAMS]
-        self.event_model["SDs"] = line[1::NORM_DIST_PARAMS]
-
-        assert not np.any(self.event_model["means"] == 0.0), "cpHmm::load_model, this model has 0 E_means"
-        assert not np.any(self.event_model["SDs"] == 0.0), "cpHmm::load_model, this model has 0 E_means"
 
 
 class HdpSignalHmm(SignalHmm):
     def __init__(self, model_type, threshold):
-        super(HdpSignalHmm, self).__init__(model_type=model_type, symbol_set_size=None)
+        super(HdpSignalHmm, self).__init__(model_type=model_type)
         self.set_default_transitions()
-        self.number_of_assignments = 0
         self.threshold = threshold
         self.kmer_assignments = []
         self.event_assignments = []
         self.assignments_record = []
 
     def add_expectations_file(self, expectations_file):
+        # expectations files have the format:
+        # line 0: stateNumber \t alphabetSize \t alphabet \t kmerLength
+        # line 1: match->match \t match->gapX \t match->gapY \t
+        #         gapX->match \t gapX->gapX \t gapX->gapY \t
+        #         gapY->match \t gapY->gapX \t gapY->gapY \n
+        # line 2: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
+        # line 3: event assignments
+        # line 4: kmer assignments
+        if not os.path.exists(expectations_file) or os.stat(expectations_file).st_size == 0:
+            print("Empty or missing file {}".format(expectations_file))
+            return
+
         fH = open(expectations_file, 'r')
 
         # line 0: smType stateNumber, symbolSetSize
-        line = map(float, fH.readline().split())
-        assert len(line) == 4, "add_expectations_file - ERROR: header line {} is incorrect".format(''.join(line))
-        assert line[0] == 7, "add_expectations_file - ERROR: got incorrect modelType"
-        assert line[1] == self.state_number, "add_expectations_file - ERROR: got incorrect stateNumber"
-        assert line[2] == self.threshold, "add_expectations_file - ERROR: got incorrect threshold"
-        self.number_of_assignments += line[3]
+        # line 0
+        line = fH.readline().split()
+        if len(line) != 4:
+            print("cpHMM: check_file - bad file (param line): {}".format(expectations_file), file=sys.stderr)
+            fH.close()
+            return
+        if line[0] != self.state_number or \
+                        int(line[1]) != self.alphabet_size or \
+                        line[2] != self.alphabet or \
+                        int(line[3]) != self.kmer_length:
+            print("cpHMM: check_file - bad file (Hmm params): {}".format(expectations_file), file=sys.stderr)
+            fH.close()
+            return
 
         # line 1: transitions, likelihood
         line = map(float, fH.readline().split())
@@ -1286,6 +1336,7 @@ class HdpSignalHmm(SignalHmm):
         # check if valid file
         if len(line) != (len(self.transitions) + 1):
             print("PYSENTINAL - problem with file {}".format(expectations_file), file=sys.stdout)
+            fH.close()
             return
 
         self.likelihood += line[-1]
@@ -1301,68 +1352,17 @@ class HdpSignalHmm(SignalHmm):
 
         fH.close()
 
-        assert (len(self.kmer_assignments) == self.number_of_assignments) and \
-               (len(self.event_assignments) == self.number_of_assignments), \
-            "trainModels - add_expectations_file: invalid number of assignments"
-
-    def write(self, out_file):
-        # format
-        # type \t statenumber \t symbolsetsize \t threshold \t numberofassignments \n
-        # [transitions,..., \t seperated] likelihood \n
-        # [event assignments,..., \t sep]
-        # [kmer assignments,..., \t sep]
-        f = open(out_file, 'w')
-
-        # line 0
-        f.write("7\t{stateNumber}\t{threshold}\t{numOfAssignments}\n".format(
-            stateNumber=self.state_number, threshold=self.threshold,
-            numOfAssignments=self.number_of_assignments)
-        )
-
-        # line 1
-        # transitions
-        for i in xrange(self.state_number * self.state_number):
-            f.write("{transition}\t".format(transition=str(self.transitions[i])))
-        # likelihood
-        f.write("{}\n".format(str(self.likelihood)))
-
-        # line 3 event assignments
-        for event in self.event_assignments:
-            f.write("{}\t".format(str(event)))
-        f.write("\n")
-
-        # line 4 kmer assignments
-        for kmer in self.kmer_assignments:
-            f.write("{}\t".format(kmer))
-        f.write("\n")
-        f.close()
+        #assert (len(self.kmer_assignments) == self.number_of_assignments) and \
+        #       (len(self.event_assignments) == self.number_of_assignments), \
+        #    "trainModels - add_expectations_file: invalid number of assignments"
 
     def reset_assignments(self):
         self.assignments_record.append(self.number_of_assignments)
         self.event_assignments = []
         self.kmer_assignments = []
-        self.number_of_assignments = 0
 
     def normalize(self, update_transitions, update_emissions=None):
         self.normalize_transitions_expectations()
-
         if update_transitions is True:
             for i in xrange(self.state_number**2):
                 self.transitions[i] = self.transitions_expectations[i]
-
-    def load_model(self, path_to_model):
-        assert os.path.exists(path_to_model), "cpHmm::load_model - didn't find model here{}?".format(path_to_model)
-
-        fH = open(path_to_model, 'r')
-
-        line = map(float, fH.readline().split())
-        assert len(line) == 4, "cpHmm::load_model - incorrect line length line:{}".format(''.join(line))
-        assert line[0] == 7
-        assert line[1] == self.state_number
-        assert line[2] == self.threshold
-
-        line = map(float, fH.readline().split())
-        assert len(line) == len(self.transitions) + 1, "cpHmm::load_model incorrect transitions line"
-        self.transitions = line[:-1]
-        self.likelihood = line[-1]
-        # todo make check transitions function
