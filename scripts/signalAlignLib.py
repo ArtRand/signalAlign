@@ -78,29 +78,12 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
         # make the 2d read
         write_fasta(id=fast5, sequence=npRead.alignment_table_sequence, destination=temp_fasta)
 
-        # models
-        # template model
-        #if npRead.template_model_id == "template_median68pA.model":
-        #    default_template_model = "template_median68pA.model"
-        #else:
-        #    print("signalAlign - WARNING: found non-default template model", file=sys.stderr)
-        #    default_template_model = None
-
-        # complement model
-        #if npRead.complement_model_id == "complement_median68pA_pop2.model":
-        #    default_complement_model = "complement_median68pA_pop2.model"
-        #elif npRead.complement_model_id == "complement_median68pA_pop1.model":
-        #    default_complement_model = "complement_median68pA_pop1.model"
-        #else:
-        #    print("signalAlign - WARNING: found non-default complement model", file=sys.stderr)
-        #    default_complement_model = None
         if npRead.complement_model_id == "complement_median68pA_pop1.model":
             pop1_complement = True
         else:
             pop1_complement = False
         version = npRead.version
         npRead.close()
-        print("signalAlign - NanoporeRead version is: {}".format(version))
         return True, version, pop1_complement
     else:
         npRead.close()
@@ -972,7 +955,7 @@ class SignalAlignment(object):
         template_model_flag = "-T {} ".format(self.in_templateHmm)
         complement_model_flag = "-C {} ".format(self.in_complementHmm)
         print("signalAlign - NOTICE: template model {t} complement model {c}\n"
-              "".format(t=self.in_templateHmm, c=self.in_complementHmm))
+              "".format(t=self.in_templateHmm, c=self.in_complementHmm), file=sys.stderr)
 
         # reference sequences
         if self.forward_reference is not None or self.backward_reference is not None:

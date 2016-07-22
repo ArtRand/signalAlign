@@ -730,10 +730,6 @@ int main(int argc, char *argv[]) {
                                           forward, pA->contig1, tCoordinateShift,
                                           rCoordinateShift_t, templateAlignedPairs, template);
             } else {
-                //writePosteriorProbsFull(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_MATRIX,
-                //                        npRead->templateParams, npRead->templateEvents, R->getTemplateTargetSequence(R),
-                //                        forward, pA->contig1, sMt->type, tCoordinateShift, rCoordinateShift_t,
-                //                        templateAlignedPairs, template);
                 writePosteriorProbsFull(posteriorProbsFile, readLabel,
                                         sMt,
                                         npRead->templateParams, npRead->templateEvents,
@@ -771,11 +767,6 @@ int main(int argc, char *argv[]) {
                                           forward, pA->contig1, cCoordinateShift,
                                           rCoordinateShift_c, complementAlignedPairs, complement);
             } else {
-                //writePosteriorProbsFull(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_MATRIX,
-                //                        npRead->complementParams, npRead->complementEvents,
-                //                        R->getComplementTargetSequence(R), forward, pA->contig1,
-                //                        sMc->type, cCoordinateShift, rCoordinateShift_c,
-                //                        complementAlignedPairs, complement);
                 writePosteriorProbsFull(posteriorProbsFile, readLabel,
                                         sMc,
                                         npRead->complementParams, npRead->complementEvents,
