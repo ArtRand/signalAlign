@@ -460,7 +460,7 @@ int main(int argc, char *argv[]) {
     p->threshold = threshold;
     p->constraintDiagonalTrim = constraintTrim;
     p->diagonalExpansion = diagExpansion;
-    st_uglyf("contstructed pA\n");
+
     // HDP routines //
     // load HDPs
     NanoporeHDP *nHdpT, *nHdpC;
@@ -497,11 +497,11 @@ int main(int argc, char *argv[]) {
     } else {
         R = signalUtils_ReferenceSequenceConstructEmpty(pA);
     }
-    st_uglyf("constructed reference sequences\n");
+
     // Nanopore Read //
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
-    st_uglyf("Loaded nanoporeRead\n:");
+
     // constrain the event sequence to the positions given by the guide alignment
     Sequence *tEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->templateEvents,
                                                                       pA->start2, pA->end2,
@@ -510,7 +510,7 @@ int main(int argc, char *argv[]) {
     Sequence *cEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->complementEvents,
                                                                       pA->start2, pA->end2,
                                                                       npRead->complementEventMap);
-    st_uglyf("Constructed event sequences\n");
+
     // the aligned pairs start at (0,0) so we need to correct them based on the guide alignment later.
     // record the pre-zeroed alignment start and end coordinates here
     // for the events:
@@ -678,7 +678,7 @@ int main(int argc, char *argv[]) {
         }
 
         Hmm *complementExpectations = hmmContinuous_getExpectationsHmm(sMc, p->threshold, 0.001, 0.001);
-
+        
         getSignalExpectations(sMc, complementExpectations, cEventSequence, npRead->complementEventMap,
                               pA->start2,
                               R->getComplementTargetSequence(R),

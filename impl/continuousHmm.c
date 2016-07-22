@@ -516,7 +516,7 @@ static void hdpHmm_addToAssignment(HdpHmm *self, void *kmer, void *event) {
 
 static bool hdpHmm_checkAssignments(HdpHmm *hdpHmm) {
     int64_t nb_kmerAssignments = stList_length(hdpHmm->kmerAssignments);
-    int64_t nb_eventAssignments = stList_length(hdpHmm->kmerAssignments);
+    int64_t nb_eventAssignments = stList_length(hdpHmm->eventAssignments);
     return nb_eventAssignments == nb_kmerAssignments;
 }
 
@@ -618,7 +618,7 @@ void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
         for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
             // get the starting position in the kmer sequence
             char *kmer = stList_get(hdpHmm->kmerAssignments, i);
-            for (int64_t n = 0; n < KMER_LENGTH; n++) {
+            for (int64_t n = 0; n < hdpHmm->baseHmm.kmerLength; n++) {
                 fprintf(fileHandle, "%c", kmer[n]);
             }
             //fprintf(fileHandle, " "); // space

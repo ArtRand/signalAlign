@@ -227,7 +227,6 @@ int main(int argc, char *argv[]) {
     if ((templateLookupTable == NULL) || (complementLookupTable == NULL)) {
         st_errAbort("[buildHdpUtil] ERROR: Need lookup tables");
     }
-    st_uglyf("NOTICE kmer length %lld\n", kmerLength);
     printStartMessage(hdpType, alignmentsFile, templateHdpOutfile, complementHdpOutfile);
 
     // option for building from alignment

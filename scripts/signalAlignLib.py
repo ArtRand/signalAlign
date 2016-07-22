@@ -1097,6 +1097,28 @@ class SignalHmm(object):
         ]
         return
 
+    def check_header_line(self, line, expectations_file):
+        if len(line) != 4:
+            print("signalHmm.check_header_line - incorrect header (param line): {}".format(expectations_file), file=sys.stderr)
+            return False
+        if int(line[0]) != self.state_number:
+            print("signalHmm.check_header_line - state number error should be {exp} got {obs}"
+                  "".format(exp=self.state_number, obs=line[0]), file=sys.stderr)
+            return False
+        if int(line[1]) != self.alphabet_size:
+            print("signalHmm.check_header_line - alphabet size error incorrect parameters: {file}, line {line}"
+                  "".format(file=expectations_file, line=''.join(line)), file=sys.stderr)
+            return False
+        if line[2] != self.alphabet:
+            print("signalHmm.check_header_line - incorrect parameters: {file}, line {line}"
+                  "".format(file=expectations_file, line=''.join(line)), file=sys.stderr)
+            return False
+        if int(line[3]) != self.kmer_length:
+            print("signalHmm.check_header_line - incorrect parameters: {file}, line {line}"
+                  "".format(file=expectations_file, line=''.join(line)), file=sys.stderr)
+            return False
+        return True
+
     def load_model(self, model_file):
         # the model file has the format:
         # line 0: stateNumber \t alphabetSize \t alphabet \t kmerLength
@@ -1207,28 +1229,9 @@ class ContinuousPairHmm(SignalHmm):
 
         # line 0
         line = fH.readline().split()
-        if len(line) != 4:
-            print("cpHMM: check_file - incorrect header (param line): {}".format(expectations_file), file=sys.stderr)
-            fH.close()
-            return False
-        if int(line[0]) != self.state_number:
-            print("cpHMM: state number error should be {exp} got {obs}"
-                  "".format(exp=self.state_number, obs=line[0]), file=sys.stderr)
-            fH.close()
-            return False
-        if int(line[1]) != self.alphabet_size:
-            print("cpHMM: alphabet size error - incorrect parameters: {file}, line {line}"
-                  "".format(file=expectations_file, line=''.join(line)), file=sys.stderr)
-            fH.close()
-            return False
-        if line[2] != self.alphabet:
-            print("cpHMM: alphabet error - incorrect parameters: {file}, line {line}"
-                  "".format(file=expectations_file, line=''.join(line)), file=sys.stderr)
-            fH.close()
-            return False
-        if int(line[3]) != self.kmer_length:
-            print("cpHMM: kmer length error - incorrect parameters: {file}, line {line}"
-                  "".format(file=expectations_file, line=''.join(line)), file=sys.stderr)
+        header_line_check = self.check_header_line(line=line, expectations_file=expectations_file)
+
+        if header_line_check is False:
             fH.close()
             return False
 
@@ -1328,32 +1331,31 @@ class HdpSignalHmm(SignalHmm):
 
         fH = open(expectations_file, 'r')
 
-        # line 0: smType stateNumber, symbolSetSize
         # line 0
         line = fH.readline().split()
-        if len(line) != 4:
-            print("cpHMM: check_file - bad file (param line): {}".format(expectations_file), file=sys.stderr)
+        header_line_check = self.check_header_line(line=line, expectations_file=expectations_file)
+        if header_line_check is False:
             fH.close()
-            return
-        if line[0] != self.state_number or \
-                        int(line[1]) != self.alphabet_size or \
-                        line[2] != self.alphabet or \
-                        int(line[3]) != self.kmer_length:
-            print("cpHMM: check_file - bad file (Hmm params): {}".format(expectations_file), file=sys.stderr)
-            fH.close()
-            return
+            return False
 
         # line 1: transitions, likelihood
         line = map(float, fH.readline().split())
-
-        # check if valid file
         if len(line) != (len(self.transitions) + 1):
-            print("PYSENTINAL - problem with file {}".format(expectations_file), file=sys.stdout)
+            print("hdpHmm.add_expectations_file - problem with file {f} transitions line {l}, incorrect length"
+                  "".format(f=expectations_file, l=''.join(line)), file=sys.stdout)
             fH.close()
-            return
+            return False
 
         self.likelihood += line[-1]
         self.transitions_expectations = map(lambda x: sum(x), zip(self.transitions_expectations, line[0:-1]))
+
+        # line 2: event model
+        line = map(float, fH.readline().split())
+        if len(line) != self.symbol_set_size * NB_MODEL_PARAMS:
+            print("hdpHmm.add_expectations_file - problem with event model in file {}"
+                  "".format(expectations_file), file=sys.stderr)
+            fH.close()
+            return False
 
         # line 3: event assignments
         line = map(float, fH.readline().split())
@@ -1364,10 +1366,7 @@ class HdpSignalHmm(SignalHmm):
         self.kmer_assignments += line
 
         fH.close()
-
-        #assert (len(self.kmer_assignments) == self.number_of_assignments) and \
-        #       (len(self.event_assignments) == self.number_of_assignments), \
-        #    "trainModels - add_expectations_file: invalid number of assignments"
+        return True
 
     def reset_assignments(self):
         self.assignments_record.append(len(self.event_assignments))
