@@ -24,6 +24,8 @@ def parse_args():
     parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
                         help="Specify degenerate nucleotide options: "
                              "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
+    parser.add_argument('--kmer_length', '-k', action='store', dest='kmer_length', required=True, type=int,
+                        help="Kmer length of model used")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', default=0.0, type=float,
                         help='Minimum threshold aligned pairs to consider')
     parser.add_argument('-n', required=False, action='store', type=int, dest='n', default=100,
@@ -78,6 +80,7 @@ def main(args):
             "positions": positions,
             "degenerate_type": degenerate_enum(args.degenerate),
             "threshold": args.threshold,
+            "kmer_length": args.kmer_length,
         }
         #c = CallMethylation(**call_methyl_args)
         #c.write()
