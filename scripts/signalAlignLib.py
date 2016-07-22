@@ -66,37 +66,46 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
 
     # load MinION read
     npRead = NanoporeRead(fast5)
+
+    # only working with 2D reads right now
     if npRead.has2D_alignment_table is False:
         npRead.close()
-        return False, None, None
+        return False, None, False
+
     proceed = npRead.write_npRead(out_file=out_file)
+
     if proceed:
         # make the 2d read
         write_fasta(id=fast5, sequence=npRead.alignment_table_sequence, destination=temp_fasta)
 
         # models
         # template model
-        if npRead.template_model_id == "template_median68pA.model":
-            default_template_model = "template_median68pA.model"
-        else:
-            print("signalAlign - WARNING: found non-default template model", file=sys.stderr)
-            default_template_model = None
+        #if npRead.template_model_id == "template_median68pA.model":
+        #    default_template_model = "template_median68pA.model"
+        #else:
+        #    print("signalAlign - WARNING: found non-default template model", file=sys.stderr)
+        #    default_template_model = None
 
         # complement model
-        if npRead.complement_model_id == "complement_median68pA_pop2.model":
-            default_complement_model = "complement_median68pA_pop2.model"
-        elif npRead.complement_model_id == "complement_median68pA_pop1.model":
-            default_complement_model = "complement_median68pA_pop1.model"
+        #if npRead.complement_model_id == "complement_median68pA_pop2.model":
+        #    default_complement_model = "complement_median68pA_pop2.model"
+        #elif npRead.complement_model_id == "complement_median68pA_pop1.model":
+        #    default_complement_model = "complement_median68pA_pop1.model"
+        #else:
+        #    print("signalAlign - WARNING: found non-default complement model", file=sys.stderr)
+        #    default_complement_model = None
+        if npRead.complement_model_id == "complement_median68pA_pop1.model":
+            pop1_complement = True
         else:
-            print("signalAlign - WARNING: found non-default complement model", file=sys.stderr)
-            default_complement_model = None
-
+            pop1_complement = False
+        version = npRead.version
         npRead.close()
-        return True, default_template_model, default_complement_model
+        print("signalAlign - NanoporeRead version is: {}".format(version))
+        return True, version, pop1_complement
     else:
         npRead.close()
         print("problem making npRead for {fast5}".format(fast5=fast5), file=sys.stderr)
-        return False, None, None
+        return False, None, False
 
 
 def parse_substitution_file(substitution_file):
@@ -241,6 +250,38 @@ def exonerated_bwa(bwa_index, query, target_regions=None):
     return completeCigarString, strand
 
 
+def default_template_model_from_version(version):
+    supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4"]
+    assert version in supported_versions
+    version_index = supported_versions.index(version)
+
+    if version_index <= 2:
+        r7_3_default_template_model = "../models/testModel_template.model"
+        assert os.path.exists(r7_3_default_template_model), "Didn't find default template R7.3 model"
+        return r7_3_default_template_model
+    else:
+        r9_default_template_model = "../models/testModelR9_template.model"
+        assert os.path.exists(r9_default_template_model), "Didn't find default template R9 model"
+        return r9_default_template_model
+
+
+def default_complement_model_from_version(version, pop1_complement=False):
+    supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4"]
+    assert version in supported_versions
+    version_index = supported_versions.index(version)
+
+    if version_index <= 2:
+        r7_3_default_complement_model = "../models/testModel_complement.model" if not pop1_complement \
+            else "../models/testModelR9_complement_pop2.model"
+        assert os.path.exists(r7_3_default_complement_model), "Didn't find default complement R7.3 model"
+        return r7_3_default_complement_model
+    else:
+        r9_default_complement_model = "../models/testModelR9_complement.model"
+        assert os.path.exists(r9_default_complement_model), "Didn't find default complement R9 model"
+        return r9_default_complement_model
+
+
+
 def degenerate_enum(degenerate_request_string):
     degenerate_type = {
         "twoWay": 0,
@@ -378,7 +419,7 @@ class NanoporeRead(object):
             self.complement_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_complement/Fastq"][()].split()[2]
             return True
         else:
-            print("Unsupported Version (1.15.0, 1.19.0, and 1.22.2 supported)", file=sys.stdout)
+            print("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)", file=sys.stdout)
             return False
 
     def assemble_2d_sequence_from_table(self):
@@ -800,7 +841,7 @@ class NanoporeRead(object):
 
             return True
         else:
-            print("write_npRead: Procede was False", file=sys.stderr)
+            print("write_npRead: proceed was False", file=sys.stderr)
             return False
 
     def close(self):
@@ -869,9 +910,9 @@ class SignalAlignment(object):
         temp_2d_read = temp_folder.add_file_path("temp_2Dseq_{read}.fa".format(read=read_label))
 
         # make the npRead and fasta
-        success, def_template_model, def_complement_model = get_npRead_2dseq_and_models(fast5=self.in_fast5,
-                                                                                        npRead_path=temp_np_read,
-                                                                                        twod_read_path=temp_2d_read)
+        success, version, pop1_complement = get_npRead_2dseq_and_models(fast5=self.in_fast5,
+                                                                        npRead_path=temp_np_read,
+                                                                        twod_read_path=temp_2d_read)
 
         if success is False:
             print("file {file} does not have 2D or is corrupt".format(file=read_label), file=sys.stderr)
@@ -921,31 +962,17 @@ class SignalAlignment(object):
         # flags
 
         # input (match) models
-        r7_template_lookup_table = "../models/testModel_template.model"
-        r7_complement_lookup_table = "../models/testModel_complement.model" if def_complement_model else \
-            "../models/testModel_complement_pop1.model"
+        if self.in_templateHmm is None:
+            self.in_templateHmm = default_template_model_from_version(version=version)
+        if self.in_complementHmm is None:
+            self.in_complementHmm = default_complement_model_from_version(version=version,
+                                                                          pop1_complement=pop1_complement)
 
-        # screwing around with different R9 models
-        #r9_template_lookup_table = "../models/testModelR9_template.model"  # 'default' 6-mer template model
-        r9_template_lookup_table = "../models/testModelR9_5mer_template.model"  # 5-mer model
-
-        #r9_complement_lookup_table = "../models/testModelR9_complement.model"  # default 6-mer complement model
-        #r9_complement_lookup_table = "../models/testModelR9_complement_pop2.model"  # extra 6-mer model for complement
-        r9_complement_lookup_table = "../models/testModelR9_5mer_complement.model"  # default 5-mer complement model
-
-        if def_template_model is not None:
-            assert (os.path.exists(r7_template_lookup_table)), "Didn't find default template look-up table"
-            template_model_flag = "-T {t_model} ".format(t_model=r7_template_lookup_table)
-        else:
-            assert(os.path.exists(r9_template_lookup_table)), "Didn't find R9 look-up table"
-            template_model_flag = "-T {t_model} ".format(t_model=r9_template_lookup_table)
-
-        if def_complement_model is not None:
-            assert (os.path.exists(r7_complement_lookup_table)), "Didn't find complement look-up table"
-            complement_model_flag = "-C {c_model} ".format(c_model=r7_complement_lookup_table)
-        else:
-            assert(os.path.exists(r9_complement_lookup_table)), "Didn't find R9 complement look-up table"
-            complement_model_flag = "-C {c_model} ".format(c_model=r9_complement_lookup_table)
+        assert self.in_templateHmm is not None and self.in_complementHmm is not None
+        template_model_flag = "-T {} ".format(self.in_templateHmm)
+        complement_model_flag = "-C {} ".format(self.in_complementHmm)
+        print("signalAlign - NOTICE: template model {t} complement model {c}\n"
+              "".format(t=self.in_templateHmm, c=self.in_complementHmm))
 
         # reference sequences
         if self.forward_reference is not None or self.backward_reference is not None:
@@ -961,16 +988,6 @@ class SignalAlignment(object):
             forward_ref_flag = ""
             backward_ref_flag = ""
             error_correct_ref_path = "-p {path}".format(path=self.path_to_EC_refs)
-
-        # input HMMs
-        if self.in_templateHmm is not None:
-            template_hmm_flag = "-y {hmm_loc} ".format(hmm_loc=self.in_templateHmm)
-        else:
-            template_hmm_flag = ""
-        if self.in_complementHmm is not None:
-            complement_hmm_flag = "-z {hmm_loc} ".format(hmm_loc=self.in_complementHmm)
-        else:
-            complement_hmm_flag = ""
 
         # input HDPs
         if (self.in_templateHdp is not None) and (self.in_complementHdp is not None):
@@ -1021,31 +1038,31 @@ class SignalAlignment(object):
 
             command = \
                 "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref}{eC} -q {npRead} " \
-                "{t_model}{c_model}{t_hmm}{c_hmm}{thresh} {expansion}{trim} {hdp}-L {readLabel} " \
+                "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} " \
                 "-t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag,
                         f_ref=forward_ref_flag, b_ref=backward_ref_flag,
-                        npRead=temp_np_read, t_hmm=template_hmm_flag, readLabel=read_label,
-                        c_hmm=complement_hmm_flag, templateExpectations=template_expectations_file_path, hdp=hdp_flags,
+                        npRead=temp_np_read, readLabel=read_label,
+                        templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag, degen=degenerate_flag, sparse=sparse_flag, eC=error_correct_ref_path)
         else:
             command = \
                 "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref}{eC} -q {npRead} " \
-                "{t_model}{c_model}{t_hmm}{c_hmm}{thresh}{expansion}{trim} " \
+                "{t_model}{c_model}{thresh}{expansion}{trim} " \
                 "-u {posteriors} {hdp}-L {readLabel}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=sparse_flag,
                         f_ref=forward_ref_flag, b_ref=backward_ref_flag, eC=error_correct_ref_path,
-                        readLabel=read_label, npRead=temp_np_read, t_hmm=template_hmm_flag,
-                        t_model=template_model_flag, c_model=complement_model_flag, c_hmm=complement_hmm_flag,
+                        readLabel=read_label, npRead=temp_np_read,
+                        t_model=template_model_flag, c_model=complement_model_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag)
 
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
-        #temp_folder.remove_folder()
+        temp_folder.remove_folder()
         return True
 
 
@@ -1118,11 +1135,10 @@ class SignalHmm(object):
         self.alphabet_size = int(line[1])
         self.alphabet = line[2]
         self.kmer_length = int(line[3])
-        print("Loaded HMM has alphabet size {aS} alphabet {al} and kmer length {kl}"
-              "".format(aS=self.alphabet_size, al=self.alphabet, kl=self.kmer_length))
         self.symbol_set_size = self.alphabet_size**self.kmer_length
         assert self.symbol_set_size > 0, "signalHmm.load_model - Got 0 for symbol_set_size"
-        assert self.symbol_set_size < 6**6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size"
+        assert self.symbol_set_size <= 6**6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
+                                             "".format(self.symbol_set_size)
 
         line = map(float, fH.readline().split())
         assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
@@ -1168,7 +1184,7 @@ class SignalHmm(object):
 
         # line 2 Event Model
         for k in xrange(self.symbol_set_size):
-            f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}"
+            f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
                     "".format(level_mean=self.event_model["means"][k], level_sd=self.event_model["SDs"][k],
                               noise_mean=self.event_model["noise_means"][k], noise_sd=self.event_model["noise_SDs"][k],
                               noise_lambda=self.event_model["noise_lambdas"][k]))
@@ -1202,23 +1218,36 @@ class ContinuousPairHmm(SignalHmm):
         # line 5: observed 1 per kmer \n
         if not os.path.exists(expectations_file) or os.stat(expectations_file).st_size == 0:
             print("Empty or missing file {}".format(expectations_file))
-            return
+            return False
 
         fH = open(expectations_file, 'r')
 
         # line 0
         line = fH.readline().split()
         if len(line) != 4:
-            print("cpHMM: check_file - bad file (param line): {}".format(expectations_file), file=sys.stderr)
+            print("cpHMM: check_file - incorrect header (param line): {}".format(expectations_file), file=sys.stderr)
             fH.close()
-            return
-        if line[0] != self.state_number or \
-                        int(line[1]) != self.alphabet_size or \
-                        line[2] != self.alphabet or \
-                        int(line[3]) != self.kmer_length:
-            print("cpHMM: check_file - bad file (Hmm params): {}".format(expectations_file), file=sys.stderr)
+            return False
+        if int(line[0]) != self.state_number:
+            print("cpHMM: state number error should be {exp} got {obs}"
+                  "".format(exp=self.state_number, obs=line[0]), file=sys.stderr)
             fH.close()
-            return
+            return False
+        if int(line[1]) != self.alphabet_size:
+            print("cpHMM: alphabet size error - incorrect parameters: {file}, line {line}"
+                  "".format(file=expectations_file, line=''.join(line)), file=sys.stderr)
+            fH.close()
+            return False
+        if line[2] != self.alphabet:
+            print("cpHMM: alphabet error - incorrect parameters: {file}, line {line}"
+                  "".format(file=expectations_file, line=''.join(line)), file=sys.stderr)
+            fH.close()
+            return False
+        if int(line[3]) != self.kmer_length:
+            print("cpHMM: kmer length error - incorrect parameters: {file}, line {line}"
+                  "".format(file=expectations_file, line=''.join(line)), file=sys.stderr)
+            fH.close()
+            return False
 
         # line 1: transitions, likelihood
         line = map(float, fH.readline().split())
@@ -1227,7 +1256,7 @@ class ContinuousPairHmm(SignalHmm):
             print("cpHMM: check_file - bad file (transitions expectations): {}".format(expectations_file),
                   file=sys.stderr)
             fH.close()
-            return
+            return False
 
         self.likelihood += line[-1]
         self.transitions_expectations = map(lambda x: sum(x), zip(self.transitions_expectations, line[0:-1]))
@@ -1237,14 +1266,14 @@ class ContinuousPairHmm(SignalHmm):
         if len(line) != self.symbol_set_size * NB_MODEL_PARAMS:
             print("cpHMM: check_file - bad file (event model): {}".format(expectations_file), file=sys.stderr)
             fH.close()
-            return
+            return False
 
         # line 3 event expectations [E_mean, E_sd]
         line = map(float, fH.readline().split())
         if len(line) != self.symbol_set_size * NORM_DIST_PARAMS:
             print("cpHMM: check_file - bad file (event expectations): {}".format(expectations_file), file=sys.stderr)
             fH.close()
-            return
+            return False
 
         self.mean_expectations = [i + j for i, j in izip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
         self.sd_expectations = [i + j for i, j in izip(self.sd_expectations, line[1::NORM_DIST_PARAMS])]
@@ -1254,7 +1283,7 @@ class ContinuousPairHmm(SignalHmm):
         if len(line) != self.symbol_set_size:
             print("cpHMM: check_file - bad file (posteriors): {}".format(expectations_file), file=sys.stderr)
             fH.close()
-            return
+            return False
 
         self.posteriors = map(lambda x: sum(x), zip(self.posteriors, line))
 
@@ -1262,11 +1291,12 @@ class ContinuousPairHmm(SignalHmm):
         if len(line) != self.symbol_set_size:
             print("cpHMM: check_file - bad file (observations): {}".format(expectations_file), file=sys.stderr)
             fH.close()
-            return
+            return False
 
         self.observed = [any(b) for b in zip(self.observed, line)]
 
         fH.close()
+        return True
 
     def normalize(self, update_transitions, update_emissions):
         # normalize transitions expectations
@@ -1357,7 +1387,7 @@ class HdpSignalHmm(SignalHmm):
         #    "trainModels - add_expectations_file: invalid number of assignments"
 
     def reset_assignments(self):
-        self.assignments_record.append(self.number_of_assignments)
+        self.assignments_record.append(len(self.event_assignments))
         self.event_assignments = []
         self.kmer_assignments = []
 

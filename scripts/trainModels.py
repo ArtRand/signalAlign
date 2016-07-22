@@ -151,9 +151,12 @@ def add_and_norm_expectations(path, files, model, hmm_file, update_transitions=F
     files_with_problems = 0
     for f in files:
         try:
-            model.add_expectations_file(path + f)
+            success = model.add_expectations_file(path + f)
             os.remove(path + f)
-            files_added_successfully += 1
+            if success:
+                files_added_successfully += 1
+            else:
+                files_with_problems += 1
         except Exception as e:
             print("Problem adding expectations file {file} got error {e}".format(file=path + f, e=e),
                   file=sys.stderr)
@@ -277,12 +280,9 @@ def main(args):
 
     trained_models = [template_hmm, complement_hmm]
 
-    default_template_hmm = "../models/default_template.hmm"
-    default_complement_hmm = "../models/default_complement.hmm"
+    untrained_models = [template_model_path, complement_model_path]
 
-    default_models = [default_template_hmm, default_complement_hmm]
-
-    for default_model, trained_model in zip(default_models, trained_models):
+    for default_model, trained_model in zip(untrained_models, trained_models):
         assert os.path.exists(default_model), "Didn't find default model {}".format(default_model)
         copyfile(default_model, trained_model)
         assert os.path.exists(trained_model), "Problem copying default model to {}".format(trained_model)
@@ -324,9 +324,9 @@ def main(args):
                 "target_regions": None,
                 "degenerate": None,
             }
-            #alignment = SignalAlignment(**alignment_args)
-            #alignment.run(get_expectations=True)
-            work_queue.put(alignment_args)
+            alignment = SignalAlignment(**alignment_args)
+            alignment.run(get_expectations=True)
+            #work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))

@@ -182,7 +182,7 @@ def main(args):
     if nb_files < len(fast5s):
         shuffle(fast5s)
         fast5s = fast5s[:nb_files]
-    print("Got {} files to align to".format(len(fast5s)), file=sys.stdout)
+    print("Got {} files to align".format(len(fast5s)), file=sys.stdout)
     for fast5 in fast5s:
         alignment_args = {
             "forward_reference": plus_strand_sequence,
@@ -204,9 +204,9 @@ def main(args):
             "target_regions": target_regions,
             "degenerate": degenerate_enum(args.degenerate),
         }
-        #alignment = SignalAlignment(**alignment_args)
-        #alignment.run()
-        work_queue.put(alignment_args)
+        alignment = SignalAlignment(**alignment_args)
+        alignment.run()
+        #work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))

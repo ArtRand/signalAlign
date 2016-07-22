@@ -91,8 +91,10 @@ StateMachine *loadR9DescaledStateMachine3(NanoporeRead *npRead) {
 
 StateMachine *load5merR9DescaledStateMachine3(NanoporeRead *npRead) {
     // load stateMachine from model file
-    char *templateModelFile = stString_print("../../signalAlign/models/testModelR9_5mer_template.model");
+    char *templateModelFile = stString_print("../../signalAlign/models/testModelR9_5mer_acegot_template.model");
     StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams, FALSE);
+    st_uglyf("Using model %s, stateMachine kmerLength %lld, alphabet %s, alphabetSize %lld\n",
+             templateModelFile, sM->kmerLength, sM->alphabet, sM->alphabetSize);
     free(templateModelFile);
     return sM;
 }
@@ -278,8 +280,11 @@ static void test_models(CuTest *testCase) {
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_template.model"));
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_complement.model"));
 
-    CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_template.model"));
-    CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_complement.model"));
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_acgt_template.model"));
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_acgt_complement.model"));
+
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_acegot_template.model"));
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_acegot_complement.model"));
 
     StateMachine *sM = getStateMachine3("../models/testModel_template.model");
     test_stateMachineModel(testCase, sM);
@@ -301,11 +306,19 @@ static void test_models(CuTest *testCase) {
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 
-    sM = getStateMachine3("../models/testModelR9_5mer_template.model");
+    sM = getStateMachine3("../models/testModelR9_5mer_acgt_template.model");
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 
-    sM = getStateMachine3("../models/testModelR9_5mer_complement.model");
+    sM = getStateMachine3("../models/testModelR9_5mer_acgt_complement.model");
+    test_stateMachineModel(testCase, sM);
+    stateMachine_destruct(sM);
+
+    sM = getStateMachine3("../models/testModelR9_5mer_acegot_template.model");
+    test_stateMachineModel(testCase, sM);
+    stateMachine_destruct(sM);
+
+    sM = getStateMachine3("../models/testModelR9_5mer_acegot_complement.model");
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 }
@@ -572,7 +585,7 @@ static void test_sm3_5merDiagonalDPCalculations(CuTest *testCase) {
             94.337668063878, 1.9731952395105, 0.0571, 0.67,//GACAT 6
     };
     // make stateMachine, forward and reverse DP matrices and banding stuff
-    char *modelFile = stString_print("../../signalAlign/models/testModelR9_5mer_template.model");
+    char *modelFile = stString_print("../../signalAlign/models/testModelR9_5mer_acgt_template.model");
     StateMachine *sM = getStateMachine3(modelFile);
 
     // make variables for the (corrected) length of the sequences
