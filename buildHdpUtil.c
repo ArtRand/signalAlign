@@ -38,8 +38,8 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
 
 int main(int argc, char *argv[]) {
     int64_t hdpType = -1;
-    char *templateLookupTable = stString_print("../models/template_median68pA.model");
-    char *complementLookupTable = stString_print("../models/complement_median68pA_pop2.model");
+    char *templateLookupTable = NULL;
+    char *complementLookupTable = NULL;
     char *alignmentsFile = NULL;
     char *templateExpectationsFile = NULL;
     char *complementExpectationsFile = NULL;
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
                 {"help",                        no_argument,        0,  'h'},
                 {"verbose",                     no_argument,        0,  'o'},
                 {"HdpType",                     required_argument,  0,  'p'},
-                {"tempalteLookupTable",         required_argument,  0,  'T'},
+                {"templateLookupTable",         required_argument,  0,  'T'},
                 {"complementLookupTable",       required_argument,  0,  'C'},
                 {"alignments",                  required_argument,  0,  'l'},
                 {"templateExpectations",        required_argument,  0,  'E'},
@@ -216,6 +216,10 @@ int main(int argc, char *argv[]) {
 
     if ((templateHdpOutfile == NULL) || (complementHdpOutfile == NULL)) {
         st_errAbort("[buildHdpUtil] ERROR: Need to specify where to put the HDP files");
+    }
+
+    if ((templateLookupTable == NULL) || (complementLookupTable == NULL)) {
+        st_errAbort("[buildHdpUtil] ERROR: Need lookup tables");
     }
 
     printStartMessage(hdpType, alignmentsFile, templateHdpOutfile, complementHdpOutfile);
