@@ -104,7 +104,7 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 }
 
 void writePosteriorProbsSparse(char *posteriorProbsFile, char *readFile, char *target, bool forward, char *contig,
-                               int64_t eventSequenceOffset, int64_t referenceSequenceOffset,
+                               int64_t eventSequenceOffset, int64_t referenceSequenceOffset, int64_t kmerLength,
                                stList *alignedPairs, Strand strand) {
     /// / label for tsv output
     char *strandLabel;
@@ -132,8 +132,8 @@ void writePosteriorProbsSparse(char *posteriorProbsFile, char *readFile, char *t
             x_adj = stIntTuple_get(aPair, 1) + referenceSequenceOffset;
         }
         if ((strand == complement && forward) || (strand == template && (!forward))) {
-            int64_t refLength = (int64_t)strlen(target);
-            int64_t refLengthInEvents = refLength - KMER_LENGTH;
+            int64_t refLength = (int64_t )strlen(target);
+            int64_t refLengthInEvents = refLength - kmerLength;
             x_adj = refLengthInEvents - (x_i + (refLength - referenceSequenceOffset));
         }
         int64_t y = stIntTuple_get(aPair, 2) + eventSequenceOffset;             // event index
@@ -141,8 +141,8 @@ void writePosteriorProbsSparse(char *posteriorProbsFile, char *readFile, char *t
         char *pathKmer = (char *)stIntTuple_get(aPair, 3);
 
         // make the kmer string at the target index,
-        char *k_i = st_malloc(KMER_LENGTH * sizeof(char));
-        for (int64_t k = 0; k < KMER_LENGTH; k++) {
+        char *k_i = st_malloc(kmerLength * sizeof(char));
+        for (int64_t k = 0; k < kmerLength; k++) {
             k_i[k] = *(target + (x_i + k));
         }
 
@@ -569,9 +569,12 @@ int main(int argc, char *argv[]) {
 
             // write to file
             if (sparseOutput) {
-                writePosteriorProbsSparse(perIterationOutputFile, readLabel, R->getTemplateTargetSequence(R),
-                                          forward, pA->contig1, tCoordinateShift,
-                                          rCoordinateShift_t, templateAlignedPairs, template);
+                writePosteriorProbsSparse(perIterationOutputFile, readLabel,
+                                          R->getTemplateTargetSequence(R),
+                                          forward, pA->contig1,
+                                          tCoordinateShift, rCoordinateShift_t,
+                                          sMt->kmerLength,
+                                          templateAlignedPairs, template);
             } else {
                 writePosteriorProbsFull(perIterationOutputFile, readLabel,
                                         sMt,
@@ -598,9 +601,13 @@ int main(int argc, char *argv[]) {
                     readLabel, i, stList_length(complementAlignedPairs), complementPosteriorScore);
 
             if (sparseOutput) {
-                writePosteriorProbsSparse(perIterationOutputFile, readLabel, R->getComplementTargetSequence(R),
-                                          forward, pA->contig1, cCoordinateShift,
-                                          rCoordinateShift_c, complementAlignedPairs, complement);
+                writePosteriorProbsSparse(perIterationOutputFile,
+                                          readLabel,
+                                          R->getComplementTargetSequence(R),
+                                          forward, pA->contig1,
+                                          cCoordinateShift, rCoordinateShift_c,
+                                          sMc->kmerLength,
+                                          complementAlignedPairs, complement);
             } else {
                 writePosteriorProbsFull(perIterationOutputFile, readLabel,
                                         sMc,
@@ -726,9 +733,12 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             if (sparseOutput) {
-                writePosteriorProbsSparse(posteriorProbsFile, readLabel, R->getTemplateTargetSequence(R),
-                                          forward, pA->contig1, tCoordinateShift,
-                                          rCoordinateShift_t, templateAlignedPairs, template);
+                writePosteriorProbsSparse(posteriorProbsFile, readLabel,
+                                          R->getTemplateTargetSequence(R),
+                                          forward, pA->contig1,
+                                          tCoordinateShift, rCoordinateShift_t,
+                                          sMt->kmerLength,
+                                          templateAlignedPairs, template);
             } else {
                 writePosteriorProbsFull(posteriorProbsFile, readLabel,
                                         sMt,
@@ -763,9 +773,12 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             if (sparseOutput) {
-                writePosteriorProbsSparse(posteriorProbsFile, readLabel, R->getComplementTargetSequence(R),
-                                          forward, pA->contig1, cCoordinateShift,
-                                          rCoordinateShift_c, complementAlignedPairs, complement);
+                writePosteriorProbsSparse(posteriorProbsFile, readLabel,
+                                          R->getComplementTargetSequence(R),
+                                          forward, pA->contig1,
+                                          cCoordinateShift, rCoordinateShift_c,
+                                          sMc->kmerLength,
+                                          complementAlignedPairs, complement);
             } else {
                 writePosteriorProbsFull(posteriorProbsFile, readLabel,
                                         sMc,
