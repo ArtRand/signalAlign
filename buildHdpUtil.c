@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
                 {0, 0, 0, 0} };
 
         int option_index = 0;
-        key = getopt_long(argc, argv, "h:o:p:T:C:l:E:W:v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
+        key = getopt_long(argc, argv, "h:a:o:p:T:C:l:E:W:v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
                           long_options, &option_index);
         if (key == -1) {
             //usage();
@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
     if ((templateLookupTable == NULL) || (complementLookupTable == NULL)) {
         st_errAbort("[buildHdpUtil] ERROR: Need lookup tables");
     }
-
+    st_uglyf("NOTICE kmer length %lld\n", kmerLength);
     printStartMessage(hdpType, alignmentsFile, templateHdpOutfile, complementHdpOutfile);
 
     // option for building from alignment
