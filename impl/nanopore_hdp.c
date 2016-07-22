@@ -1290,7 +1290,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kme
  {
     {
         fprintf(stderr, "Updating Template HDP from alignments...\n");
-        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile, kmerLength
+        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile, kmerLength,
                                                         baseGamma, middleGamma, leafGamma,
                                                         baseGammaAlpha, baseGammaBeta,
                                                         middleGammaAlpha, middleGammaBeta,
