@@ -1379,3 +1379,4 @@ class HdpSignalHmm(SignalHmm):
         if update_transitions is True:
             for i in xrange(self.state_number**2):
                 self.transitions[i] = self.transitions_expectations[i]
+        self.normalized = True
