@@ -151,7 +151,7 @@ NanoporeHDP* group_multiset_hdp_model_2(const char* alphabet, int64_t* char_grou
 void serialize_nhdp(NanoporeHDP* nhdp, const char* filepath);
 NanoporeHDP* deserialize_nhdp(const char* filepath);
 
-void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
+void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kmerLength,
                                                const char *templateModelFile, const char* complementModelFile,
                                                const char *alignments,
                                                const char *templateHDP, const char *complementHDP,

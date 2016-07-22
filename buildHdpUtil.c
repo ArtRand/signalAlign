@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     char *templateHdpOutfile = NULL;
     char *complementHdpOutfile = NULL;
 
-    int64_t nbSamples, burnIn, thinning, samplingGridLength, j;
+    int64_t nbSamples, burnIn, thinning, samplingGridLength, kmerLength, j;
     bool verbose = FALSE;
 
     double baseGamma = NULL_HYPERPARAMETER;
@@ -69,6 +69,7 @@ int main(int argc, char *argv[]) {
         static struct option long_options[] = {
                 {"help",                        no_argument,        0,  'h'},
                 {"verbose",                     no_argument,        0,  'o'},
+                {"kmerLength",                  required_argument,  0,  'a'},
                 {"HdpType",                     required_argument,  0,  'p'},
                 {"templateLookupTable",         required_argument,  0,  'T'},
                 {"complementLookupTable",       required_argument,  0,  'C'},
@@ -105,6 +106,11 @@ int main(int argc, char *argv[]) {
             case 'h':
                 usage();
                 return 1;
+            case 'a':
+                j = sscanf(optarg, "%" PRIi64 "", &kmerLength);
+                assert(j == 1);
+                assert(kmerLength > 0);
+                break;
             case 'p':
                 j = sscanf(optarg, "%" PRIi64 "", &hdpType);
                 assert (j == 1);
@@ -230,7 +236,8 @@ int main(int argc, char *argv[]) {
             st_errAbort("Invalid HDP type");
         }
         NanoporeHdpType type = (NanoporeHdpType) hdpType;
-        nanoporeHdp_buildNanoporeHdpFromAlignment(type, templateLookupTable, complementLookupTable, alignmentsFile,
+        nanoporeHdp_buildNanoporeHdpFromAlignment(type, kmerLength,
+                                                  templateLookupTable, complementLookupTable, alignmentsFile,
                                                   templateHdpOutfile, complementHdpOutfile,
                                                   nbSamples, burnIn, thinning, verbose,
                                                   baseGamma, middleGamma, leafGamma,

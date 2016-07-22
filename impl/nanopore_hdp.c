@@ -118,8 +118,8 @@ void finalize_nhdp_distributions(NanoporeHDP* nhdp) {
 void normal_inverse_gamma_params_from_minION(const char* model_filepath, double* mu_out, double* nu_out,
                                              double* alpha_out, double* beta_out) {
     // model format:
-    // alphabetSize \t alphabet \t kmerSize
-    // correlation coefficient \t eventModel..[level_mean, level_stdv, noise_mean, noise_stdv, noise_lambda]
+    // stateNumber \t alphabetSize \t alphabet \t kmerSize
+    // [level_mean, level_stdv, noise_mean, noise_stdv, noise_lambda]
     FILE* model_file = fopen(model_filepath, "r");
     
     char* line = stFile_getLineFromFile(model_file);
@@ -1125,7 +1125,7 @@ static void nanoporeHdp_checkTwoLevelPriorParameters(double baseGammaAlpha, doub
 }
 
 
-static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile,
+static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile, int64_t kmerLength,
                                                double baseGamma, double middleGamma, double leafGamma,
                                                double baseGammaAlpha, double baseGammaBeta,
                                                double middleGammaAlpha, double middleGammaBeta,
@@ -1274,7 +1274,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
     }
 }
 
-void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
+void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kmerLength,
                                                const char *templateModelFile, const char* complementModelFile,
                                                const char *alignments,
                                                const char *templateHDP, const char *complementHDP,
@@ -1290,7 +1290,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
  {
     {
         fprintf(stderr, "Updating Template HDP from alignments...\n");
-        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile,
+        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile, kmerLength
                                                         baseGamma, middleGamma, leafGamma,
                                                         baseGammaAlpha, baseGammaBeta,
                                                         middleGammaAlpha, middleGammaBeta,
@@ -1311,7 +1311,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
 #pragma omp section
     {
         fprintf(stderr, "Updating Complement HDP from alignments...\n");
-        NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile,
+        NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile, kmerLength,
                                                         baseGamma, middleGamma, leafGamma,
                                                         baseGammaAlpha, baseGammaBeta,
                                                         middleGammaAlpha, middleGammaBeta,
