@@ -792,6 +792,34 @@ static void test_stateMachine3_getAlignedPairsWithBanding(CuTest *testCase) {
     stateMachine_destruct(sMdescaled);
 }
 
+static void test_sm3Hdp_setModelToHdpExpectedValues(CuTest *testCase) {
+    NanoporeRead *npRead = loadTestNanoporeRead();
+    char *modelFile = stString_print("../../signalAlign/models/testModelR9_template.model");
+    NanoporeHDP *nHdp = deserialize_nhdp("../models/templateSingleLevelFixed.nhdp");
+    StateMachine *sM = getHdpStateMachine(nHdp, modelFile, npRead->templateParams);
+    free(modelFile);
+
+    stateMachine3_setModelToHdpExpectedValues(sM, nHdp);
+
+    stList *kmers = path_listPotentialKmers(nHdp->kmer_length, nHdp->alphabet_size, nHdp->alphabet);
+    for (int64_t i = 0; i < stList_length(kmers); i++) {
+        char *thisKmer = (char *)stList_get(kmers, i);
+        int64_t kmerIndex = kmer_id(thisKmer, sM->alphabet, sM->alphabetSize, sM->kmerLength);
+        int64_t meanIdx = i * MODEL_PARAMS;
+        int64_t sdIdx = i * MODEL_PARAMS + 1;
+        bool isObserved = hdp_check_for_observed(nHdp->hdp, kmerIndex);
+        if (isObserved) {
+            double hdp_Emean = kmer_distr_expected_val(nHdp, thisKmer);
+            double hdp_Esd = sqrt(kmer_distr_variance(nHdp, thisKmer));
+            double sM_expected = sM->EMISSION_MATCH_MATRIX[meanIdx];
+            double sM_expected_sd = sM->EMISSION_MATCH_MATRIX[sdIdx];
+            CuAssertDblEquals(testCase, hdp_Emean, sM_expected, 0.00001);
+            CuAssertDblEquals(testCase, hdp_Esd, sM_expected_sd, 0.00001);
+        }
+    }
+    stateMachine_destruct(sM);
+}
+
 static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     NanoporeRead *npRead = loadTestNanoporeRead();
     // this is a hack for this test so that I don't have to load the 200MB hdp file
@@ -1226,6 +1254,7 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
 CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
+
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
@@ -1239,11 +1268,13 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_r9StateMachineWithBanding);
     SUITE_ADD_TEST(suite, test_r9_5merModel);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_setModelToHdpExpectedValues);
     SUITE_ADD_TEST(suite, test_DegenerateNucleotides);
     SUITE_ADD_TEST(suite, test_makeAndCheckModels);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     SUITE_ADD_TEST(suite, test_hdpHmm_emTransitions);
+
     return suite;
 }

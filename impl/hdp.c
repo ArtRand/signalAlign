@@ -115,6 +115,10 @@ bool is_sampling_finalized(HierarchicalDirichletProcess* hdp) {
     return hdp->splines_finalized;
 }
 
+bool hdp_check_for_observed(HierarchicalDirichletProcess *hdp, int64_t kmerIndex) {
+    return hdp->dps[kmerIndex]->observed;
+}
+
 int64_t get_num_dir_proc(HierarchicalDirichletProcess* hdp) {
     return hdp->num_dps;
 }

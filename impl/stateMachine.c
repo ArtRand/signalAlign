@@ -1156,15 +1156,34 @@ void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
 }
 */
 
-static void stateMachine3_setModelToHdpExpectedValues(StateMachine *sM, NanoporeHDP *nhdp) {
+void stateMachine3_setModelToHdpExpectedValues(StateMachine *sM, NanoporeHDP *nhdp) {
     // get all the kmers that the HDP has data for
+    if (strcmp(sM->alphabet, nhdp->alphabet) != 0) {
+        st_errAbort("stateMachine3_setModelToHdpExpectedValues: "
+                            "This Nanopore Hdp and stateMachine have different alphabets\n");
+    }
+    if (sM->alphabetSize != nhdp->alphabet_size) {
+        st_errAbort("stateMachine3_setModelToHdpExpectedValues: StateMachine alphabet size and Nanopore HDP"
+                            "alphabet size aren't the same");
+    }
+    if (sM->kmerLength != nhdp->kmer_length) {
+        st_errAbort("stateMachine3_setModelToHdpExpectedValues: StateMachine kmer length is not the same as "
+                            "NanoporeHdp kmer length");
+    }
+
     stList *kmers = path_listPotentialKmers(nhdp->kmer_length, nhdp->alphabet_size, nhdp->alphabet);
     for (int64_t i = 0; i < stList_length(kmers); i++) {
-        int64_t kmerIndex = emissions_discrete_getKmerIndexFromKmer(stList_get(kmers, i));
-        int64_t meanIndex = 1 + (kmerIndex * MODEL_PARAMS);
-        int64_t sdIndex = 1 + (kmerIndex * MODEL_PARAMS + 1);
-        sM->EMISSION_MATCH_MATRIX[meanIndex] = kmer_distr_expected_val(nhdp, stList_get(kmers, i));
-        sM->EMISSION_MATCH_MATRIX[sdIndex] = sqrt(kmer_distr_variance(nhdp, stList_get(kmers, i)));
+        char *kmer = (char *)stList_get(kmers, i);
+        int64_t kmerIndex = kmer_id(kmer, sM->alphabet, sM->alphabetSize, sM->kmerLength);
+        int64_t meanIndex = kmerIndex * MODEL_PARAMS;
+        int64_t sdIndex = kmerIndex * MODEL_PARAMS + 1;
+        bool isObs = hdp_check_for_observed(nhdp->hdp, kmerIndex);
+        if (isObs) {
+            double newMean = dir_proc_expected_val(nhdp->hdp, kmerIndex);
+            double newSd = sqrt(dir_proc_variance(nhdp->hdp, kmerIndex));
+            sM->EMISSION_MATCH_MATRIX[meanIndex] = newMean;
+            sM->EMISSION_MATCH_MATRIX[sdIndex] = newSd;
+        }
     }
 }
 

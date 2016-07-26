@@ -1222,7 +1222,7 @@ class ContinuousPairHmm(SignalHmm):
         # line 4: posteriors 1 per kmer \n
         # line 5: observed 1 per kmer \n
         if not os.path.exists(expectations_file) or os.stat(expectations_file).st_size == 0:
-            print("Empty or missing file {}".format(expectations_file))
+            print("Empty or missing file {}".format(expectations_file), file=sys.stderr)
             return False
 
         fH = open(expectations_file, 'r')
