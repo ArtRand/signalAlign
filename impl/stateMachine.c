@@ -1658,6 +1658,9 @@ StateMachine *getHdpStateMachine(NanoporeHDP *hdp, const char *modelFile, Nanopo
     sM->shift = npp.shift;
     sM->var = npp.var;
 
+    // set the level_mean table to the expected value from the HDP
+    stateMachine3_setModelToHdpExpectedValues(sM, hdp);
+
     return sM;
 }
 
