@@ -51,6 +51,8 @@ def parse_args():
                         default=500, type=int, help="maximum number of reads to align")
     parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument('--ambig_char', '-X', action='store', required=False, default="X", type=str, dest='ambig_char',
+                        help="Character to substitute at positions, default is 'X'.")
     parser.add_argument('--sparse_output', '-s', action='store_true', default=False, dest='sparse',
                         help="flag, sparse output")
     parser.add_argument('--error_correct', action='store_true', default=False, required=False,
@@ -152,7 +154,8 @@ def main(args):
                                              substitution_file=args.substitution_file,
                                              sequence_outfile=plus_strand_sequence,
                                              rc_sequence_outfile=minus_strand_sequence,
-                                             degenerate_type=args.degenerate)
+                                             degenerate_type=args.degenerate,
+                                             ambig_char=args.ambig_char)
         else:
             make_temp_sequence(fasta=args.ref, sequence_outfile=plus_strand_sequence,
                                rc_sequence_outfile=minus_strand_sequence)

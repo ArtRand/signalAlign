@@ -68,11 +68,15 @@ def parse_args():
     parser.add_argument('--min_assignments', action='store', type=int, default=30000, dest='min_assignments',
                         help="Do not initiate Gibbs sampling unless this many assignments have been accumulated")
     # only supervised training enabled right now
-    #parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
-    #                    help="Specify degenerate nucleotide options: "
-    #                         "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
-    #parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
-    #                    dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
+                        help="Specify degenerate nucleotide options: "
+                             "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
+    parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
+                        dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument('--ambig_char', '-X', action='store', required=False, default="X", type=str, dest='ambig_char',
+                        help="Character to substitute at positions, default is 'X'.")
+    #parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
+    #                    required=False, default=None, help="tab separated table with regions to align to")
     args = parser.parse_args()
     return args
 
@@ -236,9 +240,17 @@ def main(args):
     plus_strand_sequence = working_folder.add_file_path("forward_reference.txt")
     minus_strand_sequence = working_folder.add_file_path("backward_reference.txt")
 
-    make_temp_sequence(fasta=args.ref,
-                       sequence_outfile=plus_strand_sequence,
-                       rc_sequence_outfile=minus_strand_sequence)
+    if args.substitution_file is not None:
+        add_ambiguity_chars_to_reference(input_fasta=args.ref,
+                                         substitution_file=args.substitution_file,
+                                         sequence_outfile=plus_strand_sequence,
+                                         rc_sequence_outfile=minus_strand_sequence,
+                                         degenerate_type=args.degenerate,
+                                         ambig_char=args.ambig_char)
+    else:
+        make_temp_sequence(fasta=args.ref,
+                           sequence_outfile=plus_strand_sequence,
+                           rc_sequence_outfile=minus_strand_sequence)
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)

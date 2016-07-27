@@ -1218,7 +1218,8 @@ void diagonalCalculation_Expectations(StateMachine *sM, int64_t xay,
                         dpMatrix_getDiagonal(backwardDpMatrix, xay),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
-                        sX, sY, cell_calculateUpdateExpectation, extraArgs2);
+                        sX, sY,
+                        cell_calculateUpdateExpectation, extraArgs2);
 }
 
 
