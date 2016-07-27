@@ -73,7 +73,7 @@ def parse_args():
                              "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
     parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
-    parser.add_argument('--ambig_char', '-X', action='store', required=False, default="X", type=str, dest='ambig_char',
+    parser.add_argument('--ambig_char', '-X', action='append', required=False, default=None, type=str, dest='ambig_char',
                         help="Character to substitute at positions, default is 'X'.")
     #parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
     #                    required=False, default=None, help="tab separated table with regions to align to")
@@ -95,11 +95,14 @@ def get_2d_length(fast5):
         return read_length
 
 
-def cull_training_files(directories, training_amount):
+def cull_training_files(directories, training_amount, reference_sequences):
     print("trainModels - culling training files.\n", end="", file=sys.stderr)
 
     training_files = []
     add_to_training_files = training_files.append
+
+    assert len(directories) == len(reference_sequences), "Need to have equal number of references as training " \
+                                                         "file directories."
 
     # loop over the directories and collect reads for training
     for j, directory in enumerate(directories):
@@ -108,17 +111,18 @@ def cull_training_files(directories, training_amount):
         total_amount = 0
         n = 0
         # loop over files and add them to training list, break when we have enough bases to complete a batch
+        # make a list of tuples [(fast5_path, (plus_ref_seq, minus_ref_seq)]
         for i in xrange(len(fast5s)):
-            add_to_training_files(directory + fast5s[i])
+            add_to_training_files((directory + fast5s[i], reference_sequences[j]))
             n += 1
             total_amount += get_2d_length(directory + fast5s[i])
             if total_amount >= training_amount:
                 break
-        print("Culled {nb_files} training files, for {bases} from {dir}.".format(nb_files=len(training_files),
+        print("Culled {nb_files} training files, for {bases} from {dir}.".format(nb_files=n,
                                                                                  bases=total_amount,
                                                                                  dir=directory),
               end="\n", file=sys.stderr)
-
+    shuffle(training_files)
     return training_files
 
 
@@ -236,21 +240,28 @@ def main(args):
     working_folder = FolderHandler()
     working_directory_path = working_folder.open_folder(args.out + "tempFiles_expectations")
 
-    # make the plus and minus strand sequences
-    plus_strand_sequence = working_folder.add_file_path("forward_reference.txt")
-    minus_strand_sequence = working_folder.add_file_path("backward_reference.txt")
-
+    # if we are performing supervised training with multiple kinds of substitutions, then we
+    # need to make a reference sequence for each one
     if args.substitution_file is not None:
-        add_ambiguity_chars_to_reference(input_fasta=args.ref,
-                                         substitution_file=args.substitution_file,
-                                         sequence_outfile=plus_strand_sequence,
-                                         rc_sequence_outfile=minus_strand_sequence,
-                                         degenerate_type=args.degenerate,
-                                         ambig_char=args.ambig_char)
+        assert args.ambig_char is not None, "Need to provide nucleotide to substitute"
+        reference_sequences = []
+        for sub_char in args.ambig_char:
+            plus_strand_sequence = working_folder.add_file_path("forward_reference_{}.txt".format(sub_char))
+            minus_strand_sequence = working_folder.add_file_path("backward_reference_{}.txt".format(sub_char))
+            add_ambiguity_chars_to_reference(input_fasta=args.ref,
+                                             substitution_file=args.substitution_file,
+                                             sequence_outfile=plus_strand_sequence,
+                                             rc_sequence_outfile=minus_strand_sequence,
+                                             degenerate_type=args.degenerate,
+                                             ambig_char=sub_char)
+            reference_sequences.append((plus_strand_sequence, minus_strand_sequence))
     else:
+        plus_strand_sequence = working_folder.add_file_path("forward_reference.txt")
+        minus_strand_sequence = working_folder.add_file_path("backward_reference.txt")
         make_temp_sequence(fasta=args.ref,
                            sequence_outfile=plus_strand_sequence,
                            rc_sequence_outfile=minus_strand_sequence)
+        reference_sequences = [(plus_strand_sequence, minus_strand_sequence)]
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -306,7 +317,7 @@ def main(args):
     i = 0
     while i < args.iter:
         # first cull a set of files to get expectations on
-        training_files = cull_training_files(args.files_dir, args.amount)
+        training_files = cull_training_files(args.files_dir, args.amount, reference_sequences)
 
         # setup
         workers = args.nb_jobs
@@ -315,10 +326,11 @@ def main(args):
         jobs = []
 
         # get expectations for all the files in the queue
-        for fast5 in training_files:
+        # file_ref_tuple should be (fast5, (plus_ref_seq, minus_ref_seq))
+        for file_ref_tuple in training_files:
             alignment_args = {
-                "forward_reference": plus_strand_sequence,
-                "backward_reference": minus_strand_sequence,
+                "forward_reference": file_ref_tuple[1][0],   # this is the plus strand sequence
+                "backward_reference": file_ref_tuple[1][1],  # this is the minus strand sequence
                 "path_to_EC_refs": None,
                 "destination": working_directory_path,
                 "stateMachineType": args.stateMachineType,
@@ -329,16 +341,16 @@ def main(args):
                 "in_complementHdp": complement_hdp,
                 "banded": args.banded,
                 "sparse_output": False,
-                "in_fast5": fast5,
+                "in_fast5": file_ref_tuple[0],  # fast5
                 "threshold": args.threshold,
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
                 "target_regions": None,
                 "degenerate": None,
             }
-            alignment = SignalAlignment(**alignment_args)
-            alignment.run(get_expectations=True)
-            #work_queue.put(alignment_args)
+            #alignment = SignalAlignment(**alignment_args)
+            #alignment.run(get_expectations=True)
+            work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))
