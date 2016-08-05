@@ -23,20 +23,54 @@ void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
     st_uglyf("end    2: %lld\n", pA->end2);
 }
 
+inline int64_t adjustReferenceCoordinate(int64_t x_i, int64_t referenceSeqOffset,
+                                         int64_t referenceLengthInKmers, int64_t referenceLength,
+                                         Strand strand, bool forward) {
+    if ((strand == template && forward) || (strand == complement && !forward)) {
+        return x_i + referenceSeqOffset;
+    } else {
+        return referenceLengthInKmers - (x_i + (referenceLength - referenceSeqOffset));
+    }
+}
+
+inline char *makeReferenceKmer(const char *k_i, Strand strand, bool forward) {
+    if ((strand == template && forward) || (strand == complement && !forward)) {
+        return stString_copy(k_i);
+    } else {
+        return stString_reverseComplementString(k_i);
+    }
+}
+
+inline char *kmerFromString(const char *string, int64_t start, int64_t kmerLength) {
+    char *k_i = st_malloc(kmerLength * sizeof(char));
+    for (int64_t i = 0; i < kmerLength; i++) {
+        k_i[i] = *(string + (start + i));
+    }
+
+    return k_i;
+}
+
+inline int64_t adjustQueryPosition(int64_t unadjustedQueryPosition, int64_t kmerLength, Strand strand, bool forward) {
+    if ((strand == template && forward) || (strand == complement && !forward)) {
+        return unadjustedQueryPosition;
+    } else {
+        return (kmerLength - 1) - unadjustedQueryPosition;
+    }
+}
+
 void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMachine *sM,
                              NanoporeReadAdjustmentParameters npp, double *events, char *target, bool forward,
                              char *contig, int64_t eventSequenceOffset, int64_t referenceSequenceOffset,
                              stList *alignedPairs, Strand strand) {
     // label for tsv output
-    char *strandLabel = NULL;
-    if (strand == template) {
-        strandLabel = "t";
-    }
-    if (strand == complement) {
-        strandLabel = "c";
-    }
+    char *strandLabel = strand == template ? "t" : "c";
+
     // open the file for output
     FILE *fH = fopen(posteriorProbsFile, "a");
+
+    // get some lengths outside the loop
+    int64_t refLength = (int64_t )strlen(target);
+    int64_t refLengthInKmers = refLength - sM->kmerLength;
 
     for(int64_t i = 0; i < stList_length(alignedPairs); i++) {
         // grab the aligned pair
@@ -47,33 +81,29 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
                         stIntTuple_length(aPair));
         }
 
+        // nucleotide sequence coordinate
         int64_t x_i = stIntTuple_get(aPair, 1);
-        int64_t x_adj = 0;  // x is the reference coordinate that we record in the aligned pairs
-        if ((strand == template && forward) || (strand == complement && (!forward))) {
-            x_adj = stIntTuple_get(aPair, 1) + referenceSequenceOffset;
-        }
-        if ((strand == complement && forward) || (strand == template && (!forward))) {
-            int64_t refLength = (int64_t )strlen(target);
-            int64_t refLengthInEvents = refLength - sM->kmerLength;
-            x_adj = refLengthInEvents - (x_i + (refLength - referenceSequenceOffset));
-        }
-        int64_t y = stIntTuple_get(aPair, 2) + eventSequenceOffset;             // event index
-        double p = ((double)stIntTuple_get(aPair, 0)) / PAIR_ALIGNMENT_PROB_1;  // posterior prob
+        // adjust back to reference coordinates
+        int64_t x_adj = adjustReferenceCoordinate(x_i, referenceSequenceOffset, refLengthInKmers, refLength,
+                                                  strand, forward);
+        // event index, adjust to to entire event sequence coordinates (event sequence is trimmed during alignment)
+        int64_t y = stIntTuple_get(aPair, 2) + eventSequenceOffset;
+        // posterior probability
+        double p = ((double)stIntTuple_get(aPair, 0)) / PAIR_ALIGNMENT_PROB_1;
+        // path (variant-called) kmer
         char *pathKmer = (char *)stIntTuple_get(aPair, 3);
 
-        // get the observations from the events
-        double eventMean = events[(y * NB_EVENT_PARAMS)];
-        double eventNoise = events[(y * NB_EVENT_PARAMS) + 1];
-        double eventDuration = events[(y * NB_EVENT_PARAMS) + 2];
+        double eventMean = sequence_getEventMean(events, y);
+        double eventNoise = sequence_getEventNoise(events, y);
+        double eventDuration = sequence_getEventDuration(events, y);
 
         // make the kmer string at the target index,
-        char *k_i = st_malloc(sM->kmerLength * sizeof(char));
-        for (int64_t k = 0; k < sM->kmerLength; k++) {
-            k_i[k] = *(target + (x_i + k));
-        }
+        char *k_i = kmerFromString(target, x_i, sM->kmerLength);
+        //char *k_i = st_malloc(sM->kmerLength * sizeof(char));
+        //for (int64_t k = 0; k < sM->kmerLength; k++) {
+        //    k_i[k] = *(target + (x_i + k));
+        //}
 
-        // get the kmer index // todo could make this the other function
-        //int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromPtr(pathKmer);
         int64_t targetKmerIndex = kmer_id(pathKmer, sM->alphabet, sM->alphabetSize, sM->kmerLength);
 
         // get the expected event mean amplitude and noise
@@ -85,13 +115,14 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
                                                                                  npp.scale, npp.shift, npp.var);
 
         // make reference kmer
-        char *refKmer = NULL;
-        if ((strand == template && forward) || (strand == complement && (!forward))) {
-            refKmer = k_i;
-        }
-        if ((strand == complement && forward) || (strand == template && (!forward))) {
-            refKmer = stString_reverseComplementString(k_i);
-        }
+        char *refKmer = makeReferenceKmer(k_i, strand, forward);
+        //char *refKmer = NULL;
+        //if ((strand == template && forward) || (strand == complement && (!forward))) {
+        //    refKmer = stString_copy(k_i);
+        //}
+        //if ((strand == complement && forward) || (strand == template && (!forward))) {
+        //    refKmer = stString_reverseComplementString(k_i);
+        //}
         // write to file
         fprintf(fH, "%s\t%"PRId64"\t%s\t%s\t%s\t%"PRId64"\t%f\t%f\t%f\t%s\t%f\t%f\t%f\t%f\t%f\t%s\n",
                 contig, x_adj, refKmer, readLabel, strandLabel, y, eventMean, eventNoise, eventDuration, k_i,
@@ -99,6 +130,74 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
         // cleanup
         free(k_i);
+        free(refKmer);
+    }
+    fclose(fH);
+}
+
+void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachine *sM, char *target, bool forward,
+                           int64_t eventSequenceOffset, int64_t referenceSequenceOffset, stList *alignedPairs,
+                           Strand strand) {
+    // label for tsv output
+    char *strandLabel = strand == template ? "t" : "c";
+    char *forwardLabel = forward ? "forward" : "backward";
+
+    // open the file for output
+    FILE *fH = fopen(posteriorProbsFile, "a");
+
+    // get some lengths outside the loop
+    int64_t refLength = (int64_t )strlen(target);
+    int64_t refLengthInKmers = refLength - sM->kmerLength;
+
+    for(int64_t i = 0; i < stList_length(alignedPairs); i++) {
+        // grab the aligned pair
+        stIntTuple *aPair = stList_get(alignedPairs, i);
+
+        if (stIntTuple_length(aPair) != 4) {
+            st_errAbort("Aligned pair tuples should have length 4, this one has length %lld\n",
+                        stIntTuple_length(aPair));
+        }
+
+        // trimmed nucleotide sequence coordinate
+        int64_t x_i = stIntTuple_get(aPair, 1);
+        // make the kmer string at the target index,
+        char *k_i = kmerFromString(target, x_i, sM->kmerLength);
+        char *refKmer = makeReferenceKmer(k_i, strand, forward);
+        stList *queryPositions = path_findDegeneratePositions(refKmer, sM->kmerLength);
+        // check if this aligned pair reports on a query position
+        if (stList_length(queryPositions) == 0) {
+            free(k_i);
+            free(refKmer);
+            stList_destruct(queryPositions);
+            continue;
+        }
+        // adjust back to reference coordinates
+        int64_t x_adj = adjustReferenceCoordinate(x_i, referenceSequenceOffset, refLengthInKmers, refLength,
+                                                  strand, forward);
+        // event index, adjust to to entire event sequence coordinates (event sequence is trimmed during alignment)
+        int64_t y = stIntTuple_get(aPair, 2) + eventSequenceOffset;
+        // posterior probability
+        double p = ((double)stIntTuple_get(aPair, 0)) / PAIR_ALIGNMENT_PROB_1;
+        // path (variant-called) kmer
+        char *pathKmer = (char *)stIntTuple_get(aPair, 3);
+        // get the base that was called in this aligned pair
+        int64_t nQueryPositions = stList_length(queryPositions);
+        for (int64_t q = 0; q < nQueryPositions; q++) {
+            // position in the reference kmer eg. AGXGG -> 2
+            int64_t unadjustedQueryPosition = *(int64_t  *)stList_get(queryPositions, q);
+            // position in the pathKmer
+            int64_t queryPosition = adjustQueryPosition(unadjustedQueryPosition, sM->kmerLength,
+                                                        strand, forward);
+            // called base
+            char base = pathKmer[queryPosition];
+            // position in the reference we're reporting on
+            int64_t reportPosition = x_adj + unadjustedQueryPosition;
+            fprintf(fH, "%"PRId64"\t%"PRId64"\t%c\t%f\t%s\t%s\t%s\n", y, reportPosition, base, p,
+                    strandLabel, forwardLabel, readLabel);
+        }
+        free(k_i);
+        free(refKmer);
+        stList_destruct(queryPositions);
     }
     fclose(fH);
 }
@@ -106,7 +205,7 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 void writePosteriorProbsSparse(char *posteriorProbsFile, char *readFile, char *target, bool forward, char *contig,
                                int64_t eventSequenceOffset, int64_t referenceSequenceOffset, int64_t kmerLength,
                                stList *alignedPairs, Strand strand) {
-    /// / label for tsv output
+    // label for tsv output
     char *strandLabel;
     if (strand == template) {
         strandLabel = "t";
@@ -554,9 +653,8 @@ int main(int argc, char *argv[]) {
 
             // get aligned pairs
             stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
-                                                          pA->start2, R->getTemplateTargetSequence(R),
-                                                          p, anchorPairs,
-                                                          degenerate);
+                                                                  pA->start2, R->getTemplateTargetSequence(R),
+                                                                  p, anchorPairs, degenerate);
 
             double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
@@ -733,12 +831,16 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             if (sparseOutput) {
-                writePosteriorProbsSparse(posteriorProbsFile, readLabel,
-                                          R->getTemplateTargetSequence(R),
-                                          forward, pA->contig1,
-                                          tCoordinateShift, rCoordinateShift_t,
-                                          sMt->kmerLength,
-                                          templateAlignedPairs, template);
+                //writePosteriorProbsSparse(posteriorProbsFile, readLabel,
+                //                          R->getTemplateTargetSequence(R),
+                //                          forward, pA->contig1,
+                //                          tCoordinateShift, rCoordinateShift_t,
+                //                          sMt->kmerLength,
+                //                          templateAlignedPairs, template);
+                writePosteriorProbsVC(posteriorProbsFile, readLabel, sMt, R->getTemplateTargetSequence(R),
+                                      forward, tCoordinateShift, rCoordinateShift_t, templateAlignedPairs,
+                                      template);
+
             } else {
                 writePosteriorProbsFull(posteriorProbsFile, readLabel,
                                         sMt,
@@ -773,12 +875,15 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             if (sparseOutput) {
-                writePosteriorProbsSparse(posteriorProbsFile, readLabel,
-                                          R->getComplementTargetSequence(R),
-                                          forward, pA->contig1,
-                                          cCoordinateShift, rCoordinateShift_c,
-                                          sMc->kmerLength,
-                                          complementAlignedPairs, complement);
+                //writePosteriorProbsSparse(posteriorProbsFile, readLabel,
+                //                          R->getComplementTargetSequence(R),
+                //                          forward, pA->contig1,
+                //                          cCoordinateShift, rCoordinateShift_c,
+                //                          sMc->kmerLength,
+                //                          complementAlignedPairs, complement);
+                writePosteriorProbsVC(posteriorProbsFile, readLabel, sMc, R->getComplementTargetSequence(R),
+                                      forward, cCoordinateShift, rCoordinateShift_c, complementAlignedPairs,
+                                      complement);
             } else {
                 writePosteriorProbsFull(posteriorProbsFile, readLabel,
                                         sMc,

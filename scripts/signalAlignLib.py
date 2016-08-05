@@ -954,7 +954,7 @@ class SignalAlignment(object):
         assert self.in_templateHmm is not None and self.in_complementHmm is not None
         template_model_flag = "-T {} ".format(self.in_templateHmm)
         complement_model_flag = "-C {} ".format(self.in_complementHmm)
-        print("signalAlign - NOTICE: template model {t} complement model {c}\n"
+        print("signalAlign - NOTICE: template model {t} complement model {c}"
               "".format(t=self.in_templateHmm, c=self.in_complementHmm), file=sys.stderr)
 
         # reference sequences

@@ -5,7 +5,15 @@ import os
 import pandas as pd
 import numpy as np
 from random import shuffle
+from serviceCourse.parsers import read_fasta
 
+
+def get_first_sequence(input_fasta):
+    input_sequence = ""
+    for header, comment, sequence in read_fasta(input_fasta):
+        input_sequence += sequence
+        break
+    return input_sequence
 
 def parse_alignment_file(alignment_file):
     data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),

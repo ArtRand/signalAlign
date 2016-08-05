@@ -5,15 +5,28 @@ import unittest
 import glob
 import os
 import shutil
-import filecmp
 import pandas as pd
+import numpy as np
 from subprocess import call
-from alignmentAnalysisLib import parse_alignment_file
+from alignmentAnalysisLib import get_first_sequence
 
 SIGNALALIGN_ROOT = "../"
 ZYMO_C_READS = SIGNALALIGN_ROOT + "tests/minion_test_reads/C/"
 ZYMO_REFERENCE = SIGNALALIGN_ROOT + "tests/test_sequences/zymo_sequence.fasta"
 
+
+def parse_alignment_full(alignment_file):
+    data = pd.read_table(alignment_file, usecols=(1, 2, 4, 5, 9, 12, 13),
+                         dtype={'ref_pos': np.int64,
+                                'ref_kmer': np.str,
+                                'strand': np.str,
+                                'event_index': np.int64,
+                                'kmer': np.str,
+                                'posterior_prob': np.float64,
+                                'event_mean': np.float64},
+                         header=None,
+                         names=['ref_pos', 'ref_kmer', 'strand', 'event_index', 'kmer', 'posterior_prob', 'event_mean'])
+    return data
 
 class LibTest(unittest.TestCase):
     def test_signalAlign_library(self):
@@ -29,7 +42,11 @@ class signalAlign_alignment_test(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree("./signalAlign_unittest/")
 
-    def check_alignments(self, true_alignments, reads, reference):#, test_directory):
+    def check_alignments(self, true_alignments, reads, reference, kmer_length):
+
+        def get_kmer(start):
+            return referece_sequence[start:start + kmer_length]
+
         assert len(glob.glob(reads + "*.fast5")) > 0, "Didn't find zymo test MinION reads"
         assert os.path.isfile(reference), "Didn't find zymo reference sequence"
 
@@ -43,27 +60,41 @@ class signalAlign_alignment_test(unittest.TestCase):
 
         test_alignments = glob.glob("./signalAlign_unittest/tempFiles_alignment/*.tsv")
 
-        # todo make this argument
+        referece_sequence = get_first_sequence(reference)
+
         self.assertTrue(len(test_alignments) == len(glob.glob(true_alignments + "*.tsv")),
                         "Didn't make all alignments")
 
         for alignment in test_alignments:
             alignment_file = alignment.split("/")[-1]
-            expected = parse_alignment_file(true_alignments + alignment_file)
-            obs = parse_alignment_file(alignment)
+            expected = parse_alignment_full(true_alignments + alignment_file)
+            obs = parse_alignment_full(alignment)
+            for row in obs.itertuples():
+                ref_pos = row[1]
+                obs_kmer = row[2]
+                strand = row[3]
+                exp_kmer = get_kmer(ref_pos)
+                self.assertTrue(obs_kmer == exp_kmer, msg="kmer at index {idx} on strand {strand} is {obs} should be "
+                                                          "{exp}, file {f}".format(idx=ref_pos,
+                                                                                   strand=strand,
+                                                                                   obs=obs_kmer,
+                                                                                   exp=exp_kmer,
+                                                                                   f=alignment))
             self.assertTrue(expected.equals(obs), msg="{} is not the same".format(alignment_file))
 
     def test_zymo_reads(self):
         zymo_true_alignments = SIGNALALIGN_ROOT + "tests/test_alignments/zymo_C_test_alignments_sm3/" \
                                                             "tempFiles_alignment/"
-        self.check_alignments(true_alignments=zymo_true_alignments, reads=ZYMO_C_READS, reference=ZYMO_REFERENCE)
+        self.check_alignments(true_alignments=zymo_true_alignments, reads=ZYMO_C_READS,
+                              reference=ZYMO_REFERENCE, kmer_length=6)
 
     def test_ecoli_reads(self):
         ecoli_true_alignments = SIGNALALIGN_ROOT + "tests/test_alignments/ecoli_test_alignments_sm3/" \
                                                              "tempFiles_alignment/"
         ecoli_reads = SIGNALALIGN_ROOT + "tests/minion_test_reads/ecoli/"
         ecoli_reference = SIGNALALIGN_ROOT + "tests/test_sequences/E.coli_K12.fasta"
-        self.check_alignments(true_alignments=ecoli_true_alignments, reads=ecoli_reads, reference=ecoli_reference)
+        self.check_alignments(true_alignments=ecoli_true_alignments, reads=ecoli_reads,
+                              reference=ecoli_reference, kmer_length=6)
 
 
 class signalAlign_EM_test(unittest.TestCase):
@@ -85,7 +116,7 @@ class signalAlign_EM_test(unittest.TestCase):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
+    #testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(signalAlign_alignment_test('test_zymo_reads'))
     #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
     #testSuite.addTest(signalAlign_EM_test('test_EM'))

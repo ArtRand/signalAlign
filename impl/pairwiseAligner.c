@@ -429,6 +429,19 @@ int64_t sequence_correctSeqLength(int64_t length, SequenceType type, int64_t kme
     }
     return 0;
 }
+
+double sequence_getEventMean(double *events, int64_t index) {
+    return events[index * NB_EVENT_PARAMS];
+}
+
+double sequence_getEventNoise(double *events, int64_t index) {
+    return events[index * NB_EVENT_PARAMS + 1];
+}
+
+double sequence_getEventDuration(double *events, int64_t index) {
+    return events[index * NB_EVENT_PARAMS + 2];
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  Path for variable order HMM
 //  Test: Pass
@@ -459,7 +472,7 @@ stList *path_findDegeneratePositions(char *kmer, int64_t kmerLength) {
     if (kmer == NULL) {
         return methyls;
     }
-    for (int64_t i = 0; i < kmerLength; i++) { // could make KMERLENGTH strlen here
+    for (int64_t i = 0; i < kmerLength; i++) {
         char n = *(kmer + i);
         if (strchr(AMBIG_BASE, n)) {
             int64_t *methylPosition = (int64_t *)st_malloc(sizeof(int64_t));
@@ -991,7 +1004,6 @@ void dpDiagonal_destruct(DpDiagonal *dpDiagonal) {
 //  DpMatrix Structure for storing dp-matrix
 //  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 struct _dpMatrix {
     DpDiagonal **diagonals;
     int64_t diagonalNumber;

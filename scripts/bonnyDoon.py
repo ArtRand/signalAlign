@@ -5,7 +5,7 @@ from __future__ import print_function
 import pandas as pd
 
 from signalAlignLib import *
-from alignmentAnalysisLib import CallMethylation
+from alignmentAnalysisLib import CallMethylation, get_first_sequence
 from variantCallingLib import scan_for_proposals
 from multiprocessing import Process, Queue, current_process, Manager
 from serviceCourse.file_handlers import FolderHandler
@@ -86,14 +86,6 @@ def group_sites_in_window2(sites, window=6):
         g, i = collect_group(i)
         groups.append(g)
     return groups
-
-
-def get_first_sequence(input_fasta):
-    input_sequence = ""
-    for header, comment, sequence in read_fasta(input_fasta):
-        input_sequence += sequence
-        break
-    return input_sequence
 
 
 def make_degenerate_reference(input_fasta, start, forward_sequence_path, backward_sequence_path,

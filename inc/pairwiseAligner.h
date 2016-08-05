@@ -100,6 +100,12 @@ void *sequence_getEvent(void *elements, int64_t index);
 
 void *sequence_getEventSafe(void *s, int64_t index);
 
+double sequence_getEventMean(double *events, int64_t index);
+
+double sequence_getEventNoise(double *events, int64_t index);
+
+double sequence_getEventDuration(double *events, int64_t index);
+
 Sequence *sequence_constructEventSequence(int64_t length, void *events);
 
 int64_t sequence_correctSeqLength(int64_t length, SequenceType type, int64_t kmerLength);
