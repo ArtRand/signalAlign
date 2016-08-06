@@ -61,7 +61,7 @@ NanoporeRead *loadTestR9NanoporeRead() {
 }
 
 StateMachine *loadScaledStateMachine3(NanoporeRead *npRead) {
-    char *templateModelFile = stString_print("../../signalAlign/models/testModel_template.model");
+    char *templateModelFile = stString_print("../../signalAlign/models/testModelR73_acegot_template.model");
     StateMachine *sMt = getStateMachine3(templateModelFile);
 
     // scale model
@@ -74,7 +74,7 @@ StateMachine *loadScaledStateMachine3(NanoporeRead *npRead) {
 
 StateMachine *loadDescaledStateMachine3(NanoporeRead *npRead) {
     // load stateMachine from model file
-    char *templateModelFile = stString_print("../../signalAlign/models/testModel_template.model");
+    char *templateModelFile = stString_print("../../signalAlign/models/testModelR73_acegot_template.model");
     StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams, TRUE);
 
     free(templateModelFile);
@@ -100,7 +100,7 @@ StateMachine *load5merR9DescaledStateMachine3(NanoporeRead *npRead) {
 }
 
 StateMachine *loadStateMachineHdp(NanoporeRead *npRead) {
-    char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
+    char *modelFile = stString_print("../../signalAlign/models/testModelR73_acegot_template.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
     StateMachine *sM = getHdpStateMachine(nHdp, modelFile, npRead->templateParams);
     free(modelFile);
@@ -273,9 +273,9 @@ static void test_stateMachineModel(CuTest *testCase, StateMachine *sM) {
 }
 
 static void test_models(CuTest *testCase) {
-    CuAssertTrue(testCase, stFile_exists("../models/testModel_template.model"));
-    CuAssertTrue(testCase, stFile_exists("../models/testModel_complement.model"));
-    CuAssertTrue(testCase, stFile_exists("../models/testModel_complement_pop1.model"));
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR73_acegot_template.model"));
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR73_agegot_complement.model"));
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR73_acegot_complement_pop1.model"));
 
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_template.model"));
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_complement.model"));
@@ -286,15 +286,15 @@ static void test_models(CuTest *testCase) {
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_acegot_template.model"));
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_5mer_acegot_complement.model"));
 
-    StateMachine *sM = getStateMachine3("../models/testModel_template.model");
+    StateMachine *sM = getStateMachine3("../models/testModelR73_acegot_template.model");
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 
-    sM = getStateMachine3("../models/testModel_complement.model");
+    sM = getStateMachine3("../models/testModelR73_agegot_complement.model");
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 
-    sM = getStateMachine3("../models/testModel_complement_pop1.model");
+    sM = getStateMachine3("../models/testModelR73_acegot_complement_pop1.model");
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 
@@ -455,7 +455,7 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     };
 
     // make stateMachine, forward and reverse DP matrices and banding stuff
-    char *modelFile = stString_print("../../signalAlign/models/testModel_template.model");
+    char *modelFile = stString_print("../../signalAlign/models/testModelR73_acegot_template.model");
     StateMachine *sM = getStateMachine3(modelFile);
 
     // make variables for the (corrected) length of the sequences
@@ -828,9 +828,8 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     // load the reference sequence and the nanopore read
     Sequence *refSeq = getZymoReferenceSequence(sM->kmerLength);
 
-    test_stateMachine(testCase, sM, npRead, refSeq, 1217, 0.1);
-    // parameters for pairwise alignment using defaults
-
+    test_stateMachine(testCase, sM, npRead, refSeq, 1251, 0.1);
+    
     // clean
     nanopore_nanoporeReadDestruct(npRead);
     sequence_destruct(refSeq);
@@ -917,7 +916,7 @@ static void test_cpHmmEmissionsAgainstStateMachine(CuTest *testCase, StateMachin
 
 static void test_makeAndCheckModels(CuTest *testCase) {
     // this is the lookup table with default values
-    const char *templateLookupTableFile = "../models/testModel_template.model";
+    const char *templateLookupTableFile = "../models/testModelR73_acegot_template.model";
     if (!stFile_exists(templateLookupTableFile)) {
         st_errAbort("Didn't find model file %s\n", templateLookupTableFile);
     }
@@ -938,7 +937,7 @@ static void test_makeAndCheckModels(CuTest *testCase) {
 }
 
 static void test_continuousPairHmm(CuTest *testCase) {
-    const char *model = "../../signalAlign/models/testModel_template.model";
+    const char *model = "../../signalAlign/models/testModelR73_acegot_template.model";
     if (!stFile_exists(model)) {
         st_errAbort("Didn't find model file %s\n", model);
     }
@@ -1076,7 +1075,7 @@ static void test_continuousPairHmm(CuTest *testCase) {
 
 static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     // load the event model into a stateMachine
-    const char *model = "../../signalAlign/models/testModel_template.model";
+    const char *model = "../../signalAlign/models/testModelR73_acegot_template.model";
     if (!stFile_exists(model)) {
         st_errAbort("Didn't find model file %s\n", model);
     }

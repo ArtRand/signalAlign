@@ -90,7 +90,7 @@ static void test_getLogGaussPdfMatchProb(CuTest *testCase) {
     CuAssertDblEquals(testCase, expTest, control, 0.001);
     CuAssertDblEquals(testCase, test, log(control), 0.001);
 
-    char *modelFile = stString_print("../models/testModel_template.model");
+    char *modelFile = stString_print("../models/testModelR73_acegot_template.model");
     //StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
     StateMachine *sM = getStateMachine3(modelFile);
     double event2[] = {62.784241};
@@ -111,7 +111,7 @@ static void test_bivariateGaussPdfMatchProb(CuTest *testCase) {
     double eTest = exp(test);
     CuAssertDblEquals(testCase, controlSq, eTest, 0.001);
 
-    char *modelFile = stString_print("../models/testModel_template.model");
+    char *modelFile = stString_print("../models/testModelR73_acegot_template.model");
     //StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
     StateMachine *sM = getStateMachine3(modelFile);
     double event2[] = {62.784241, 0.664989};
@@ -126,7 +126,7 @@ static void test_bivariateGaussPdfMatchProb(CuTest *testCase) {
 
 static void test_twoDistributionPdf(CuTest *testCase) {
     // load up a stateMachine
-    char *modelFile = stString_print("../models/testModel_template.model");
+    char *modelFile = stString_print("../models/testModelR73_acegot_template.model");
     //StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
     StateMachine *sM = getStateMachine3(modelFile);
     double event[] = {62.784241, 0.664989}; // level_mean and noise_mean for AAAAAA
@@ -575,7 +575,7 @@ static void test_hdCellConstructWorstCase(CuTest *testCase) {
 
 static void test_dpDiagonal(CuTest *testCase) {
     // load model and make stateMachine
-    char *testModelPath = stString_print("../../signalAlign/models/testModel_template.model");
+    char *testModelPath = stString_print("../../signalAlign/models/testModelR73_acegot_template.model");
     StateMachine *sM = getStateMachine3(testModelPath);
 
     Diagonal diagonal = diagonal_construct(3, -1, 1); // makes a diagonal with 2 cells

@@ -464,7 +464,7 @@ void test_serialization(CuTest* ct) {
 void test_nhdp_serialization(CuTest* ct) {
 
     NanoporeHDP* nhdp = flat_hdp_model("ACGT", 4, 6, 4.0, 20.0, 0.0, 100.0, 100,
-                                       "../models/testModel_template.model");
+                                       "../models/testModelR73_acegot_template.model");
 
     update_nhdp_from_alignment(nhdp, "../tests/test_alignments/simple_alignment.tsv", false);
 

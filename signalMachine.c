@@ -46,7 +46,7 @@ inline char *kmerFromString(const char *string, int64_t start, int64_t kmerLengt
     for (int64_t i = 0; i < kmerLength; i++) {
         k_i[i] = *(string + (start + i));
     }
-
+    k_i[kmerLength] = '\0';
     return k_i;
 }
 
