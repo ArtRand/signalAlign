@@ -272,7 +272,7 @@ def main(args):
     # todo next make get default model function based on version inferred from reads
     template_model_path = "../../signalAlign/models/testModelR73_acegot_template.model" if \
         args.in_T_Hmm is None else args.in_T_Hmm
-    complement_model_path = "../../signalAlign/models/testModelR73_agegot_complement.model" if \
+    complement_model_path = "../../signalAlign/models/testModelR73_acegot_complement.model" if \
         args.in_C_Hmm is None else args.in_C_Hmm
 
     assert os.path.exists(template_model_path) and os.path.exists(complement_model_path), \

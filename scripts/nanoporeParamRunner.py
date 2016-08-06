@@ -67,7 +67,7 @@ def estimate_params_with_anchors(fast5, working_folder, bwa_index, forward_refer
 
     # input (match) models
     template_lookup_table = "../models/testModelR73_acegot_template.model"
-    complement_lookup_table = "../models/testModelR73_agegot_complement.model" if def_complement_model else \
+    complement_lookup_table = "../models/testModelR73_acegot_complement.model" if def_complement_model else \
         "../models/testModelR73_acegot_complement_pop1.model"
 
     binary = "./estimateNanoporeParams"

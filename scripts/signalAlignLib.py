@@ -254,7 +254,7 @@ def default_complement_model_from_version(version, pop1_complement=False):
     version_index = supported_versions.index(version)
 
     if version_index <= 2:
-        r7_3_default_complement_model = "../models/testModelR73_agegot_complement.model" if not pop1_complement \
+        r7_3_default_complement_model = "../models/testModelR73_acegot_complement.model" if not pop1_complement \
             else "../models/testModelR9_complement_pop2.model"
         assert os.path.exists(r7_3_default_complement_model), "Didn't find default complement R7.3 model"
         return r7_3_default_complement_model

@@ -274,7 +274,7 @@ static void test_stateMachineModel(CuTest *testCase, StateMachine *sM) {
 
 static void test_models(CuTest *testCase) {
     CuAssertTrue(testCase, stFile_exists("../models/testModelR73_acegot_template.model"));
-    CuAssertTrue(testCase, stFile_exists("../models/testModelR73_agegot_complement.model"));
+    CuAssertTrue(testCase, stFile_exists("../models/testModelR73_acegot_complement.model"));
     CuAssertTrue(testCase, stFile_exists("../models/testModelR73_acegot_complement_pop1.model"));
 
     CuAssertTrue(testCase, stFile_exists("../models/testModelR9_template.model"));
@@ -290,7 +290,7 @@ static void test_models(CuTest *testCase) {
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 
-    sM = getStateMachine3("../models/testModelR73_agegot_complement.model");
+    sM = getStateMachine3("../models/testModelR73_acegot_complement.model");
     test_stateMachineModel(testCase, sM);
     stateMachine_destruct(sM);
 
