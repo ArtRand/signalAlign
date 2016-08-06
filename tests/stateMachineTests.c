@@ -829,7 +829,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     Sequence *refSeq = getZymoReferenceSequence(sM->kmerLength);
 
     test_stateMachine(testCase, sM, npRead, refSeq, 1251, 0.1);
-    
+
     // clean
     nanopore_nanoporeReadDestruct(npRead);
     sequence_destruct(refSeq);
