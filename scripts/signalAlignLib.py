@@ -835,7 +835,7 @@ class SignalAlignment(object):
     def __init__(self, in_fast5, forward_reference, backward_reference, path_to_EC_refs, destination, stateMachineType,
                  banded, bwa_index, in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
                  threshold, diagonal_expansion, constraint_trim, degenerate,
-                 target_regions=None, sparse_output=False):
+                 target_regions=None, output_format="full"):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.forward_reference = forward_reference  # forward 'FASTA-oriented' reference
         self.backward_reference = backward_reference  # complement of the forward reference
@@ -848,7 +848,7 @@ class SignalAlignment(object):
         self.diagonal_expansion = diagonal_expansion  # alignment algorithm param
         self.constraint_trim = constraint_trim  # alignment algorithm param
         self.target_regions = target_regions  # only signal-align reads that map to these positions
-        self.sparse_output = sparse_output  # smaller output files
+        self.output_format = output_format  # smaller output files
         self.degenerate = degenerate  # set of nucleotides for degenerate characters
 
         # if we're using an input hmm, make sure it exists
@@ -922,13 +922,23 @@ class SignalAlignment(object):
 
         # forward strand
         if strand == "+":
-            forward = True
-            posteriors_file_path = self.destination + read_name + model_label + ".forward.tsv"
+            #forward = True
+            if self.output_format == "full":
+                posteriors_file_path = self.destination + read_name + model_label + ".forward.tsv"
+            elif self.output_format == "variantCaller":
+                posteriors_file_path = self.destination + read_name + model_label + ".tsv"
+            else:
+                posteriors_file_path = self.destination + read_name + model_label + ".assignments"
 
         # backward strand
         if strand == "-":
-            forward = False
-            posteriors_file_path = self.destination + read_name + model_label + ".backward.tsv"
+            #forward = False
+            if self.output_format == "full":
+                posteriors_file_path = self.destination + read_name + model_label + ".backward.tsv"
+            elif self.output_format == "variantCaller":
+                posteriors_file_path = self.destination + read_name + model_label + ".tsv"
+            else:
+                posteriors_file_path = self.destination + read_name + model_label + ".assignments"
 
         # didn't map
         elif (strand != "+") and (strand != "-"):
@@ -1003,11 +1013,12 @@ class SignalAlignment(object):
         else:
             trim_flag = "-m 9999"
 
-        # sparse output
-        if self.sparse_output is True:
-            sparse_flag = "--sparse_output "
-        else:
-            sparse_flag = ""
+        # output format
+        fmts = {"full": 0, "variantCaller": 1, "assignments": 2}
+        if self.output_format not in fmts.keys():
+            temp_folder.remove_folder()
+            return False
+        out_fmt = "-s {fmt} ".format(fmt=fmts[self.output_format])
 
         # degenerate nucleotide information
         if self.degenerate is not None:
@@ -1029,13 +1040,13 @@ class SignalAlignment(object):
                         templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag, degen=degenerate_flag, sparse=sparse_flag, eC=error_correct_ref_path)
+                        trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, eC=error_correct_ref_path)
         else:
             command = \
                 "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref}{eC} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} " \
                 "-u {posteriors} {hdp}-L {readLabel}"\
-                .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=sparse_flag,
+                .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
                         f_ref=forward_ref_flag, b_ref=backward_ref_flag, eC=error_correct_ref_path,
                         readLabel=read_label, npRead=temp_np_read,
                         t_model=template_model_flag, c_model=complement_model_flag,

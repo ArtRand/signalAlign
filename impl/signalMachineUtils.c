@@ -222,5 +222,3 @@ void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
     stList_destruct(map);
     return;
 }
-
-

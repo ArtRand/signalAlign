@@ -53,8 +53,8 @@ def parse_args():
                         dest='substitution_file', help="Ambiguity positions")
     parser.add_argument('--ambig_char', '-X', action='store', required=False, default="X", type=str, dest='ambig_char',
                         help="Character to substitute at positions, default is 'X'.")
-    parser.add_argument('--sparse_output', '-s', action='store_true', default=False, dest='sparse',
-                        help="flag, sparse output")
+    parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
+                        help="output format: full, variantCaller, or assignments. Default: full")
     parser.add_argument('--error_correct', action='store_true', default=False, required=False,
                         dest='error_correct', help="Enable error correction")
     parser.add_argument('--output_location', '-o', action='store', dest='out',
@@ -199,7 +199,7 @@ def main(args):
             "in_templateHdp": args.templateHDP,
             "in_complementHdp": args.complementHDP,
             "banded": args.banded,
-            "sparse_output": args.sparse,
+            "output_format": args.outFmt,
             "in_fast5": args.files_dir + fast5,
             "threshold": args.threshold,
             "diagonal_expansion": args.diag_expansion,

@@ -340,7 +340,7 @@ def main(args):
                 "in_templateHdp": template_hdp,
                 "in_complementHdp": complement_hdp,
                 "banded": args.banded,
-                "sparse_output": False,
+                #"output_format": "full",
                 "in_fast5": file_ref_tuple[0],  # fast5
                 "threshold": args.threshold,
                 "diagonal_expansion": args.diag_expansion,
