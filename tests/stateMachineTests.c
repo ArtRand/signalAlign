@@ -93,8 +93,6 @@ StateMachine *load5merR9DescaledStateMachine3(NanoporeRead *npRead) {
     // load stateMachine from model file
     char *templateModelFile = stString_print("../../signalAlign/models/testModelR9_5mer_acegot_template.model");
     StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams, FALSE);
-    st_uglyf("Using model %s, stateMachine kmerLength %lld, alphabet %s, alphabetSize %lld\n",
-             templateModelFile, sM->kmerLength, sM->alphabet, sM->alphabetSize);
     free(templateModelFile);
     return sM;
 }
@@ -398,7 +396,7 @@ static void test_nanoporeScaleParamsFromStrandRead(CuTest *testCase) {
 
     nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, TRUE, TRUE);
     nanopore_compute_noise_scale_params(sM->EMISSION_MATCH_MATRIX, map, params);
-
+    /*
     st_uglyf("npRead scale: %f, estimated: %f diff %f\n", npRead->templateParams.scale, params->scale,
              absPercentDiff(params->scale, npRead->templateParams.scale));
     st_uglyf("npRead shift: %f, estimated: %f diff %f\n", npRead->templateParams.shift, params->shift,
@@ -412,7 +410,7 @@ static void test_nanoporeScaleParamsFromStrandRead(CuTest *testCase) {
              absPercentDiff(params->scale_sd, npRead->templateParams.scale_sd));
     st_uglyf("npRead var_sd: %f, estimated: %f diff %f\n", npRead->templateParams.var_sd, params->var_sd,
              absPercentDiff(params->var_sd, npRead->templateParams.var_sd));
-
+    */
 
     CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 5.0);
     CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 5.0);

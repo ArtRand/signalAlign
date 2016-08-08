@@ -99,10 +99,6 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
         // make the kmer string at the target index,
         char *k_i = kmerFromString(target, x_i, sM->kmerLength);
-        //char *k_i = st_malloc(sM->kmerLength * sizeof(char));
-        //for (int64_t k = 0; k < sM->kmerLength; k++) {
-        //    k_i[k] = *(target + (x_i + k));
-        //}
 
         int64_t targetKmerIndex = kmer_id(pathKmer, sM->alphabet, sM->alphabetSize, sM->kmerLength);
 
@@ -116,13 +112,7 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
         // make reference kmer
         char *refKmer = makeReferenceKmer(k_i, strand, forward);
-        //char *refKmer = NULL;
-        //if ((strand == template && forward) || (strand == complement && (!forward))) {
-        //    refKmer = stString_copy(k_i);
-        //}
-        //if ((strand == complement && forward) || (strand == template && (!forward))) {
-        //    refKmer = stString_reverseComplementString(k_i);
-        //}
+
         // write to file
         fprintf(fH, "%s\t%"PRId64"\t%s\t%s\t%s\t%"PRId64"\t%f\t%f\t%f\t%s\t%f\t%f\t%f\t%f\t%f\t%s\n",
                 contig, x_adj, refKmer, readLabel, strandLabel, y, eventMean, eventNoise, eventDuration, k_i,
@@ -438,8 +428,6 @@ int main(int argc, char *argv[]) {
                 {"backward_reference",      required_argument,  0,  'b'},
                 {"error_correct_path",      required_argument,  0,  'p'},
                 {"posteriors",              required_argument,  0,  'u'},
-                //{"inTemplateHmm",           required_argument,  0,  'y'},
-                //{"inComplementHmm",         required_argument,  0,  'z'},
                 {"templateHdp",             required_argument,  0,  'v'},
                 {"complementHdp",           required_argument,  0,  'w'},
                 {"templateExpectations",    required_argument,  0,  't'},
@@ -504,12 +492,6 @@ int main(int argc, char *argv[]) {
             case 'c':
                 complementExpectationsFile = stString_copy(optarg);
                 break;
-            //case 'y':
-            //    templateHmmFile = stString_copy(optarg);
-            //    break;
-            //case 'z':
-            //    complementHmmFile = stString_copy(optarg);
-            //    break;
             case 'v':
                 templateHdp = stString_copy(optarg);
                 break;
@@ -624,6 +606,7 @@ int main(int argc, char *argv[]) {
     stList *anchorPairs = signalUtils_guideAlignmentToRebasedAnchorPairs(pA, p);  // pA gets modified here, no turning back
 
     if (errorCorrectPath != NULL) {
+        st_errAbort("signalAlign - Error correction not implemented, yet\n");
         st_uglyf("Starting error correcting routine\n");
 
         //stList *aP = stList_construct3(0, &free);
