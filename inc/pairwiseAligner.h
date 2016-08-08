@@ -32,6 +32,7 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 #define AMBIG_BASE "X"  // internal ambigious base
 #define THREE_CYTOSINES "CEO"
 #define TWO_CYTOSINES "CE"
+#define ADENOSINES "AI"
 #define CANONICAL_NUCLEOTIDES "ACGT"
 #define ALL_BASES "ACEGOT"
 
@@ -49,6 +50,7 @@ typedef enum {
 typedef enum {
     cytosineMethylation2 = 0,
     cytosineMethylation3 = 1,
+    adenosineMethylation = 2,
     canonicalVariants = 3
 } DegenerateType;
 
@@ -65,14 +67,21 @@ struct _sequence {
 
 char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size);
 
+int64_t sequence_nbBaseOptions(DegenerateType type);
+
+char *sequence_getBaseOptions(DegenerateType type);
+
 Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t), SequenceType type);
 
 // same as sequence construct, but initializes slice function
 Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
                               Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t), SequenceType type);
 
-Sequence *sequence_constructKmerSequence(int64_t length, void *elements,
-                                         void *(*getFcn)(void *, int64_t),
+Sequence *sequence_constructReferenceKmerSequence(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
+                                                  Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                                                  DegenerateType dType, SequenceType type);
+
+Sequence *sequence_constructKmerSequence(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
                                          Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
                                          char *nucleotideOptions, int64_t nbOptions, SequenceType type);
 

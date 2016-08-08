@@ -114,8 +114,6 @@ int main(int argc, char *argv[]) {
             case 'p':
                 j = sscanf(optarg, "%" PRIi64 "", &hdpType);
                 assert (j == 1);
-                assert (hdpType >= 0);
-                assert (hdpType <= 3);
                 break;
             case 'T':
                 templateLookupTable = stString_copy(optarg);
@@ -231,7 +229,7 @@ int main(int argc, char *argv[]) {
 
     // option for building from alignment
     if (alignmentsFile != NULL) {
-        if (!((hdpType >= 0) && (hdpType <= 12))) {
+        if (!((hdpType >= 0) && (hdpType <= 13))) {
             st_errAbort("Invalid HDP type");
         }
         NanoporeHdpType type = (NanoporeHdpType) hdpType;

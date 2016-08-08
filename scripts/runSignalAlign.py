@@ -32,7 +32,7 @@ def parse_args():
                         help="complement serialized HDP file")
     parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
                         help="Specify degenerate nucleotide options: "
-                             "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
+                             "variant -> {ACGT}, cytosine2 -> {CE} cytosine3 -> {CEO} adenosine {AI}")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", help="decide which model to use, threeState by default")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
@@ -46,7 +46,7 @@ def parse_args():
     parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
                         default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
-                        default=4, type=int, help="number of jobs to run concurrently")
+                        default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
     parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,

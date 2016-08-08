@@ -343,13 +343,8 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     stList *filteredRemappedAnchors = signalUtils_getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
     // make sequences
-    Sequence *sX = sequence_constructKmerSequence(
-            lX, target, sequence_getKmer, sequence_sliceNucleotideSequence,
-            (degenerate == canonicalVariants ? CANONICAL_NUCLEOTIDES :
-             (degenerate == cytosineMethylation2 ? TWO_CYTOSINES : THREE_CYTOSINES)),
-            (degenerate == canonicalVariants ? NB_CANONICAL_BASES :
-             (degenerate == cytosineMethylation2 ? (NB_CYTOSINE_OPTIONS - 1) : NB_CYTOSINE_OPTIONS)),
-            kmer);
+    Sequence *sX = sequence_constructReferenceKmerSequence(lX, target, sequence_getKmer,
+                                                           sequence_sliceNucleotideSequence, degenerate, kmer);
 
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, eventSequence, filteredRemappedAnchors, p,

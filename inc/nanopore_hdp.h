@@ -34,6 +34,8 @@ typedef enum _nanoporeHdpType {
     groupMultisetPrior = 9,
     singleLevelPrior2 = 10,
     multisetPrior2 = 11,
+    multisetPriorEcoli = 12, // trained to learn GATC and CCWGG methylation patterns
+    singleLevelPriorEcoli = 13,
 } NanoporeHdpType;
 
 typedef struct _nanoporeDistributionMetricMemo {

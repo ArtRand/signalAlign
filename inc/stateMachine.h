@@ -15,9 +15,11 @@
 #define SYMBOL_NUMBER 5 // todo depreciate
 #define SYMBOL_NUMBER_NO_N 6
 #define SYMBOL_NUMBER_EPIGENETIC_C 6
+#define SYMBOL_NUMBER_METHYL_CA 6
 #define MODEL_PARAMS 5 // level_mean, level_sd, fluctuation_mean, fluctuation_noise, fluctuation_lambda
-#define SIX_LETTER_ALPHA "ACEGOT"
-#define FIVE_LETTER_ALPHA "ACEGT"
+#define METHYL_HYDROXY_CYTOSINE_ALPHA "ACEGOT"
+#define METHYL_CYTOSINE_ALPHA "ACEGT"
+#define METHYL_CYTOSINE_ADENOSINE_ALPHA "ACEGIT"
 #define PURINES "AG"
 #define PYRIMIDINES "CEOT"
 #define EXTRA_EVENT_NOISE_MULTIPLIER 1.75

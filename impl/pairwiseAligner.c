@@ -261,6 +261,35 @@ double logAdd(double x, double y) {
 static double _NULLEVENT[] = {LOG_ZERO, 0};
 static double *NULLEVENT = _NULLEVENT;
 
+char *sequence_getBaseOptions(DegenerateType type) {
+    switch (type) {
+        case cytosineMethylation2:
+            return TWO_CYTOSINES;
+        case cytosineMethylation3:
+            return THREE_CYTOSINES;
+        case canonicalVariants:
+            return CANONICAL_NUCLEOTIDES;
+        case adenosineMethylation:
+            return ADENOSINES;
+        default:
+            return CANONICAL_NUCLEOTIDES;
+    }
+}
+
+int64_t sequence_nbBaseOptions(DegenerateType type) {
+    switch (type) {
+        case cytosineMethylation2:
+            return 2; // C, E
+        case cytosineMethylation3:
+            return 3; // C, E, O
+        case canonicalVariants:
+            return 4; // A, C, G, T
+        case adenosineMethylation:
+            return 2; // A, I
+        default:
+            return 4; // A, C, G, T
+    }
+}
 
 char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size) {
     // copy and sort alphabet
@@ -349,6 +378,17 @@ Sequence *sequence_constructKmerSequence(int64_t length, void *elements,
     self->sliceFcn = sliceFcn;
     self->degenerateBases = degenerateBases;
     self->nbDegenerateBases = nbOptions;
+    return self;
+}
+
+Sequence *sequence_constructReferenceKmerSequence(int64_t length, void *elements,
+                                                  void *(*getFcn)(void *, int64_t),
+                                                  Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                                                  DegenerateType dType, SequenceType type) {
+    Sequence *self = sequence_constructKmerSequence(length, elements, getFcn, sliceFcn,
+                                                    sequence_getBaseOptions(dType),
+                                                    sequence_nbBaseOptions(dType),
+                                                    type);
     return self;
 }
 

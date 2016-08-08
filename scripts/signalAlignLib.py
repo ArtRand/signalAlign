@@ -267,11 +267,11 @@ def default_complement_model_from_version(version, pop1_complement=False):
 
 def degenerate_enum(degenerate_request_string):
     degenerate_type = {
-        "twoWay": 0,
-        "threeWay": 1,
+        "cytosine2": 0,
+        "cytosine3": 1,
+        "adenosine": 2,
         "variant": 3,
     }
-
     assert (degenerate_request_string in degenerate_type.keys()), "Requested degenerate nucleotide set not recognized."
     return degenerate_type[degenerate_request_string]
 
