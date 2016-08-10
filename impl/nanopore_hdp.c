@@ -1307,9 +1307,9 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kme
                                                double samplingGridStart, double samplingGridEnd,
                                                int64_t samplingGridLength) {
     fprintf(stderr, "Building Nanopore HDP\n");
-#pragma omp parallel sections
- {
-    {
+//#pragma omp parallel sections
+// {
+//    {
         fprintf(stderr, "Updating Template HDP from alignments...\n");
         NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile, kmerLength,
                                                         baseGamma, middleGamma, leafGamma,
@@ -1328,9 +1328,9 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kme
         fprintf(stderr, "Serializing template to %s...\n", templateHDP);
         serialize_nhdp(nHdpT, templateHDP);
         destroy_nanopore_hdp(nHdpT);
-    }
-#pragma omp section
-    {
+//    }
+//#pragma omp section
+//    {
         fprintf(stderr, "Updating Complement HDP from alignments...\n");
         NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile, kmerLength,
                                                         baseGamma, middleGamma, leafGamma,
@@ -1348,7 +1348,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kme
         fprintf(stderr, "Serializing complement to %s...\n", complementHDP);
         serialize_nhdp(nHdpC, complementHDP);
         destroy_nanopore_hdp(nHdpC);
-    }
-}
+//    }
+//}
 }
 
