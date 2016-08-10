@@ -41,8 +41,6 @@ int main(int argc, char *argv[]) {
     char *templateLookupTable = NULL;
     char *complementLookupTable = NULL;
     char *alignmentsFile = NULL;
-    char *templateExpectationsFile = NULL;
-    char *complementExpectationsFile = NULL;
     char *templateHdpOutfile = NULL;
     char *complementHdpOutfile = NULL;
 
@@ -123,12 +121,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'l':
                 alignmentsFile = stString_copy(optarg);
-                break;
-            case 'E':
-                templateExpectationsFile = stString_copy(optarg);
-                break;
-            case 'W':
-                complementExpectationsFile = stString_copy(optarg);
                 break;
             case 'v':
                 templateHdpOutfile = stString_copy(optarg);
@@ -242,29 +234,6 @@ int main(int argc, char *argv[]) {
                                                   middleGammaAlpha, middleGammaBeta,
                                                   leafGammaAlpha, leafGammaBeta,
                                                   samplingGridStart, samplingGridEnd, samplingGridLength);
-    } else {
-#pragma omp parallel sections
-        {
-            {
-                if (templateExpectationsFile != NULL) {
-                    if (templateHdpOutfile == NULL) {
-                        st_errAbort("Need to provide HDP file");
-                    }
-                    updateHdpFromAssignments(templateHdpOutfile, templateExpectationsFile, templateHdpOutfile,
-                                             nbSamples, burnIn, thinning, verbose);
-                }
-            }
-#pragma omp section
-            {
-                if (complementExpectationsFile != NULL) {
-                    if (complementHdpOutfile == NULL) {
-                        st_errAbort("Need to provide HDP file");
-                    }
-                    updateHdpFromAssignments(complementHdpOutfile, complementExpectationsFile, complementHdpOutfile,
-                                             nbSamples, burnIn, thinning, verbose);
-                }
-            }
-        }
-        return 0;
     }
+    return 0;
 }
