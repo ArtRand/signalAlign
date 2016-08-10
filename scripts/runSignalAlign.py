@@ -32,7 +32,7 @@ def parse_args():
                         help="complement serialized HDP file")
     parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
                         help="Specify degenerate nucleotide options: "
-                             "variant -> {ACGT}, cytosine2 -> {CE} cytosine3 -> {CEO} adenosine {AI}")
+                             "variant -> {ACGT}, cytosine2 -> {CE} cytosine3 -> {CEO} adenosine -> {AI}")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", help="decide which model to use, threeState by default")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
@@ -134,7 +134,7 @@ def main(args):
     print(start_message, file=sys.stdout)
 
     if not os.path.isfile(args.ref):
-        print("Did not find valid reference file", file=sys.stderr)
+        print("Did not find valid reference file, looked for it {here}".format(here=args.ref), file=sys.stderr)
         sys.exit(1)
 
     # make directory to put temporary files

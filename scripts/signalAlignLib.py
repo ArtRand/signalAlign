@@ -141,12 +141,12 @@ def add_ambiguity_chars_to_reference(input_fasta, substitution_file, sequence_ou
     backward_pos = b[1]
 
     for position in forward_pos:
-        if degenerate_type in ["twoWay", "threeWay"]:
+        if degenerate_type in ["cytosine2", "cytosine3"]:
             assert seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed"\
                 .format(seq_pos=seq[position])
         seq[position] = ambig_char
     for position in backward_pos:
-        if degenerate_type in ["twoWay", "threeWay"]:
+        if degenerate_type in ["cytosine2", "cytosine3"]:
             assert r_seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed"\
                 .format(seq_pos=seq[position])
         r_seq[position] = ambig_char

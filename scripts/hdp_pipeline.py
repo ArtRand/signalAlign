@@ -36,7 +36,7 @@ def parse_args():
     # initial HDP
     parser.add_argument('--build_alignment', action='store', type=str, default=None,
                         required=False, dest='build_alignment')
-    parser.add_argument('--threshold', '-t', action='store', type=float, default=0.9, dest='threshold')
+    parser.add_argument('--threshold', '-t', action='store', type=float, default=0.0, dest='threshold')
     parser.add_argument('--hdp_type', action='store', type=str, required=False, dest='hdp_type', default='Prior',
                         help="Build Hdp, specify type, options: "
                              "Prior, Fixed, twoWay. twoWay is a Prior-type model (recommended)")
@@ -99,6 +99,8 @@ def get_hdp_type(requested_type):
             "groupMultisetPrior": 9,
             "singleLevelPrior2": 10,
             "multisetPrior2": 11,
+            "multisetPriorEcoli": 12,
+            "singleLevelPriorEcoli": 13
         }
         assert (requested_type in hdp_types.keys()), "Requested HDP type is invalid, got {}".format(requested_type)
         return hdp_types[requested_type]
@@ -168,6 +170,11 @@ HDP_TYPES_2 = [
     ("multisetPrior2", 11),
 ]
 
+HDP_TYPES_ECOLI = [
+    ("multisetPriorEcoli", 12),
+    ("singleLevelPriorEcoli", 13),
+]
+
 # Pipeline Script
 args = parse_args()  # parse arguments
 working_directory = args.out  # this is the directory we will use for everything
@@ -215,8 +222,10 @@ template_lookup_table = " -T" + args.template_lookup
 complement_lookup_table = " -C" + args.complement_lookup
 verbose_flag = "--verbose " if args.verbose is True else ""
 build_commands = []
-if args.hdp_type == "twoWay":
+if args.hdp_type == "cytosine2":
     hdp_types = HDP_TYPES_2
+elif args.hdp_type == "ecoli":
+    hdp_types = HDP_TYPES_ECOLI
 else:
     hdp_types = HDP_TYPES[1::2] if args.hdp_type == "Prior" else HDP_TYPES[::2]
 for hdp_type, i, in hdp_types:
