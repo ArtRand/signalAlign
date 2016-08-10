@@ -55,8 +55,8 @@ def parse_args():
                         help="Character to substitute at positions, default is 'X'.")
     parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
                         help="output format: full, variantCaller, or assignments. Default: full")
-    parser.add_argument('--error_correct', action='store_true', default=False, required=False,
-                        dest='error_correct', help="Enable error correction")
+    #parser.add_argument('--error_correct', action='store_true', default=False, required=False,
+    #                    dest='error_correct', help="Enable error correction")
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")

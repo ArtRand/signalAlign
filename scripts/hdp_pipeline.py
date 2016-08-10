@@ -246,9 +246,6 @@ for hdp_type, i, in hdp_types:
 
 procs = [Popen(x.split(), stdout=initial_hdp_build_out, stderr=initial_hdp_build_err) for x in build_commands]
 status = [p.wait() for p in procs]
-#for proc in build_commands:
-#    p = Popen(proc.split(),  stdout=initial_hdp_build_out, stderr=initial_hdp_build_err)
-#    p.wait()
 
 initial_hdp_build_out.close()
 initial_hdp_build_err.close()
