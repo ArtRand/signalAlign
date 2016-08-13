@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "signalMachineUtils.h"
 
-#define REPORT_ADJUSTMENTS FALSE
+#define REPORT_ADJUSTMENTS TRUE
 
 // Borrowed from Bob Stout http://stjarnhimlen.se/snippets/strrev.c
 char *signalUtils_stringReverse(char *str) {
@@ -202,6 +202,7 @@ void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
 
     nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, TRUE, TRUE);
     nanopore_compute_noise_scale_params(sM->EMISSION_MATCH_MATRIX, map, params);
+
     if (REPORT_ADJUSTMENTS) {
         st_uglyf("SENTINEL - After: scale: %f shift: %f var: %f drift: %f\n", params->scale, params->shift, params->var,
                  params->drift);
