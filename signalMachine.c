@@ -781,6 +781,13 @@ int main(int argc, char *argv[]) {
             signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
                                                signalUtils_templateOneDAssignmentsFromRead,
                                                nanopore_adjustTemplateEventsForDrift);
+            //signalUtils_estimateNanoporeParamsFromTable("../models/testModelR9_acgt_template.model",
+            //                                            npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
+            //                                            signalUtils_templateOneDAssignmentsFromRead,
+            //                                            nanopore_adjustTemplateEventsForDrift);
+        }
+        if (sMtype == threeStateHdp) {
+            stateMachine3_setModelToHdpExpectedValues(sMt, nHdpT);
         }
 
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
@@ -807,6 +814,14 @@ int main(int argc, char *argv[]) {
             signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
                                                signalUtils_complementOneDAssignmentsFromRead,
                                                nanopore_adjustComplementEventsForDrift);
+            //signalUtils_estimateNanoporeParamsFromTable("../models/testModelR9_acgt_complement.model",
+            //                                            npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
+            //                                            signalUtils_complementOneDAssignmentsFromRead,
+            //                                            nanopore_adjustComplementEventsForDrift);
+        }
+
+        if (sMtype == threeStateHdp) {
+            stateMachine3_setModelToHdpExpectedValues(sMc, nHdpC);
         }
 
         stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,

@@ -75,11 +75,11 @@ static double *continuousPairHmm_getEventModelEntry(Hmm *hmm, int64_t kmerIndex)
     return &(cpHmm->eventModel[kmerIndex * MODEL_PARAMS]);
 }
 
-static double continuousPairHmm_descaleEventMean_JordanStyle(ContinuousPairHmm *self,
-                                                             double eventMean, double levelMean) {
-    // (x  + var * level_mean - scale * level_mean - shift) / var
-    return (eventMean + self->var * levelMean - self->scale * levelMean - self->shift) / self->var;
-}
+//static double continuousPairHmm_descaleEventMean_JordanStyle(ContinuousPairHmm *self,
+//                                                             double eventMean, double levelMean) {
+//    // (x  + var * level_mean - scale * level_mean - shift) / var
+//    return (eventMean + self->var * levelMean - self->scale * levelMean - self->shift) / self->var;
+//}
 
 Hmm *continuousPairHmm_construct(double transitionPseudocount, double emissionPseudocount,
                                  int64_t stateNumber, int64_t alphabetSize, char *alphabet, int64_t kmerLength,

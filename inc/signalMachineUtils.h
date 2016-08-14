@@ -42,6 +42,12 @@ void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
                                         stList *(*assignmentFunction)(NanoporeRead *, StateMachine *, double),
                                         void (*driftAdjustmentFunction)(NanoporeRead *));
 
+void signalUtils_estimateNanoporeParamsFromTable(const char *modelPath,
+                                                 NanoporeRead *npRead, NanoporeReadAdjustmentParameters *params,
+                                                 double assignmentThreshold,
+                                                 stList *(*assignmentFunction)(NanoporeRead *, StateMachine *, double),
+                                                 void (*driftAdjustmentFunction)(NanoporeRead *));
+
 stList *signalUtils_templateOneDAssignmentsFromRead(NanoporeRead *npRead, StateMachine *sM, double ignore);
 
 stList *signalUtils_complementOneDAssignmentsFromRead(NanoporeRead *npRead, StateMachine *sM, double ignore);

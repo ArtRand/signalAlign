@@ -223,3 +223,18 @@ void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
     stList_destruct(map);
     return;
 }
+
+void signalUtils_estimateNanoporeParamsFromTable(const char *modelPath,
+                                                 NanoporeRead *npRead, NanoporeReadAdjustmentParameters *params,
+                                                 double assignmentThreshold,
+                                                 stList *(*assignmentFunction)(NanoporeRead *, StateMachine *, double),
+                                                 void (*driftAdjustmentFunction)(NanoporeRead *)) {
+    if (!stFile_exists(modelPath)) {
+        st_errAbort("signalUtils_estimateNanoporeParamsFromTable: didn't find table, looked here %s\n", modelPath);
+    }
+    StateMachine *sM = getStateMachine3_descaled(modelPath, *params, FALSE);
+    signalUtils_estimateNanoporeParams(sM, npRead, params, assignmentThreshold,
+                                       assignmentFunction, driftAdjustmentFunction);
+    stateMachine_destruct(sM);
+    return;
+}

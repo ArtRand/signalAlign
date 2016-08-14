@@ -108,6 +108,12 @@ def aligner(work_queue, done_queue):
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
+def concat_variant_call_files(path):
+    concat_command = "cat {path}/*.tsv > {path}/probs.tsv".format(path=path)
+    os.system(concat_command)
+    return
+
+
 def main(args):
     # parse args
     args = parse_args()
@@ -224,6 +230,8 @@ def main(args):
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
     print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
 
+    if args.outFmt == "variantCaller":
+        concat_variant_call_files(temp_dir_path)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
