@@ -264,7 +264,6 @@ def default_complement_model_from_version(version, pop1_complement=False):
         return r9_default_complement_model
 
 
-
 def degenerate_enum(degenerate_request_string):
     degenerate_type = {
         "cytosine2": 0,
