@@ -33,6 +33,7 @@ def parse_args():
     parser.add_argument('--null_positions', '-n', action='store', dest='null_positions', required=False,
                         default=None, help="file with extra positions to add without labeling, and positions to"
                                            "ignore in the canonical alignments")
+    parser.add_argument("--kmer_length", action='store', dest='kmer_length', required=True, type=int)
     parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out_file')
 
     return parser.parse_args()
@@ -198,7 +199,7 @@ def main(args):
     positive_alignments = cull_list_of_alignment_files(args.positive)
     positive_assignments = get_labeled_assignments(alignments=positive_alignments, max_labels=args.max_labels,
                                                    positions=forward_positive_sites, threshold=args.threshold,
-                                                   label=args.label)
+                                                   label=args.label, kmer_length=args.kmer_length)
     if positive_assignments is None:
         sys.exit(1)
 
