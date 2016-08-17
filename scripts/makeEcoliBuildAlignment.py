@@ -75,10 +75,10 @@ def get_assignments(data, hit_range, strand, substitution, threshold):
     return pd.concat(assignments)
 
 
-def get_assignment_table(data, hits, strand, get_range_function, substitution, threshold):
+def get_assignment_table(data, hits, strand, get_range_function, substitution, threshold, kmer_length):
     assignment_table = []
     for hit in hits:
-        hit_range = get_range_function(hit)
+        hit_range = get_range_function(hit, kmer_length=kmer_length)
         assignments = get_assignments(data=data, hit_range=hit_range, strand=strand, substitution=substitution,
                                       threshold=threshold)
         assignment_table.append(assignments)
@@ -97,16 +97,16 @@ def get_labeled_assignmets_from_alignment(alignment, positions, forward, thresho
 
     if forward is True:
         assignments = get_assignment_table(data=data, hits=hits, strand='t', get_range_function=get_hit_range,
-                                           substitution=substitution, threshold=threshold)
+                                           substitution=substitution, threshold=threshold, kmer_length=kmer_length)
         rc_assignments = get_assignment_table(data=data, hits=rc_hits, strand='c',
                                               get_range_function=get_reverse_complement_hit_range,
-                                              substitution=substitution, threshold=threshold)
+                                              substitution=substitution, threshold=threshold, kmer_length=kmer_length)
     else:
         assignments = get_assignment_table(data=data, hits=rc_hits, strand='t',
                                            get_range_function=get_reverse_complement_hit_range,
-                                           substitution=substitution, threshold=threshold)
+                                           substitution=substitution, threshold=threshold, kmer_length=kmer_length)
         rc_assignments = get_assignment_table(data=data, hits=hits, strand='c', get_range_function=get_hit_range,
-                                              substitution=substitution, threshold=threshold)
+                                              substitution=substitution, threshold=threshold, kmer_length=kmer_length)
 
     return assignments + rc_assignments
 
