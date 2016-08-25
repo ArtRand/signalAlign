@@ -19,6 +19,8 @@ def parse_args():
     parser.add_argument('--file_directory', '-d', action='append', default=None,
                         dest='files_dir', required=False, type=str,
                         help="directories with fast5 files to train on")
+    parser.add_argument("--file_of_files", "-fofn", action="append", required=False, default=None, dest="fofn",
+                        type=str, help="text file with absolute paths of files to use")
     parser.add_argument('--ref', '-r', action='store', default=None,
                         dest='ref', required=False, type=str,
                         help="location of refrerence sequence in FASTA")
@@ -68,9 +70,9 @@ def parse_args():
     parser.add_argument('--min_assignments', action='store', type=int, default=30000, dest='min_assignments',
                         help="Do not initiate Gibbs sampling unless this many assignments have been accumulated")
     # only supervised training enabled right now
-    parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
-                        help="Specify degenerate nucleotide options: "
-                             "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
+    #parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
+    #                    help="Specify degenerate nucleotide options: "
+    #                         "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
     parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
     parser.add_argument('--ambig_char', '-X', action='append', required=False, default=None, type=str, dest='ambig_char',
@@ -95,33 +97,49 @@ def get_2d_length(fast5):
         return read_length
 
 
-def cull_training_files(directories, training_amount, reference_sequences):
+def cull_training_files(directories, fofns, training_amount, reference_sequences):
+    def get_file_list():
+        source_list_tups = []
+        if fofns is not None:
+            for fofn in fofns:
+                source_list_tups.append((fofn, parse_fofn(fofn)))
+            return source_list_tups
+        else:
+            assert directories is not None
+            for d in directories:
+                fast5s = [d + x for x in os.listdir(d) if x.endswith(".fast5")]
+                source_list_tups.append((d, fast5s))
+            return source_list_tups
+
     print("trainModels - culling training files.\n", end="", file=sys.stderr)
 
     training_files = []
     add_to_training_files = training_files.append
 
-    assert len(directories) == len(reference_sequences), "Need to have equal number of references as training " \
-                                                         "file directories."
+    sources_and_files = get_file_list()
 
+    assert len(sources_and_files) == len(reference_sequences), "Need to have equal number of references as training " \
+                                                               "file directories."
     # loop over the directories and collect reads for training
-    for j, directory in enumerate(directories):
-        fast5s = [x for x in os.listdir(directory) if x.endswith(".fast5")]
+    for j, tup in enumerate(sources_and_files):
+        assert len(tup) == 2
+        source = tup[0]
+        fast5s = tup[1]
         shuffle(fast5s)
         total_amount = 0
         n = 0
         # loop over files and add them to training list, break when we have enough bases to complete a batch
-        # make a list of tuples [(fast5_path, (plus_ref_seq, minus_ref_seq)]
+        # make a list of tuples [(fast5_path, (plus_ref_seq, minus_ref_seq))]
         for i in xrange(len(fast5s)):
-            add_to_training_files((directory + fast5s[i], reference_sequences[j]))
+            add_to_training_files((fast5s[i], reference_sequences[j]))
             n += 1
-            total_amount += get_2d_length(directory + fast5s[i])
+            total_amount += get_2d_length(fast5s[i])
             if total_amount >= training_amount:
                 break
-        print("Culled {nb_files} training files, for {bases} from {dir}.".format(nb_files=n,
-                                                                                 bases=total_amount,
-                                                                                 dir=directory),
+        print("Culled {nb_files} training files, for {bases} from {dir}.".format(nb_files=n, bases=total_amount,
+                                                                                 dir=source),
               end="\n", file=sys.stderr)
+
     shuffle(training_files)
     return training_files
 
@@ -226,7 +244,10 @@ def main(args):
                iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP,
                emissions=args.emissions, transitions=args.transitions)
 
-    assert (args.files_dir is not None), "Need to specify which files to train on"
+    if args.files_dir is None and args.fofn is None:
+        print("Need to provide directory with .fast5 files of fofn", file=sys.stderr)
+        sys.exit(1)
+
     assert (args.ref is not None), "Need to provide a reference file"
     assert (args.out is not None), "Need to know the working directory for training"
 
@@ -252,8 +273,8 @@ def main(args):
                                              substitution_file=args.substitution_file,
                                              sequence_outfile=plus_strand_sequence,
                                              rc_sequence_outfile=minus_strand_sequence,
-                                             degenerate_type=args.degenerate,
-                                             ambig_char=sub_char)
+                                             degenerate_type=None,
+                                             sub_char=sub_char)
             reference_sequences.append((plus_strand_sequence, minus_strand_sequence))
     else:
         plus_strand_sequence = working_folder.add_file_path("forward_reference.txt")
@@ -317,8 +338,9 @@ def main(args):
     i = 0
     while i < args.iter:
         # first cull a set of files to get expectations on
-        training_files = cull_training_files(args.files_dir, args.amount, reference_sequences)
-
+        #training_files = cull_training_files(args.files_dir, args.amount, reference_sequences)
+        training_files = cull_training_files(directories=args.files_dir, fofns=args.fofn, training_amount=args.amount,
+                                             reference_sequences=reference_sequences)
         # setup
         workers = args.nb_jobs
         work_queue = Manager().Queue()

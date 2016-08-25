@@ -18,6 +18,16 @@ from serviceCourse.file_handlers import FolderHandler
 NORM_DIST_PARAMS = 2
 NB_MODEL_PARAMS = 5
 
+
+def parse_fofn(fofn_file):
+    files = []
+    with open(fofn_file, "r") as fH:
+        for l in fH:
+            files.append(l.strip())
+    assert len(files) > 0, "parse_fofn: error, didn't find any files in file of files {}".format(fofn_file)
+    return files
+
+
 def kmer_iterator(dna, k):
     for i in xrange(len(dna)):
         kmer = dna[i:(i+k)]
@@ -116,7 +126,24 @@ def make_temp_sequence(fasta, sequence_outfile, rc_sequence_outfile):
 
 
 def add_ambiguity_chars_to_reference(input_fasta, substitution_file, sequence_outfile, rc_sequence_outfile,
-                                     degenerate_type, sub_out="C", ambig_char="X"):
+                                     degenerate_type, sub_char="X"):
+    def check_substitution(position, seq):
+        sub_out = seq[position]
+        if sub_out == sub_char:
+            return True  # no change
+        if sub_char == "I" and sub_out != "A":
+            return False
+        if (sub_char == "E" or sub_char == "O") and sub_out != "C":
+            return False
+        if sub_char == "X":
+            if degenerate_type is None:
+                return False
+            if sub_out == "C" and degenerate_type not in ["cytosine2", "cytosine3"]:
+                return False
+            if sub_out == "A" and degenerate_type not in ["adenosine"]:
+                return False
+        return True
+
     assert os.path.isfile(input_fasta), "ERROR: Didn't find reference FASTA {}".format(input_fasta)
     assert os.path.isfile(substitution_file), "ERROR: Didn't find substitution file {}".format(substitution_file)
     assert (not os.path.isfile(sequence_outfile)), "ERROR: forward file already exists"
@@ -141,15 +168,13 @@ def add_ambiguity_chars_to_reference(input_fasta, substitution_file, sequence_ou
     backward_pos = b[1]
 
     for position in forward_pos:
-        if degenerate_type in ["cytosine2", "cytosine3"]:
-            assert seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed"\
-                .format(seq_pos=seq[position])
-        seq[position] = ambig_char
+        ok = check_substitution(position=position, seq=seq)
+        assert ok, "substitution not allowed"
+        seq[position] = sub_char
     for position in backward_pos:
-        if degenerate_type in ["cytosine2", "cytosine3"]:
-            assert r_seq[position] in list(sub_out), "ERROR: trying to sub {seq_pos} not allowed"\
-                .format(seq_pos=seq[position])
-        r_seq[position] = ambig_char
+        ok = check_substitution(position=position, seq=r_seq)
+        assert ok, "substitution not allowed"
+        r_seq[position] = sub_char
 
     # make them back into strings
     seq = ''.join(seq)
