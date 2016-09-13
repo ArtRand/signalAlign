@@ -77,68 +77,37 @@ static void test_poissonPosteriorProb(CuTest *testCase) {
     //st_uglyf("0 - %f\n1 - %f\n2 - %f\n3 - %f\n4 - %f\n5 - %f\n", test0, test1, test2, test3, test4, test5);
 }
 */
-static void test_getLogGaussPdfMatchProb(CuTest *testCase) {
-    // standard normal distribution
-    double eventModel[] = {0, 0, 1.0};
+
+static void test_stateMachine3EmissionsPdfs(CuTest *testCase) {
+    // test Gaussian distribution PDF
     double control = test_standardNormalPdf(0);
-    st_uglyf("contol: %f\n", control);
-    char *kmer1 = "AAAAAA";
-    double event1[] = {0};
-    double test = emissions_signal_logGaussMatchProb(eventModel, kmer1, event1);
-    st_uglyf("test: %f\n", test);
-    double expTest = exp(test);
-    CuAssertDblEquals(testCase, expTest, control, 0.001);
-    CuAssertDblEquals(testCase, test, log(control), 0.001);
+    double obs = emissions_signal_logGaussianProbabilityDensity(0, 0, 1);
+    CuAssertDblEquals(testCase, log(control), obs, 0.001);
+    CuAssertDblEquals(testCase, control, exp(obs), 0.001);
+    st_randomSeed(5);
+    double sigma = 0.0;
+    while (sigma <= 0.1) {
+        sigma = st_random();
+    }
+    double mu = rand_uniform2(0, 10);
+    double posOrNeg = st_random();
+    double x = 0.0;
 
-    char *modelFile = stString_print("../models/testModelR73_acegot_template.model");
-    //StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
-    StateMachine *sM = getStateMachine3(modelFile);
-    double event2[] = {62.784241};
-    double control2 = test_normalPdf(62.784241, sM->EMISSION_MATCH_MATRIX[1], sM->EMISSION_MATCH_MATRIX[2]);
-    double test2 = emissions_signal_logGaussMatchProb(sM->EMISSION_MATCH_MATRIX, kmer1, event2);
-    CuAssertDblEquals(testCase, test2, log(control2), 0.001);
-    stateMachine_destruct(sM);
-}
-
-static void test_bivariateGaussPdfMatchProb(CuTest *testCase) {
-    // standard normal distribution
-    double eventModel[] = {0, 0, 1.0, 0, 1.0};
-    double control = test_standardNormalPdf(0);
-    double controlSq = control * control;
-    char *kmer1 = "AAAAAA";
-    double event1[] = {0, 0}; // mean noise
-    double test = emissions_signal_getBivariateGaussPdfMatchProb(eventModel, kmer1, event1);
-    double eTest = exp(test);
-    CuAssertDblEquals(testCase, controlSq, eTest, 0.001);
-
-    char *modelFile = stString_print("../models/testModelR73_acegot_template.model");
-    //StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
-    StateMachine *sM = getStateMachine3(modelFile);
-    double event2[] = {62.784241, 0.664989};
-    double control2a = test_normalPdf(62.784241, sM->EMISSION_MATCH_MATRIX[1], sM->EMISSION_MATCH_MATRIX[2]);
-    double control2b = test_normalPdf(0.664989, sM->EMISSION_MATCH_MATRIX[3], sM->EMISSION_MATCH_MATRIX[4]);
-    double control2Sq = control2a * control2b;
-    double test2 = emissions_signal_getBivariateGaussPdfMatchProb(sM->EMISSION_MATCH_MATRIX, kmer1, event2);
-    double eTest2 = exp(test2);
-    CuAssertDblEquals(testCase, eTest2, control2Sq, 0.001);
-    stateMachine_destruct(sM);
-}
-
-static void test_twoDistributionPdf(CuTest *testCase) {
-    // load up a stateMachine
-    char *modelFile = stString_print("../models/testModelR73_acegot_template.model");
-    //StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
-    StateMachine *sM = getStateMachine3(modelFile);
-    double event[] = {62.784241, 0.664989}; // level_mean and noise_mean for AAAAAA
-    char *kmer1 = "AAAAAA";
-
-    // get a sample match prob
-    double test = emissions_signal_getEventMatchProbWithTwoDists(sM->EMISSION_MATCH_MATRIX, kmer1, event);
-    double control_level = test_normalPdf(62.784241, sM->EMISSION_MATCH_MATRIX[1], sM->EMISSION_MATCH_MATRIX[2]);
-    double control_noise = test_inverseGaussianPdf(0.664989, sM->EMISSION_MATCH_MATRIX[3], sM->EMISSION_MATCH_MATRIX[5]);
-    double control_prob = log(control_level) + log(control_noise);
-    CuAssertDblEquals(testCase, test, control_prob, 0.001);
-    stateMachine_destruct(sM);
+    if (posOrNeg > 0.5) {
+        x = mu - st_random();
+    } else {
+        x = mu + st_random();
+    }
+    control = test_normalPdf(x, mu, sigma);
+    obs = emissions_signal_logGaussianProbabilityDensity(x, mu, sigma);
+    CuAssertDblEquals(testCase, log(control), obs, 0.001);
+    CuAssertDblEquals(testCase, control, exp(obs), 0.001);
+    // test Inverse Gaussian PDF
+    double lambda = st_random();
+    control = test_inverseGaussianPdf(x, mu, lambda);
+    obs = emissions_signal_logInverseGaussianProbabilityDensity(x, mu, lambda);
+    CuAssertDblEquals(testCase, log(control), obs, 0.001);
+    CuAssertDblEquals(testCase, control, exp(obs), 0.001);
 }
 
 static bool testDiagonalsEqual(Diagonal d1, Diagonal d2) {
@@ -730,7 +699,7 @@ static void test_getBlastPairs(CuTest *testCase) {
         free(sY);
     }
 }
-
+/*
 static void test_filterToRemoveOverlap(CuTest *testCase) {
     for (int64_t i = 0; i < 5; i++) {
         //Make random pairs
@@ -790,7 +759,7 @@ static void test_filterToRemoveOverlap(CuTest *testCase) {
 
     }
 }
-
+*/
 static void test_getBlastPairsWithRecursion(CuTest *testCase) {
     /*
      * Test the blast heuristic to get the different pairs.
@@ -814,6 +783,7 @@ static void test_getBlastPairsWithRecursion(CuTest *testCase) {
 
 CuSuite *signalPairwiseAlignerTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
+
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_logAdd);
@@ -830,11 +800,7 @@ CuSuite *signalPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
 
     //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);  // wonky
-
-    //SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
-    //SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
-    //SUITE_ADD_TEST(suite, test_twoDistributionPdf);
+    SUITE_ADD_TEST(suite, test_stateMachine3EmissionsPdfs);
     //SUITE_ADD_TEST(suite, test_poissonPosteriorProb);
-    //SUITE_ADD_TEST(suite, test_strawMan_cell);
     return suite;
 }

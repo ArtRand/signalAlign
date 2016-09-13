@@ -273,6 +273,10 @@ void emissions_discrete_initEmissionsToZero(StateMachine *sM);
 * In the most simple case, with 4 nucleotides the gap matrix is 4x1 matrix and the match matrix is a 4x4 matrix.
 */
 
+// probability density functions
+double emissions_signal_logGaussianProbabilityDensity(double x, double mu, double sigma);
+double emissions_signal_logInverseGaussianProbabilityDensity(double x, double mu, double lambda);
+
 double emissions_signal_getHdpKmerDensity(StateMachine *sM, void *x_i, void *e_j, bool ignore);
 
 double emissions_signal_descaleEventMean_JordanStyle(double scaledEvent, double levelMean, double scale, double shift, double var);

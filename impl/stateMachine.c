@@ -274,6 +274,14 @@ static double emissions_signal_poissonPosteriorProb(int64_t n, double duration) 
 }
 
 ///////////////////////////////////////////// CORE FUNCTIONS ////////////////////////////////////////////////////////
+double emissions_signal_logGaussianProbabilityDensity(double x, double mu, double sigma) {
+    return emissions_signal_logGaussPdf(x, mu, sigma);
+}
+
+double emissions_signal_logInverseGaussianProbabilityDensity(double x, double mu, double lambda) {
+    return emissions_signal_logInvGaussPdf(x, mu, lambda);
+}
+
 double emissions_signal_descaleEventMean_JordanStyle(double scaledEvent, double levelMean,
                                                      double scale, double shift, double var) {
     // (x  + var * level_mean - scale * level_mean - shift) / var
@@ -354,7 +362,7 @@ double emissions_signal_logGaussMatchProb(const double *eventModel, void *kmer, 
 
     // clean up
     free(kmer_i);
-    /// / debugging
+    // debugging
     //double prob = l_inv_sqrt_2pi - l_modelSD + (-0.5f * a * a);
     //st_uglyf("MATCHING--kmer:%s (index: %lld), event mean: %f, levelMean: %f, prob: %f\n", kmer_i, kmerIndex, eventMean, modelMean, prob);
     // returns log space
@@ -521,7 +529,7 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine 
     double modelNoiseLambda = emissions_signal_getModelFluctuationLambda(eventModel, kmerIndex);
 
     double l_probEventMean = emissions_signal_logGaussPdf(eventMean, levelMean, levelStdDev);
-    // I tried using the inverse gaussian here
+
     //double l_probEventNoise = emissions_signal_logGaussPdf(eventNoise, noiseMean, noiseStdDev);
     double l_probEventNoise = emissions_signal_logInvGaussPdf(eventNoise, noiseMean, modelNoiseLambda);
 
@@ -1001,11 +1009,7 @@ static void stateMachine5_loadSymmetric(StateMachine5 *sM5, Hmm *hmm) {
 /////////////////////////////////////////// STATIC FUNCTIONS ////////////////////////////////////////////////////////
 
 // Transitions //
-typedef enum {
-    match0 = 0, match1 = 1, match2 = 2, match3 = 3, match4 = 4, match5 = 5, gapX = 6
-} SignalState;
-
-static bool stateMachine3_checkStateNumber(int64_t stateNumber, StateMachineType type) {
+static inline bool stateMachine3_checkStateNumber(int64_t stateNumber, StateMachineType type) {
     if (((type == threeState) || (type == threeStateHdp)) && (stateNumber == 3)) {
         return TRUE;
     }
@@ -1015,18 +1019,18 @@ static bool stateMachine3_checkStateNumber(int64_t stateNumber, StateMachineType
     return FALSE;
 }
 
-static double stateMachine3_startStateProb(StateMachine *sM, int64_t state) {
+static inline double stateMachine3_startStateProb(StateMachine *sM, int64_t state) {
     //Match state is like going to a match.
     state_check(sM, state);
     return state == match ? 0 : LOG_ZERO;
 }
 
-static double stateMachine3_raggedStartStateProb(StateMachine *sM, int64_t state) {
+static inline double stateMachine3_raggedStartStateProb(StateMachine *sM, int64_t state) {
     state_check(sM, state);
     return (state == shortGapX || state == shortGapY) ? 0 : LOG_ZERO;
 }
 
-static double stateMachine3_endStateProb(StateMachine *sM, int64_t state) {
+static inline double stateMachine3_endStateProb(StateMachine *sM, int64_t state) {
     //End state is like to going to a match
     StateMachine3 *sM3 = (StateMachine3 *) sM;
     state_check(sM, state);
@@ -1041,7 +1045,7 @@ static double stateMachine3_endStateProb(StateMachine *sM, int64_t state) {
     return 0.0;
 }
 
-static double stateMachine3_raggedEndStateProb(StateMachine *sM, int64_t state) {
+static inline double stateMachine3_raggedEndStateProb(StateMachine *sM, int64_t state) {
     //End state is like to going to a match
     StateMachine3 *sM3 = (StateMachine3 *) sM;
     state_check(sM, state);

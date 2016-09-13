@@ -7,11 +7,10 @@
 #include "stateMachine.h"
 #include "CuTest.h"
 #include "pairwiseAligner.h"
-//#include "discreteHmm.h"
-//#include "continuousHmm.h"
 #include "randomSequences.h"
 
 // helper functions
+/*
 static void print_stateMachine_transitions(StateMachine *sM) {
     StateMachine3_HDP *sMhdp = (StateMachine3_HDP *)sM;
     st_uglyf("Match continue %f\n", exp(sMhdp->TRANSITION_MATCH_CONTINUE));
@@ -26,6 +25,7 @@ static void print_stateMachine_transitions(StateMachine *sM) {
     st_uglyf("gap Y to match %f\n", exp(sMhdp->TRANSITION_MATCH_FROM_GAP_Y));
     st_uglyf("gap Y from gap X %f\n", exp(sMhdp->TRANSITION_GAP_SWITCH_TO_Y));
 }
+*/
 
 static inline char *homopolymer(char base, int64_t repeat) {
     char *homopolymer = (char *)st_malloc(sizeof(char) * (repeat + 1));
