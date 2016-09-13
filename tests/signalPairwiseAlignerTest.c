@@ -60,7 +60,7 @@ Sequence *makeKmerSequence(char *nucleotides) {
 }
 
 //////////////////////////////////////////////Function Tests/////////////////////////////////////////////////////////
-
+/*  Old test that I'm keeping around in case I re-instate the duration model
 static void test_poissonPosteriorProb(CuTest *testCase) {
     double event1[] = {62.784241, 0.664989, 0.00332005312085};
     double test0 = emissions_signal_getDurationProb(event1, 0);
@@ -76,7 +76,7 @@ static void test_poissonPosteriorProb(CuTest *testCase) {
     CuAssertTrue(testCase, test4 > test5);
     //st_uglyf("0 - %f\n1 - %f\n2 - %f\n3 - %f\n4 - %f\n5 - %f\n", test0, test1, test2, test3, test4, test5);
 }
-
+*/
 static void test_getLogGaussPdfMatchProb(CuTest *testCase) {
     // standard normal distribution
     double eventModel[] = {0, 0, 1.0};
@@ -263,37 +263,57 @@ static void test_loadNanoporeRead(CuTest *testCase) {
     FILE *fH = fopen(tempFile, "w");
 
     // write line 1
-    fprintf(fH, "%"PRId64"\t""%"PRId64"\t""%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t\n",
-            length, length, length, param, param, param, param, param, param, param, param, param, param);
+    fprintf(fH, "%"PRId64"\t""%"PRId64"\t""%"PRId64"\t""%"PRId64"\t""%"PRId64""
+                    "\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n",
+            length, length, length, length, length,
+            param, param, param, param, param, param, param, param, param, param, param, param);
 
-    // write line 2 2D read
+    // line 2 2D (alignment table) read sequence
     fprintf(fH, "%s\n", read);
 
-    // write line 3 template event map
+    // line 3 template read
+    fprintf(fH, "%s\n", read);
+
+    // line 4 template 'strand' map
     for (int64_t i = 0; i < length; i++) {
         fprintf(fH, "%"PRId64"\t", i);
     }
     fprintf(fH, "\n");
 
-    // write line 4 template events
-    for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
-        fprintf(fH, "%"PRId64"\t", i);
-    }
-    fprintf(fH, "\n");
+    // line 5 complement read
+    fprintf(fH, "%s\n", read);
 
-    // write line 5 complement event map
+    // line 6 complement 'stand' map
     for (int64_t i = 0; i < length; i++) {
         fprintf(fH, "%"PRId64"\t", i);
     }
     fprintf(fH, "\n");
 
-    // write line 6 complement events
+    // line 7 template 2D 'event' map
+    for (int64_t i = 0; i < length; i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // line 8 template events
     for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
         fprintf(fH, "%"PRId64"\t", i);
     }
     fprintf(fH, "\n");
 
-    // line 7 template model_state
+    // line 9 complement 2D 'event' map
+    for (int64_t i = 0; i < length; i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // line 10 complement events
+    for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // line 11 template model_state
     char *kmer;
     for (int64_t i = 0; i < length; i++) {
         kmer = (char *)stList_get(kmers, i);
@@ -301,21 +321,20 @@ static void test_loadNanoporeRead(CuTest *testCase) {
     }
     fprintf(fH, "\n");
 
-    // line 8 pModel template
+    // line 12 pModel template
     for (int64_t i = 0; i < length; i++) {
         fprintf(fH, "%f\t", prob);
     }
     fprintf(fH, "\n");
 
-    // line 9 complement model_state
-    *kmer;
+    // line 13 complement model_state
     for (int64_t i = 0; i < length; i++) {
         kmer = (char *)stList_get(kmers, i);
         fprintf(fH, "%s\t", kmer);
     }
     fprintf(fH, "\n");
 
-    // line 10 pModel complement
+    // line 14 pModel complement
     for (int64_t i = 0; i < length; i++) {
         fprintf(fH, "%f\t", prob);
     }
@@ -325,23 +344,32 @@ static void test_loadNanoporeRead(CuTest *testCase) {
 
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile);
     CuAssertTrue(testCase, npRead->readLength == length);
+    CuAssertTrue(testCase, npRead->templateReadLength == length);
+    CuAssertTrue(testCase, npRead->complementReadLength == length);
+    CuAssertTrue(testCase, npRead->nbTemplateEvents == length);
+    CuAssertTrue(testCase, npRead->nbComplementEvents == length);
+
     CuAssertTrue(testCase, npRead->templateParams.scale == param);
     CuAssertTrue(testCase, npRead->templateParams.shift == param);
     CuAssertTrue(testCase, npRead->templateParams.var == param);
     CuAssertTrue(testCase, npRead->templateParams.scale_sd == param);
     CuAssertTrue(testCase, npRead->templateParams.var_sd == param);
+
     CuAssertTrue(testCase, npRead->complementParams.scale == param);
     CuAssertTrue(testCase, npRead->complementParams.shift == param);
     CuAssertTrue(testCase, npRead->complementParams.var == param);
     CuAssertTrue(testCase, npRead->complementParams.scale_sd == param);
     CuAssertTrue(testCase, npRead->complementParams.var_sd == param);
-    CuAssertTrue(testCase, npRead->nbTemplateEvents == length);
-    CuAssertTrue(testCase, npRead->nbComplementEvents == length);
+
     CuAssertStrEquals(testCase, npRead->twoDread, read);
+    CuAssertStrEquals(testCase, npRead->templateRead, read);
+    CuAssertStrEquals(testCase, npRead->complementRead, read);
 
     for (int64_t i = 0; i < length; i++) {
         CuAssertTrue(testCase, npRead->templateEventMap[i] == i);
         CuAssertTrue(testCase, npRead->complementEventMap[i] == i);
+        CuAssertTrue(testCase, npRead->templateStrandEventMap[i] == i);
+        CuAssertTrue(testCase, npRead->complementStrandEventMap[i] == i);
     }
     for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
         CuAssertTrue(testCase, npRead->templateEvents[i] == i);
@@ -792,7 +820,7 @@ CuSuite *signalPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_Sequence);
     SUITE_ADD_TEST(suite, test_referenceSequence);
     SUITE_ADD_TEST(suite, test_eventSequence);
-    //SUITE_ADD_TEST(suite, test_loadNanoporeRead);
+    SUITE_ADD_TEST(suite, test_loadNanoporeRead);
     SUITE_ADD_TEST(suite, test_getSplitPoints);
     SUITE_ADD_TEST(suite, test_hdCellConstruct);
     SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "signalMachineUtils.h"
 
-#define REPORT_ADJUSTMENTS TRUE
+#define REPORT_ADJUSTMENTS FALSE
 
 // Borrowed from Bob Stout http://stjarnhimlen.se/snippets/strrev.c
 char *signalUtils_stringReverse(char *str) {

@@ -18,7 +18,6 @@
 #define M_PI 3.14159265358979323846264338
 #endif
 
-
 typedef struct Factor Factor;
 typedef struct DirichletProcess DirichletProcess;
 
@@ -2238,7 +2237,8 @@ void sample_gammas(HierarchicalDirichletProcess* hdp, int64_t* iter_counter, int
     
     int64_t num_dps = hdp->num_dps;
     DirichletProcess** dps = hdp->dps;
-    DirichletProcess* dp;
+    //DirichletProcess* dp;
+    DirichletProcess* dp = NULL;
     int64_t dp_depth;
     for (int64_t id = 0; id < num_dps; id++) {
         dp = dps[id];
@@ -2341,7 +2341,8 @@ double* snapshot_gamma_params(HierarchicalDirichletProcess* hdp, int64_t* length
 }
 
 double snapshot_factor_log_likelihood(Factor* fctr) {
-    double parent_prob;
+    //double parent_prob;
+    double parent_prob = 0.0;
     double cumul = 0.0;
     
     if (fctr->factor_type == BASE) {
@@ -2394,11 +2395,12 @@ double snapshot_factor_log_likelihood(Factor* fctr) {
         stSetIterator* pool_iter = stSet_getIterator(pool);
         Factor* fctr_option;
         double log_prob;
-        double parent_log_prob;
+        //double parent_log_prob;
+        double parent_log_prob = 0.0;
         double fctr_size;
         for (int64_t i = 0; i < num_fctrs; i++) {
-            fctr_option = (Factor*) stSet_getNext(pool_iter);
-            fctr_size = (double) stSet_size(fctr_option->children);
+            fctr_option = (Factor *)stSet_getNext(pool_iter);
+            fctr_size = (double )stSet_size(fctr_option->children);
             log_prob = factor_parent_joint_log_likelihood(fctr, fctr_option) + log(fctr_size);
             log_probs[i] = log_prob;
             if (fctr_option == parent_fctr) {
@@ -3062,7 +3064,8 @@ HierarchicalDirichletProcess* deserialize_hdp(FILE* in) {
     free(line);
     
     double* data;
-    int64_t* dp_ids;
+    //int64_t* dp_ids;
+    int64_t* dp_ids = NULL;
     int64_t data_length;
     stList* tokens;
     if (has_data) {

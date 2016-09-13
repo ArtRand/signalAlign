@@ -211,7 +211,6 @@ int main(int argc, char *argv[]) {
     st_uglyf("SENTINEL - After: shift_sd: %f scale_sd: %f var_sd: %f [template]\n",
              npRead->complementParams.shift_sd, npRead->complementParams.scale_sd, npRead->complementParams.var_sd);
 
-
     //signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
     //                                   signalUtils_templateOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
     //signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,

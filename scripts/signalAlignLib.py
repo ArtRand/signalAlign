@@ -771,9 +771,9 @@ class NanoporeRead(object):
             print(len(self.template_events), end=' ', file=out_file)           # 1nb of template events
             print(len(self.complement_events), end=' ', file=out_file)         # 2nb of complement events
             print(len(self.template_read), end=' ', file=out_file)             # 3length of template read
-            print(len(self.complement_read), end=' ', file=out_file)           # 4length of template read
+            print(len(self.complement_read), end=' ', file=out_file)           # 4length of complement read
             print(self.template_scale, end=' ', file=out_file)                 # 5template scale
-            print(self.template_shift, end=' ', file=out_file)                 # 67template shift
+            print(self.template_shift, end=' ', file=out_file)                 # 6template shift
             print(self.template_var, end=' ', file=out_file)                   # 7template var
             print(self.template_scale_sd, end=' ', file=out_file)              # 8template scale_sd
             print(self.template_var_sd, end=' ', file=out_file)                # 9template var_sd
@@ -791,7 +791,7 @@ class NanoporeRead(object):
             # line 3 template read
             print(self.template_read, end='\n', file=out_file)
 
-            # line 4 tempalte strand map
+            # line 4 template strand map
             for _ in self.template_strand_event_map:
                 print(_, end=' ', file=out_file)
             print("", end="\n", file=out_file)

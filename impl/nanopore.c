@@ -97,10 +97,25 @@ NanoporeReadAdjustmentParameters *nanopore_readAdjustmentParametersConstruct() {
 
 NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     FILE *fH = fopen(nanoporeReadFile, "r");
+    // line 1: all tab-seperated
+    // 0 alignment read length
+    // 1 # template events
+    // 2 # complement events
+    // 3 length of template read
+    // 4 length of complement read
+    // 5 template scale
+    // 6 template shift
+    // 7 template var
+    // 8 template scale_sd
+    // 9 template var_sd
+    // 0 template drift
+    // 1 complement scale
+    // 2 complement shift
+    // 3 complement var
+    // 4 complement scale_sd
+    // 5 complement var_sd
+    // 6 complement drift
 
-    // line 1 [2D read length] [# of template events] [# of complement events]
-    //        [template scale] [template shift] [template var] [template scale_sd] [template var_sd]
-    //        [complement scale] [complement shift] [complement var] [complement scale_sd] [complement var_sd] \n
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
     int64_t npRead_readLength, npRead_nbTemplateEvents, npRead_nbComplementEvents,
@@ -446,6 +461,8 @@ stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSeq
     return mapOfEventsToKmers;
 }
 
+// This function basically reads off the 1D alignment table, and will give back eventKmerTuples that have kmers with
+// whatever length the base caller used
 static stList *nanopore_makeEventTuplesFromOneDRead(int64_t *kmerIndices, double *events, double *probs,
                                                     int64_t numberOfEvents, double threshold) {
     stList *map = stList_construct3(0, &free);

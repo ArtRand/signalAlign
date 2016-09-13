@@ -24,11 +24,11 @@ CuSuite *stateMachineAlignmentTestSuite(void);
 int stBaseAlignerRunAllTests(void) {
     CuString *output = CuStringNew();
     CuSuite *suite = CuSuiteNew();
-    CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
-    CuSuiteAddSuite(suite, HdpTestSuite());
+    //CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
+    //CuSuiteAddSuite(suite, HdpTestSuite());
     CuSuiteAddSuite(suite, signalPairwiseAlignerTestSuite());
-    CuSuiteAddSuite(suite, variableOrderPairwiseAlignerTestSuite());
-    CuSuiteAddSuite(suite, stateMachineAlignmentTestSuite());
+    //CuSuiteAddSuite(suite, variableOrderPairwiseAlignerTestSuite());
+    //CuSuiteAddSuite(suite, stateMachineAlignmentTestSuite());
 
     // coming soon..
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());

@@ -77,6 +77,8 @@ stList *nanopore_getTemplateOneDAssignments(NanoporeRead *npRead, double thresho
 
 stList *nanopore_getComplementOneDAssignments(NanoporeRead *npRead, double threshold);
 
+// Assembles eventKmerTuples from the 1D read nucleotide sequence (so you can have k-mer lengths that are different
+// from the base caller
 stList *nanopore_getOneDAssignmentsFromRead(int64_t *strandEventMap, double *events, char *strandRead,
                                             int64_t readLength, char *alphabet, int64_t alphabetSize,
                                             int64_t kmerLength);
