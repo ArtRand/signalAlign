@@ -209,7 +209,9 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
-
+    
+    (void) j;
+    
     if ((templateHdpOutfile == NULL) || (complementHdpOutfile == NULL)) {
         st_errAbort("[buildHdpUtil] ERROR: Need to specify where to put the HDP files");
     }
