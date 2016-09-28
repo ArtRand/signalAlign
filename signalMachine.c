@@ -631,7 +631,7 @@ int main(int argc, char *argv[]) {
             // set referenceSequence to this iteration's sequence
             signalUtils_ReferenceSequenceSet(R, fR, bR);
 
-            fprintf(stderr, "signalAlign - starting template alignment round %lld\n", i);
+            fprintf(stderr, "signalAlign - starting template alignment round %"PRId64"\n", i);
 
             // get aligned pairs
             stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, npRead->templateEventMap,
@@ -640,7 +640,7 @@ int main(int argc, char *argv[]) {
 
             double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
-            fprintf(stdout, "%s :: Iteration %lld, # alignedPairs (template): %lld, score: %f\n",
+            fprintf(stdout, "%s :: Iteration %"PRId64", # alignedPairs (template): %"PRId64", score: %f\n",
                     readLabel, i, stList_length(templateAlignedPairs), templatePosteriorScore);
 
             stList_sort(templateAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
@@ -657,7 +657,7 @@ int main(int argc, char *argv[]) {
                                     templateAlignedPairs, template);
 
 
-            fprintf(stderr, "signalAlign - starting complement alignment round %lld\n", i);
+            fprintf(stderr, "signalAlign - starting complement alignment round %"PRId64"\n", i);
 
             stList *complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
                                                             npRead->complementEventMap, pA->start2,
@@ -669,7 +669,7 @@ int main(int argc, char *argv[]) {
             // sort
             stList_sort(complementAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
 
-            fprintf(stdout, "%s :: Iteration %lld, # alignedPairs (complement): %lld, score: %f\n",
+            fprintf(stdout, "%s :: Iteration %"PRId64", # alignedPairs (complement): %"PRId64", score: %f\n",
                     readLabel, i, stList_length(complementAlignedPairs), complementPosteriorScore);
 
             writePosteriorProbsFull(perIterationOutputFile, readLabel,

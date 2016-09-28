@@ -28,6 +28,7 @@ def parse_alignment_full(alignment_file):
                          names=['ref_pos', 'ref_kmer', 'strand', 'event_index', 'kmer', 'posterior_prob', 'event_mean'])
     return data
 
+
 class LibTest(unittest.TestCase):
     def test_signalAlign_library(self):
         command = "./signalAlignLibTests"
@@ -35,7 +36,7 @@ class LibTest(unittest.TestCase):
         self.assertTrue(result == 0, "signalAlign Library Tests Fail")
 
 
-class signalAlign_alignment_test(unittest.TestCase):
+class SignalAlignAlignmentTest(unittest.TestCase):
     def setUp(self):
         os.makedirs("./signalAlign_unittest/")
 
@@ -117,7 +118,7 @@ class signalAlign_EM_test(unittest.TestCase):
 def main():
     testSuite = unittest.TestSuite()
     testSuite.addTest(LibTest('test_signalAlign_library'))
-    testSuite.addTest(signalAlign_alignment_test('test_zymo_reads'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
     #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
     testSuite.addTest(signalAlign_EM_test('test_EM'))
 
