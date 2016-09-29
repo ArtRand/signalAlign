@@ -210,7 +210,7 @@ void test_distr_metrics(CuTest* ct) {
 void test_nhdp_distrs(CuTest* ct) {
 
     NanoporeHDP* nhdp = flat_hdp_model("ACGT", 4, 6, 4.0, 20.0, 0.0, 100.0, 100,
-                                       "../models/template_median68pA.model");
+                                       "../models/testModelR73_acegot_template.model");
 
     update_nhdp_from_alignment(nhdp, "../tests/test_alignments/simple_alignment.tsv",
                                false);

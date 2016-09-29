@@ -464,7 +464,7 @@ void test_serialization(CuTest* ct) {
 void test_nhdp_serialization(CuTest* ct) {
 
     NanoporeHDP* nhdp = flat_hdp_model("ACGT", 4, 6, 4.0, 20.0, 0.0, 100.0, 100,
-                                       "../models/template_median68pA.model");
+                                       "../models/testModelR73_acegot_template.model");
 
     update_nhdp_from_alignment(nhdp, "../tests/test_alignments/simple_alignment.tsv", false);
 
@@ -477,116 +477,6 @@ void test_nhdp_serialization(CuTest* ct) {
     remove("../tests/test_hdp/test.nhdp");
 }
 
-static void test_HdpHmmWithAssignments_flat_model(CuTest *testCase) {
-    char *alignmentFile = stString_print("../tests/test_alignments/simple_alignment.tsv");
-    char *templateModelFile = "../models/template_median68pA.model";
-    // make NanoporeHDP to compare to
-    NanoporeHDP *nHdp1 = flat_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                        5.0, 0.5,
-                                        0.0, 100.0, 100, templateModelFile);
-    update_nhdp_from_alignment_with_filter(nHdp1, alignmentFile, FALSE, "t");
-    execute_nhdp_gibbs_sampling(nHdp1, 400, 1000, 10, FALSE);
-    finalize_nhdp_distributions(nHdp1);
-
-    // make NanoporeHDP from Hmm
-    NanoporeHDP *nHdp2 = flat_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                        5.0, 0.5, // base_gamma, leaf_gamma
-                                        0.0, 100.0, 100, templateModelFile);
-    // load Hmm from disk and update the NanoporeHDP
-    Hmm *hmm = hdpHmm_loadFromFile("../../cPecan/tests/test_hdp/test_expectations.expectations", nHdp2);
-    (void) hmm;
-    execute_nhdp_gibbs_sampling(nHdp2, 400, 1000, 10, FALSE);
-    finalize_nhdp_distributions(nHdp2);
-
-    // test against model updated with simple alignment
-    test_checkHDPs(testCase, nHdp2, nHdp1, 0.0001);
-}
-
-static void test_HdpHmmWithAssignments_flat_model2(CuTest *testCase) {
-    char *alignmentFile = stString_print("../tests/test_alignments/simple_alignment.tsv");
-    char *templateModelFile = "../models/template_median68pA.model";
-    // make NanoporeHDP to compare to
-    NanoporeHDP *nHdp1 = flat_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                          5.0, 0.5, 5.0, 0.5, // base_alpha, base_beta, leaf_alpha, leaf_beta
-                                          0.0, 100, 100,
-                                          templateModelFile);
-    update_nhdp_from_alignment_with_filter(nHdp1, alignmentFile, FALSE, "t");
-    execute_nhdp_gibbs_sampling(nHdp1, 1000, 10000, 100, FALSE);
-    finalize_nhdp_distributions(nHdp1);
-
-    // make NanoporeHDP from Hmm
-    NanoporeHDP *nHdp2 = flat_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                          5.0, 0.5, 5.0, 0.5,
-                                          0.0, 100, 100,
-                                          templateModelFile);
-    // load Hmm from disk and update the NanoporeHDP
-    Hmm *hmm = hdpHmm_loadFromFile("../../cPecan/tests/test_hdp/test_expectations.expectations", nHdp2);
-    (void) hmm;
-    execute_nhdp_gibbs_sampling(nHdp2, 1000, 10000, 100, FALSE);
-    finalize_nhdp_distributions(nHdp2);
-
-    // test against model updated with simple alignment
-    test_checkHDPs(testCase, nHdp2, nHdp1, 0.0001);
-}
-
-static void test_HdpHmmWithAssignments_multiset_model(CuTest *testCase) {
-    char *alignmentFile = stString_print("../tests/test_alignments/simple_alignment.tsv");
-    char *templateModelFile = "../models/template_median68pA.model";
-    // make NanoporeHDP to compare to
-    NanoporeHDP *nHdp1 = multiset_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                            1.0, 1.0, 1.0,
-                                            0.0, 100, 100,
-                                            templateModelFile);
-    update_nhdp_from_alignment_with_filter(nHdp1, alignmentFile, FALSE, "t");
-    execute_nhdp_gibbs_sampling(nHdp1, 400, 1000, 10, FALSE);
-    finalize_nhdp_distributions(nHdp1);
-
-    // make NanoporeHDP from Hmm
-    NanoporeHDP *nHdp2 = multiset_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                            1.0, 1.0, 1.0,
-                                            0.0, 100, 100,
-                                            templateModelFile);
-    // load Hmm from disk and update the NanoporeHDP
-    Hmm *hmm = hdpHmm_loadFromFile("../../cPecan/tests/test_hdp/test_expectations.expectations", nHdp2);
-    (void) hmm;
-    execute_nhdp_gibbs_sampling(nHdp2, 400, 1000, 10, FALSE);
-    finalize_nhdp_distributions(nHdp2);
-
-    // test against model updated with simple alignment
-    test_checkHDPs(testCase, nHdp2, nHdp1, 0.0001);
-}
-
-static void test_HdpHmmWithAssignments_multiset_model2(CuTest *testCase) {
-    char *alignmentFile = stString_print("../tests/test_alignments/simple_alignment.tsv");
-    char *templateModelFile = "../models/template_median68pA.model";
-    // make NanoporeHDP to compare to
-    NanoporeHDP *nHdp1 = multiset_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                              5.0, 0.5,
-                                              5.0, 0.5,
-                                              5.0, 0.5,
-                                              0.0, 100, 100,
-                                              templateModelFile);
-    update_nhdp_from_alignment_with_filter(nHdp1, alignmentFile, FALSE, "t");
-    execute_nhdp_gibbs_sampling(nHdp1, 400, 1000, 10, FALSE);
-    finalize_nhdp_distributions(nHdp1);
-
-    // make NanoporeHDP from Hmm
-    NanoporeHDP *nHdp2 = multiset_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
-                                              5.0, 0.5,
-                                              5.0, 0.5,
-                                              5.0, 0.5,
-                                              0.0, 100, 100,
-                                              templateModelFile);
-    // load Hmm from disk and update the NanoporeHDP
-    Hmm *hmm = hdpHmm_loadFromFile("../../cPecan/tests/test_hdp/test_expectations.expectations", nHdp2);
-    (void) hmm;
-    execute_nhdp_gibbs_sampling(nHdp2, 400, 1000, 10, FALSE);
-    finalize_nhdp_distributions(nHdp2);
-
-    // test against model updated with simple alignment
-    test_checkHDPs(testCase, nHdp2, nHdp1, 0.0001);
-}
-
 CuSuite *NanoporeHdpTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_first_kmer_index);
@@ -597,9 +487,5 @@ CuSuite *NanoporeHdpTestSuite(void) {
     SUITE_ADD_TEST(suite, test_kmer_id);
     SUITE_ADD_TEST(suite, test_serialization);
     SUITE_ADD_TEST(suite, test_nhdp_serialization);
-    //SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model);
-    //SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model2);
-    //SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_multiset_model);
-    //SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_multiset_model2);
     return suite;
 }

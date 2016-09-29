@@ -36,14 +36,14 @@ def parse_args():
     # initial HDP
     parser.add_argument('--build_alignment', action='store', type=str, default=None,
                         required=False, dest='build_alignment')
-    parser.add_argument('--threshold', '-t', action='store', type=float, default=0.9, dest='threshold')
+    parser.add_argument('--threshold', '-t', action='store', type=float, default=0.0, dest='threshold')
     parser.add_argument('--hdp_type', action='store', type=str, required=False, dest='hdp_type', default='Prior',
                         help="Build Hdp, specify type, options: "
                              "Prior, Fixed, twoWay. twoWay is a Prior-type model (recommended)")
-    parser.add_argument('--template_model', '-tM', action='store', type=str, default=None, dest='template_lookup',
-                        required=False, help="Input template lookup table")
-    parser.add_argument('--complement_model', '-cM', action='store', type=str, default=None, dest='complement_lookup',
-                        required=False, help="Input complement lookup table")
+    parser.add_argument('--template_model', '-tM', action='store', type=str, dest='template_lookup',
+                        required=True, help="Input template lookup table")
+    parser.add_argument('--complement_model', '-cM', action='store', type=str, dest='complement_lookup',
+                        required=True, help="Input complement lookup table")
     # fixed concentration models
     parser.add_argument('--base_gamma', '-B', action='store', type=float, default=1.0, dest='base_gamma',
                         required=False)
@@ -99,6 +99,8 @@ def get_hdp_type(requested_type):
             "groupMultisetPrior": 9,
             "singleLevelPrior2": 10,
             "multisetPrior2": 11,
+            "multisetPriorEcoli": 12,
+            "singleLevelPriorEcoli": 13
         }
         assert (requested_type in hdp_types.keys()), "Requested HDP type is invalid, got {}".format(requested_type)
         return hdp_types[requested_type]
@@ -109,6 +111,20 @@ def count_lines_in_build_alignment(build_alignment_path):
     for line in open(build_alignment_path, 'r').xreadlines():
         count += 1
     return count
+
+
+def kmer_length_from_model(template_model_file, complement_model_file):
+    def get_kmer_length(model_file):
+        with open(model_file, "r") as fH:
+            line = fH.readline().split()
+            assert len(line) == 4, "HdpPipeline ERROR: wrong header in model file {}".format(model_file)
+            kmer_length = int(line[3])
+            fH.close()
+        return kmer_length
+    template_kmer_length = get_kmer_length(template_model_file)
+    complement_kmer_length = get_kmer_length(complement_model_file)
+    assert template_kmer_length == complement_kmer_length
+    return template_kmer_length
 
 
 def get_initial_hdp_args(args, hdp_type):
@@ -154,6 +170,11 @@ HDP_TYPES_2 = [
     ("multisetPrior2", 11),
 ]
 
+HDP_TYPES_ECOLI = [
+    ("multisetPriorEcoli", 12),
+    ("singleLevelPriorEcoli", 13),
+]
+
 # Pipeline Script
 args = parse_args()  # parse arguments
 working_directory = args.out  # this is the directory we will use for everything
@@ -196,31 +217,36 @@ pipeline_log.write("[pipeline] NOTICE: Making initial HDP of type {}\n".format(a
 
 initial_hdp_build_out = open(working_directory + "build_initial_hdp.out", 'w')
 initial_hdp_build_err = open(working_directory + "build_initial_hdp.err", 'w')
-template_lookup_table = " -T" + args.template_lookup if args.template_lookup is not None else ""
-complement_lookup_table = " -C" + args.complement_lookup if args.complement_lookup is not None else ""
+kmer_length = kmer_length_from_model(args.template_lookup, args.complement_lookup)
+template_lookup_table = " -T" + args.template_lookup
+complement_lookup_table = " -C" + args.complement_lookup
 verbose_flag = "--verbose " if args.verbose is True else ""
 build_commands = []
-if args.hdp_type == "twoWay":
+if args.hdp_type == "cytosine2":
     hdp_types = HDP_TYPES_2
+elif args.hdp_type == "ecoli":
+    hdp_types = HDP_TYPES_ECOLI
 else:
     hdp_types = HDP_TYPES[1::2] if args.hdp_type == "Prior" else HDP_TYPES[::2]
 for hdp_type, i, in hdp_types:
     template_hdp_location = working_directory + "template." + hdp_type + ".nhdp"
     complement_hdp_location = working_directory + "complement." + hdp_type + ".nhdp"
     build_initial_hdp_command = "./buildHdpUtil {verbose}-p {hdpType} -v {tHdpLoc} -w {cHdpLoc} -l {buildAln} " \
-                                "-n {samples} -I {burnIn} -t {thin} -s {start} -e {end} -k {len}{tL}{cL} " \
+                                "-a {kmerLength} -n {samples} -I {burnIn} -t {thin} -s {start} -e {end} " \
+                                "-k {len}{tL}{cL} " \
                                 "".format(hdpType=i, tHdpLoc=template_hdp_location,
                                           cHdpLoc=complement_hdp_location, buildAln=build_alignment_location,
                                           samples=args.gibbs_samples, burnIn=32 * approx_total_build_assignments,
                                           thin=args.thinning, start=args.grid_start, end=args.grid_end,
                                           len=args.grid_length, verbose=verbose_flag, tL=template_lookup_table,
-                                          cL=complement_lookup_table)
+                                          cL=complement_lookup_table, kmerLength=kmer_length)
     build_initial_hdp_command += get_initial_hdp_args(args=args, hdp_type=i)
     build_commands.append(build_initial_hdp_command)
     pipeline_log.write("[pipeline] Command: {}\n".format(build_initial_hdp_command))
 
 procs = [Popen(x.split(), stdout=initial_hdp_build_out, stderr=initial_hdp_build_err) for x in build_commands]
 status = [p.wait() for p in procs]
+
 initial_hdp_build_out.close()
 initial_hdp_build_err.close()
 

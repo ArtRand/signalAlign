@@ -56,7 +56,7 @@ void take_snapshot(HierarchicalDirichletProcess* hdp, int64_t** num_dp_fctrs_out
                    double* log_density_out);
 
 // get methods
-
+bool hdp_check_for_observed(HierarchicalDirichletProcess *hdp, int64_t kmerIndex);
 bool is_structure_finalized(HierarchicalDirichletProcess* hdp);
 bool is_gamma_random(HierarchicalDirichletProcess* hdp);
 bool is_sampling_finalized(HierarchicalDirichletProcess* hdp);

@@ -15,12 +15,14 @@
 #define SYMBOL_NUMBER 5 // todo depreciate
 #define SYMBOL_NUMBER_NO_N 6
 #define SYMBOL_NUMBER_EPIGENETIC_C 6
+#define SYMBOL_NUMBER_METHYL_CA 6
 #define MODEL_PARAMS 5 // level_mean, level_sd, fluctuation_mean, fluctuation_noise, fluctuation_lambda
-#define SIX_LETTER_ALPHA "ACEGOT"
-#define FIVE_LETTER_ALPHA "ACEGT"
+#define METHYL_HYDROXY_CYTOSINE_ALPHA "ACEGOT"
+#define METHYL_CYTOSINE_ALPHA "ACEGT"
+#define METHYL_CYTOSINE_ADENOSINE_ALPHA "ACEGIT"
 #define PURINES "AG"
 #define PYRIMIDINES "CEOT"
-
+#define EXTRA_EVENT_NOISE_MULTIPLIER 1.75
 
 
 typedef enum {
@@ -54,8 +56,12 @@ struct _hmm {
     double likelihood;
     StateMachineType type;
     int64_t stateNumber;
-    int64_t symbolSetSize;
+    int64_t parameterSetSize;
     int64_t matrixSize;
+
+    char *alphabet;
+    int64_t alphabetSize;
+    int64_t kmerLength;
 
     double *transitions;
 
@@ -73,9 +79,18 @@ struct _stateMachine {
     int64_t matchState;
     int64_t parameterSetSize;
 
-    double *EMISSION_MATCH_MATRIX; //Match emission probs
-    double *EMISSION_GAP_X_PROBS;  //Gap emission probs
-    double *EMISSION_GAP_Y_MATRIX; //Gap emission probs
+    // scale, shift, and var variables for MinION alignments
+    double scale;
+    double shift;
+    double var;
+
+    char *alphabet;
+    int64_t alphabetSize;
+    int64_t kmerLength;
+
+    double *EMISSION_MATCH_MATRIX;
+    double *EMISSION_GAP_X_PROBS;
+    double *EMISSION_GAP_Y_MATRIX;
 
     double (*startStateProb)(StateMachine *sM, int64_t state);
 
@@ -137,16 +152,11 @@ struct _StateMachine3 {
     double TRANSITION_GAP_SWITCH_TO_X;
     double TRANSITION_GAP_SWITCH_TO_Y;
 
-    // scale, shift, and var variables for MinION alignments
-    double scale;
-    double shift;
-    double var;
-
-    double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
+    double (*getXGapProbFcn)(StateMachine *self, const double *emissionXGapProbs, void *i);
     //double (*getYGapProbFcn)(const double *emissionYGapProbs, void *x, void *y);
     //double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
-    double (*getYGapProbFcn)(StateMachine3 *sM, void *x, void *y, bool match);
-    double (*getMatchProbFcn)(StateMachine3 *sM, void *x, void *y, bool match);
+    double (*getYGapProbFcn)(StateMachine *self, void *x, void *y, bool match);
+    double (*getMatchProbFcn)(StateMachine *self, void *x, void *y, bool match);
 };
 
 typedef struct _StateMachine3_HDP StateMachine3_HDP;
@@ -166,12 +176,9 @@ struct _StateMachine3_HDP {
     //double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
     //double (*getYGapProbFcn)(StateMachine3_HDP *self, void *x, void *y);
     // scale, shift, and var variables for MinION alignments
-    double scale;
-    double shift;
-    double var;
 
     NanoporeHDP *hdpModel;
-    double (*getMatchProbFcn)(StateMachine3_HDP *self, void *x, void *y);
+    double (*getMatchProbFcn)(StateMachine *self, void *x, void *y, bool ignore);
 };
 
 typedef struct _StateMachineEchelon {
@@ -209,23 +216,22 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
                                                                    int64_t from, int64_t to,
                                                                    double eP, double tP, void *extraArgs));
 
-StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t parameterSetSize,
-                                         void (*setTransitionsToDefaults)(StateMachine *sM),
-                                         void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
+StateMachine *stateMachine3Hdp_construct(StateMachineType type,
+                                         const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
+                                         void (*setTransitionsToDefaults)(StateMachine *),
+                                         void (*setEmissionsDefaults)(StateMachine *, int64_t),
                                          NanoporeHDP *hdpModel,
-        //double (*gapXProbFcn)(const double *, void *),
-        //double (*gapYProbFcn)(NanoporeHDP *, void *, void *),
-                                         double (*matchProbFcn)(StateMachine3_HDP *, void *, void *),
-                                         void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
-                                                                      int64_t from, int64_t to,
-                                                                      double eP, double tP, void *extraArgs));
+                                         double (*matchProbFcn)(StateMachine *, void *, void *, bool),
+                                         void (*cellCalcUpdateExpFcn)(double *, double *, int64_t, int64_t,
+                                                                      double , double , void *));
 
-StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
-                                      void (*setTransitionsToDefaults)(StateMachine *sM),
-                                      void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
-                                      double (*gapXProbFcn)(const double *, void *),
-                                      double (*gapYProbFcn)(StateMachine3 *, void *, void *, bool ),
-                                      double (*matchProbFcn)(StateMachine3 *, void *, void *, bool ),
+StateMachine *stateMachine3_construct(StateMachineType type,
+                                      const char *alphabet, int64_t alphabetSize, int64_t kmerLength,
+                                      void (*setTransitionsToDefaults)(StateMachine *),
+                                      void (*setEmissionsDefaults)(StateMachine *, int64_t),
+                                      double (*gapXProbFcn)(StateMachine *, const double *, void *),
+                                      double (*gapYProbFcn)(StateMachine *, void *, void *, bool ),
+                                      double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
                                       void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
                                                                    int64_t from, int64_t to,
                                                                    double eP, double tP, void *extraArgs));
@@ -267,7 +273,11 @@ void emissions_discrete_initEmissionsToZero(StateMachine *sM);
 * In the most simple case, with 4 nucleotides the gap matrix is 4x1 matrix and the match matrix is a 4x4 matrix.
 */
 
-double emissions_signal_getHdpKmerDensity(StateMachine3_HDP *self, void *x_i, void *e_j);
+// probability density functions
+double emissions_signal_logGaussianProbabilityDensity(double x, double mu, double sigma);
+double emissions_signal_logInverseGaussianProbabilityDensity(double x, double mu, double lambda);
+
+double emissions_signal_getHdpKmerDensity(StateMachine *sM, void *x_i, void *e_j, bool ignore);
 
 double emissions_signal_descaleEventMean_JordanStyle(double scaledEvent, double levelMean, double scale, double shift, double var);
 
@@ -277,7 +287,7 @@ double emissions_symbol_getGapProb(const double *emissionGapProbs, void *base);
 
 double emissions_symbol_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
 
-double emissions_kmer_getGapProb(const double *emissionGapProbs, void *x_i);
+double emissions_kmer_getGapProb(StateMachine *sM, const double *emissionGapProbs, void *x_i);
 
 double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
 
@@ -294,16 +304,34 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
 
 double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, void *kmer, void *event);
 
-double emissions_signal_strawManGetKmerEventMatchProb(StateMachine3 *sM, void *x_i, void *e_j, bool match);
+double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine *sM, void *x_i, void *e_j, bool match);
+
+double emissions_signal_strawManGetKmerEventMatchProb(StateMachine *sM, void *x_i, void *e_j, bool match);
 
 void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, double var,
                                  double scale_sd, double var_sd);
 
 void emissions_signal_scaleEmissions(StateMachine *sM, double scale, double shift, double var);
 
+void emissions_signal_scaleNoise(StateMachine *sM, NanoporeReadAdjustmentParameters npp);
+
 double emissions_signal_getDurationProb(void *event, int64_t n);
 
-StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp);
+StateMachine *stateMachine3_signalMachineBuilder(StateMachineType type, char *alphabet, int64_t alphabetSize,
+                                                 int64_t kmerLength,
+                                                 double (*gapXProbFcn)(StateMachine *, const double *, void *),
+                                                 double (*matchProbFcn)(StateMachine *, void *, void *, bool),
+                                                 NanoporeHDP *nHdp);
+
+StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType type,
+                                         double (*gapXProbFcn)(StateMachine *, const double *, void *),
+                                         double (*matchProbFcn)(StateMachine *, void *, void *, bool ),
+                                         void (*loadTransitionsFcn)(StateMachine *, stList *),
+                                         NanoporeHDP *nHdp);
+
+void stateMachine3_setModelToHdpExpectedValues(StateMachine *sM, NanoporeHDP *nhdp);
+
+StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjustmentParameters npp, bool scaleNoise);
 
 StateMachine *getHdpStateMachine(NanoporeHDP *hdp, const char *modelFile, NanoporeReadAdjustmentParameters npp);
 

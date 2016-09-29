@@ -261,6 +261,67 @@ double logAdd(double x, double y) {
 static double _NULLEVENT[] = {LOG_ZERO, 0};
 static double *NULLEVENT = _NULLEVENT;
 
+char *sequence_getBaseOptions(DegenerateType type) {
+    switch (type) {
+        case cytosineMethylation2:
+            return TWO_CYTOSINES;
+        case cytosineMethylation3:
+            return THREE_CYTOSINES;
+        case canonicalVariants:
+            return CANONICAL_NUCLEOTIDES;
+        case adenosineMethylation:
+            return ADENOSINES;
+        default:
+            return CANONICAL_NUCLEOTIDES;
+    }
+}
+
+int64_t sequence_nbBaseOptions(DegenerateType type) {
+    switch (type) {
+        case cytosineMethylation2:
+            return 2; // C, E
+        case cytosineMethylation3:
+            return 3; // C, E, O
+        case canonicalVariants:
+            return 4; // A, C, G, T
+        case adenosineMethylation:
+            return 2; // A, I
+        default:
+            return 4; // A, C, G, T
+    }
+}
+
+char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size) {
+    // copy and sort alphabet
+    char* internal_alphabet = (char *)malloc(sizeof(char) * (alphabet_size + 1));
+    for (int64_t i = 0; i < alphabet_size; i++) {
+        internal_alphabet[i] = alphabet[i];
+    }
+
+    int64_t min_idx;
+    char temp;
+    for (int64_t i = 0; i < alphabet_size; i++) {
+        min_idx = i;
+        for (int64_t j = i + 1; j < alphabet_size; j++) {
+            if (internal_alphabet[j] < internal_alphabet[min_idx]) {
+                min_idx = j;
+            }
+        }
+        temp = internal_alphabet[i];
+        internal_alphabet[i] = internal_alphabet[min_idx];
+        internal_alphabet[min_idx] = temp;
+    }
+
+    for (int64_t i = 1; i < alphabet_size; i++) {
+        if (alphabet[i - 1] == alphabet[i]) {
+            fprintf(stderr, "Characters of alphabet must be distinct. got %s, making internal %s\n", alphabet, internal_alphabet);
+            exit(EXIT_FAILURE);
+        }
+    }
+    internal_alphabet[alphabet_size] = '\0';
+    return internal_alphabet;
+}
+
 Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t), SequenceType type) {
     Sequence *self = malloc(sizeof(Sequence));
     self->type = type;
@@ -317,6 +378,17 @@ Sequence *sequence_constructKmerSequence(int64_t length, void *elements,
     self->sliceFcn = sliceFcn;
     self->degenerateBases = degenerateBases;
     self->nbDegenerateBases = nbOptions;
+    return self;
+}
+
+Sequence *sequence_constructReferenceKmerSequence(int64_t length, void *elements,
+                                                  void *(*getFcn)(void *, int64_t),
+                                                  Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                                                  DegenerateType dType, SequenceType type) {
+    Sequence *self = sequence_constructKmerSequence(length, elements, getFcn, sliceFcn,
+                                                    sequence_getBaseOptions(dType),
+                                                    sequence_nbBaseOptions(dType),
+                                                    type);
     return self;
 }
 
@@ -381,7 +453,7 @@ void *sequence_getEventSafe(void *s, int64_t index) {
     }
 }
 
-int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
+int64_t sequence_correctSeqLength(int64_t length, SequenceType type, int64_t kmerLength) {
     // for trivial case
     if (length == 0) {
         return 0;
@@ -392,11 +464,24 @@ int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
                 return length;
             case kmer: // event and kmer sequence
             case event:
-                return length - (KMER_LENGTH - 1);
+                return length - (kmerLength - 1);
         }
     }
     return 0;
 }
+
+double sequence_getEventMean(double *events, int64_t index) {
+    return events[index * NB_EVENT_PARAMS];
+}
+
+double sequence_getEventNoise(double *events, int64_t index) {
+    return events[index * NB_EVENT_PARAMS + 1];
+}
+
+double sequence_getEventDuration(double *events, int64_t index) {
+    return events[index * NB_EVENT_PARAMS + 2];
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  Path for variable order HMM
 //  Test: Pass
@@ -413,20 +498,21 @@ int64_t intPow(int64_t base, int64_t exp) {
     }
 }
 
-Path *path_construct(char *kmer, int64_t stateNumber) {
+Path *path_construct(char *kmer, int64_t stateNumber, int64_t kmerLength) {
     Path *path = st_malloc(sizeof(Path));
     path->kmer = kmer;
     path->stateNumber = stateNumber;
+    path->kmerLength = kmerLength;
     path->cells = st_calloc(stateNumber, sizeof(double));
     return path;
 }
 
-stList *path_findDegeneratePositions(char *kmer) {
+stList *path_findDegeneratePositions(char *kmer, int64_t kmerLength) {
     stList *methyls = stList_construct3(0, &free);
     if (kmer == NULL) {
         return methyls;
     }
-    for (int64_t i = 0; i < KMER_LENGTH; i++) { // could make KMERLENGTH strlen here
+    for (int64_t i = 0; i < kmerLength; i++) {
         char n = *(kmer + i);
         if (strchr(AMBIG_BASE, n)) {
             int64_t *methylPosition = (int64_t *)st_malloc(sizeof(int64_t));
@@ -437,10 +523,10 @@ stList *path_findDegeneratePositions(char *kmer) {
     return methyls;
 }
 
-static bool path_checkKmerLegalTransition(char *kmerOne, char *kmerTwo) {
+static bool path_checkKmerLegalTransition(char *kmerOne, char *kmerTwo, int64_t kmerLength) {
     // checks for xATAGA
     //             ATAGAy
-    for (int64_t x = 0; x < (KMER_LENGTH - 1); x++) {
+    for (int64_t x = 0; x < (kmerLength - 1); x++) {
         char x_i = *(kmerOne + (x + 1));
         char x_j = *(kmerTwo + x);
         if (x_i == x_j) {
@@ -453,12 +539,15 @@ static bool path_checkKmerLegalTransition(char *kmerOne, char *kmerTwo) {
 }
 
 bool path_checkLegal(Path *path1, Path *path2) {
+    if (path1->kmerLength != path2->kmerLength) {
+        st_errAbort("path_checkLegal: Paths don't have the same kmer length\n");
+    }
     if (path1->stateNumber != path2->stateNumber) {
         return FALSE;
-    } else if (path1->kmer == NULL || path2->kmer == NULL) { // todo make sure this is logical
+    } else if (path1->kmer == NULL || path2->kmer == NULL) { // coming from or going to NULL (ends)
         return TRUE;
     } else {
-        return path_checkKmerLegalTransition(path1->kmer, path2->kmer);
+        return path_checkKmerLegalTransition(path1->kmer, path2->kmer, path1->kmerLength);
     }
 }
 
@@ -513,26 +602,28 @@ void path_destruct(Path *path) {
 //  hdCell (High-dimension cell) for variable order HMM
 //  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbBaseOptions, char *baseOptions) {
+HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbBaseOptions, char *baseOptions,
+                         int64_t kmerLength) {
     char *kmer_i;
     if (nucleotideSequence != NULL) {
-        kmer_i = (char *)st_malloc((KMER_LENGTH) * sizeof(char));
-        for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_i = (char *)st_malloc((kmerLength) * sizeof(char));
+        for (int64_t x = 0; x < kmerLength; x++) {
             kmer_i[x] = *((char *)nucleotideSequence + x);
         }
-        kmer_i[KMER_LENGTH] = '\0';
+        kmer_i[kmerLength] = '\0';
     } else {
         kmer_i = NULL;
     }
 
     HDCell *cell = st_malloc(sizeof(HDCell));
 
-    stList *degeneratePositions = path_findDegeneratePositions(kmer_i);  // will return empty list for NULL kmer
+    stList *degeneratePositions = path_findDegeneratePositions(kmer_i, kmerLength);  // will return empty list for NULL kmer
+
     int64_t nbDegeneratePositions = stList_length(degeneratePositions);  // NULL kmer will be 0
 
     cell->numberOfPaths = intPow(nbBaseOptions, nbDegeneratePositions);
 
-    if ((cell->numberOfPaths < 1) || (cell->numberOfPaths > intPow(nbBaseOptions, KMER_LENGTH))) {
+    if ((cell->numberOfPaths < 1) || (cell->numberOfPaths > intPow(nbBaseOptions, kmerLength))) {
         st_errAbort("hdCell_construct: got illegal number of paths: %lld", cell->numberOfPaths);
     }
 
@@ -543,12 +634,12 @@ HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t 
         for (int64_t i = 0; i < cell->numberOfPaths; i++) {
             char *pattern = stList_get(patterns, i);
             Path *path = path_construct(hdCell_getSubstitutedKmer(degeneratePositions, nbDegeneratePositions, pattern,
-                                                                  kmer_i), stateNumber);
+                                                                  kmer_i), stateNumber, kmerLength);
             cell->paths[i] = path;
         }
     } else {
         char *onePathKmer = stString_copy(kmer_i);
-        Path *path = path_construct(onePathKmer, stateNumber);
+        Path *path = path_construct(onePathKmer, stateNumber, kmerLength);
         cell->paths[0] = path;
     }
 
@@ -664,7 +755,7 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
     hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
 
-    if(x < hmmExpectations->baseHmm.symbolSetSize && y < hmmExpectations->baseHmm.symbolSetSize) { //Ignore gaps involving Ns.
+    if(x < hmmExpectations->baseHmm.parameterSetSize && y < hmmExpectations->baseHmm.parameterSetSize) { //Ignore gaps involving Ns.
         hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, to, x, y, p);
     }
 }
@@ -677,11 +768,17 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     if (!hmmExpectations->hasModel) {
         st_errAbort("cell_signal_updateExpectations: HMM needs to have model\n");
     }
+    // this gives you the kmer index
 
-    int64_t kmerIndex = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the kmer index
+    int64_t kmerIndex = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2],
+                                                            hmmExpectations->baseHmm.alphabet,
+                                                            hmmExpectations->baseHmm.alphabetSize,
+                                                            hmmExpectations->baseHmm.kmerLength);
+
     double eventMean = *(double *)((void **) extraArgs)[3];
     double descaledEventMean = hmmExpectations->getDescaledEvent(
-            hmmExpectations, eventMean, *(hmmExpectations->getEventModelEntry((Hmm *)hmmExpectations, kmerIndex)));
+            eventMean, *(hmmExpectations->getEventModelEntry((Hmm *)hmmExpectations, kmerIndex)),
+            hmmExpectations->scale, hmmExpectations->shift, hmmExpectations->var);
 
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
@@ -690,12 +787,13 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
     //
     if (to == match) {
+        //st_uglyf("adding to expectations kmerIndex %lld, event mean %f, p %f\n", kmerIndex, descaledEventMean, p);
         hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, kmerIndex, descaledEventMean, p);
     }
 }
 
-void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *toCells, int64_t from, int64_t to,
-                                                    double eP, double tP, void *extraArgs) {
+void cell_signal_updateExpectationsAndAssignments(double *fromCells, double *toCells, int64_t from, int64_t to,
+                                                  double eP, double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     // unpack the extraArgs thing
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
@@ -736,7 +834,8 @@ static void cell_calculateUpdateExpectation(StateMachine *sM,
 //  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequence *nucleotideSequence) {
+DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, int64_t kmerLength,
+                                 Sequence *nucleotideSequence) {
     if (nucleotideSequence->type != kmer) {  // todo will need to change this for nuc/nuc alignments
         st_errAbort("dpDiagonal_construct: got illegal sequence type %i", nucleotideSequence->type);
     }
@@ -753,6 +852,7 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
     DpDiagonal *dpDiagonal = st_malloc(sizeof(DpDiagonal));
     dpDiagonal->diagonal = diagonal;
     dpDiagonal->stateNumber = stateNumber;
+    dpDiagonal->kmerLength = kmerLength;
     dpDiagonal->sequence = nucleotideSequence;
     dpDiagonal->totalPaths = 0;
     assert(diagonal_getWidth(diagonal) >= 0);
@@ -770,7 +870,7 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
         void *k = sequence_getKmerWithBoundsCheck(nucleotideSequence, (x - 1));
 
         HDCell *hdCell = hdCell_construct(k, stateNumber, nucleotideSequence->nbDegenerateBases,
-                                          nucleotideSequence->degenerateBases);
+                                          nucleotideSequence->degenerateBases, kmerLength);
 
         dpDiagonal->totalPaths += hdCell->numberOfPaths;
         dpDiagonal_assignCell(dpDiagonal, hdCell, xmy);
@@ -782,7 +882,8 @@ DpDiagonal *dpDiagonal_construct(Diagonal diagonal, int64_t stateNumber, Sequenc
 
 DpDiagonal *dpDiagonal_clone(DpDiagonal *diagonal) {
     // make empty dpDiagonal
-    DpDiagonal *diagonal2 = dpDiagonal_construct(diagonal->diagonal, diagonal->stateNumber, diagonal->sequence);
+    DpDiagonal *diagonal2 = dpDiagonal_construct(diagonal->diagonal, diagonal->stateNumber, diagonal->kmerLength,
+                                                 diagonal->sequence);
 
     // copy the cells (doubles) from the paths
     int64_t nCells = diagonal_getWidth(diagonal2->diagonal);
@@ -943,21 +1044,22 @@ void dpDiagonal_destruct(DpDiagonal *dpDiagonal) {
 //  DpMatrix Structure for storing dp-matrix
 //  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 struct _dpMatrix {
     DpDiagonal **diagonals;
     int64_t diagonalNumber;
     int64_t activeDiagonals;
     int64_t stateNumber;
+    int64_t kmerLength;
 };
 
-DpMatrix *dpMatrix_construct(int64_t diagonalNumber, int64_t stateNumber) {
+DpMatrix *dpMatrix_construct(int64_t diagonalNumber, int64_t stateNumber, int64_t kmerLength) {
     assert(diagonalNumber >= 0);
     DpMatrix *dpMatrix = st_malloc(sizeof(DpMatrix));
     dpMatrix->diagonalNumber = diagonalNumber;
     dpMatrix->diagonals = st_calloc(dpMatrix->diagonalNumber + 1, sizeof(DpDiagonal *));
     dpMatrix->activeDiagonals = 0;
     dpMatrix->stateNumber = stateNumber;
+    dpMatrix->kmerLength = kmerLength;
     return dpMatrix;
 }
 
@@ -977,7 +1079,7 @@ DpDiagonal *dpMatrix_getDiagonal(DpMatrix *dpMatrix, int64_t xay) {
 int64_t dpMatrix_getActiveDiagonalNumber(DpMatrix *dpMatrix) {
     return dpMatrix->activeDiagonals;
 }
-
+// todo can add kmerLength here, percolate down to path
 DpDiagonal *dpMatrix_createDiagonal(DpMatrix *dpMatrix, Diagonal diagonal, Sequence *sX) {
     if (sX->type != kmer) {
         st_errAbort("dpMatrix_createDiagonal: wrong king of sequence got: %lld\n", sX->type);
@@ -986,7 +1088,7 @@ DpDiagonal *dpMatrix_createDiagonal(DpMatrix *dpMatrix, Diagonal diagonal, Seque
     assert(diagonal.xay >= 0);
     assert(diagonal.xay <= dpMatrix->diagonalNumber);
     assert(dpMatrix_getDiagonal(dpMatrix, diagonal.xay) == NULL);
-    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, dpMatrix->stateNumber, sX);
+    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, dpMatrix->stateNumber, dpMatrix->kmerLength, sX);
     dpMatrix->diagonals[diagonal_getXay(diagonal)] = dpDiagonal;
     dpMatrix->activeDiagonals++;
     return dpDiagonal;
@@ -1168,7 +1270,8 @@ void diagonalCalculation_Expectations(StateMachine *sM, int64_t xay,
                         dpMatrix_getDiagonal(backwardDpMatrix, xay),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
-                        sX, sY, cell_calculateUpdateExpectation, extraArgs2);
+                        sX, sY,
+                        cell_calculateUpdateExpectation, extraArgs2);
 }
 
 
@@ -1176,7 +1279,6 @@ void diagonalCalculation_Expectations(StateMachine *sM, int64_t xay,
 //  Banded alignment routine to calculate posterior match probs
 //  Test: Pass
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 void getPosteriorProbsWithBanding(StateMachine *sM,
                                   stList *anchorPairs,
                                   Sequence *sX, Sequence *sY,
@@ -1202,14 +1304,14 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
     Band *band = band_construct(anchorPairs, sX->length, sY->length, p->diagonalExpansion);
 
     BandIterator *forwardBandIterator = bandIterator_construct(band);
-    DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
+    DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber, sM->kmerLength);
 
     //Initialise forward matrix.
-    dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator), sX), // added sX here
+    dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator), sX),
                                 sM, alignmentHasRaggedLeftEnd ? sM->raggedStartStateProb : sM->startStateProb);
 
     //Backward matrix.
-    DpMatrix *backwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
+    DpMatrix *backwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber, sM->kmerLength);
 
     int64_t tracedBackTo = 0;
     int64_t totalPosteriorCalculations = 0;
@@ -1836,16 +1938,16 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
 
     // make matrices and bands
     int64_t diagonalNumber = ScX->length + ScY->length;
-    DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
-    DpMatrix *backwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
+    DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber, sM->kmerLength);
+    DpMatrix *backwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber, sM->kmerLength);
     stList *emptyList = stList_construct(); // place holder for band_construct
     Band *band = band_construct(emptyList, ScX->length, ScY->length, 2); // why 2?
     BandIterator *bandIt = bandIterator_construct(band);
 
     for (int64_t i = 0; i <= diagonalNumber; i++) {
         Diagonal d = bandIterator_getNext(bandIt);
-        dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, d, ScX)); // added sX here
-        dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, d, ScX)); // added sX here
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, d, ScX));
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, d, ScX));
     }
 
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(forwardDpMatrix, 0), sM,

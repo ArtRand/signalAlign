@@ -15,8 +15,10 @@ def parse_args():
     parser = ArgumentParser(description=__doc__)
 
     parser.add_argument('--file_directory', '-d', action='store',
-                        dest='files_dir', required=True, type=str, default=None,
+                        dest='files_dir', required=False, type=str, default=None,
                         help="directory with MinION fast5 reads to align")
+    parser.add_argument('--file_of_files', '-fofn', action='store', dest='fofn', required=False, type=str, default=None,
+                        help="text file containing absolute paths to files to use")
     parser.add_argument('--ref', '-r', action='store',
                         dest='ref', required=True, type=str,
                         help="reference sequence to align to, in FASTA")
@@ -32,7 +34,7 @@ def parse_args():
                         help="complement serialized HDP file")
     parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
                         help="Specify degenerate nucleotide options: "
-                             "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
+                             "variant -> {ACGT}, cytosine2 -> {CE} cytosine3 -> {CEO} adenosine -> {AI}")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", help="decide which model to use, threeState by default")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
@@ -43,16 +45,19 @@ def parse_args():
                         required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
                         required=False, default=None, help="tab separated table with regions to align to")
-    parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
-                        default=True, help='flag, turn off banding')
+    # depreciated
+    #parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
+    #                    default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
-                        default=4, type=int, help="number of jobs to run concurrently")
+                        default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
     parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
-    parser.add_argument('--sparse_output', '-s', action='store_true', default=False, dest='sparse',
-                        help="flag, sparse output")
+    parser.add_argument('--ambig_char', '-X', action='store', required=False, default="X", type=str, dest='ambig_char',
+                        help="Character to substitute at positions, default is 'X'.")
+    parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
+                        help="output format: full, variantCaller, or assignments. Default: full")
     parser.add_argument('--error_correct', action='store_true', default=False, required=False,
                         dest='error_correct', help="Enable error correction")
     parser.add_argument('--output_location', '-o', action='store', dest='out',
@@ -106,6 +111,12 @@ def aligner(work_queue, done_queue):
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
+def concat_variant_call_files(path):
+    concat_command = "cat {path}/*.tsv > {path}/probs.tsv".format(path=path)
+    os.system(concat_command)
+    return
+
+
 def main(args):
     # parse args
     args = parse_args()
@@ -119,20 +130,24 @@ def main(args):
 #   Aligning to reference: {reference}
 #   Aligning maximum of {nbFiles} files
 #   Using model: {model}
-#   Using banding: {banding}
+#   Using banding: True
 #   Aligning to regions in: {regions}
 #   Non-default template HMM: {inThmm}
 #   Non-default complement HMM: {inChmm}
 #   Template HDP: {tHdp}
 #   Complement HDP: {cHdp}
-    """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files, banding=args.banded,
+    """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files, #banding=args.banded,
                inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType, regions=args.target_regions,
                tHdp=args.templateHDP, cHdp=args.complementHDP)
 
     print(start_message, file=sys.stdout)
 
+    if args.files_dir is None and args.fofn is None:
+        print("Need to provide directory with .fast5 files of fofn", file=sys.stderr)
+        sys.exit(1)
+
     if not os.path.isfile(args.ref):
-        print("Did not find valid reference file", file=sys.stderr)
+        print("Did not find valid reference file, looked for it {here}".format(here=args.ref), file=sys.stderr)
         sys.exit(1)
 
     # make directory to put temporary files
@@ -152,7 +167,8 @@ def main(args):
                                              substitution_file=args.substitution_file,
                                              sequence_outfile=plus_strand_sequence,
                                              rc_sequence_outfile=minus_strand_sequence,
-                                             degenerate_type=args.degenerate)
+                                             degenerate_type=args.degenerate,
+                                             sub_char=args.ambig_char)
         else:
             make_temp_sequence(fasta=args.ref, sequence_outfile=plus_strand_sequence,
                                rc_sequence_outfile=minus_strand_sequence)
@@ -176,13 +192,16 @@ def main(args):
     jobs = []
 
     # list of read files
-    fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
+    if args.fofn is not None:
+        fast5s = [x for x in parse_fofn(args.fofn) if x.endswith(".fast5")]
+    else:
+        fast5s = [args.files_dir + x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
 
     nb_files = args.nb_files
     if nb_files < len(fast5s):
         shuffle(fast5s)
         fast5s = fast5s[:nb_files]
-    print("Got {} files to align to".format(len(fast5s)), file=sys.stdout)
+    print("Got {} files to align".format(len(fast5s)), file=sys.stdout)
     for fast5 in fast5s:
         alignment_args = {
             "forward_reference": plus_strand_sequence,
@@ -195,9 +214,10 @@ def main(args):
             "in_complementHmm": args.in_C_Hmm,
             "in_templateHdp": args.templateHDP,
             "in_complementHdp": args.complementHDP,
-            "banded": args.banded,
-            "sparse_output": args.sparse,
-            "in_fast5": args.files_dir + fast5,
+            "banded": True, #args.banded,
+            "output_format": args.outFmt,
+            #"in_fast5": args.files_dir + fast5,
+            "in_fast5": fast5,
             "threshold": args.threshold,
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim,
@@ -221,6 +241,8 @@ def main(args):
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
     print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
 
+    if args.outFmt == "variantCaller":
+        concat_variant_call_files(temp_dir_path)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

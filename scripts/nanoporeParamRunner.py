@@ -14,19 +14,19 @@ def parse_args():
 
     parser.add_argument('--file_directory', '-d', action='store',
                         dest='files_dir', required=True, type=str, default=None,
-                        help="directory with MinION fast5 reads to align")
+                        help="directory with MinION files to estimate parameters from")
     #parser.add_argument('--ref', '-r', action='store',
     #                    dest='ref', required=True, type=str,
     #                    help="reference sequence to align to, in FASTA")
-    parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
-                        required=False, type=str, default=None,
-                        help="input HMM for template events, if you don't want the default")
-    parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
-                        required=False, type=str, default=None,
-                        help="input HMM for complement events, if you don't want the default")
+    #parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
+    #                    required=False, type=str, default=None,
+    #                    help="input HMM for template events, if you don't want the default")
+    #parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
+    #                    required=False, type=str, default=None,
+    #                    help="input HMM for complement events, if you don't want the default")
 
-    parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
-                        default=0.01, help="posterior match probability threshold, Default: 0.01")
+    #parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
+    #                    default=0.01, help="posterior match probability threshold, Default: 0.01")
 
     #parser.add_argument('--constraintTrim', '-m', action='store', dest='trim', type=int,
     #                    required=False, default=14, help='amount to remove from an anchor constraint')
@@ -38,13 +38,14 @@ def parse_args():
 
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
-                        help="directory to put the alignments")
+                        help="directory to put temp files")
 
     args = parser.parse_args()
     return args
 
 
-def estimate_params_with_anchors(fast5, working_folder, bwa_index, forward_reference_path, backward_reference_path, threshold):
+def estimate_params_with_anchors(fast5, working_folder, bwa_index, forward_reference_path, backward_reference_path,
+                                 threshold):
     assert (isinstance(working_folder, FolderHandler))
 
     read_name = fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
@@ -65,9 +66,9 @@ def estimate_params_with_anchors(fast5, working_folder, bwa_index, forward_refer
         return False
 
     # input (match) models
-    template_lookup_table = "../models/testModel_template.model"
-    complement_lookup_table = "../models/testModel_complement.model" if def_complement_model else \
-        "../models/testModel_complement_pop1.model"
+    template_lookup_table = "../models/testModelR73_acegot_template.model"
+    complement_lookup_table = "../models/testModelR73_acegot_complement.model" if def_complement_model else \
+        "../models/testModelR73_acegot_complement_pop1.model"
 
     binary = "./estimateNanoporeParams"
 
@@ -81,7 +82,7 @@ def estimate_params_with_anchors(fast5, working_folder, bwa_index, forward_refer
     os.system(command)
 
 
-def estimate_params(fast5, working_folder, threshold):
+def estimate_params(fast5, working_folder):
     assert (isinstance(working_folder, FolderHandler))
 
     read_name = fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
@@ -96,19 +97,20 @@ def estimate_params(fast5, working_folder, threshold):
         return False
 
     # input (match) models
-    template_lookup_table = "../models/testModel_template.model"
-    complement_lookup_table = "../models/testModel_complement.model" if def_complement_model else \
-        "../models/testModel_complement_pop1.model"
+    template_lookup_table = "../models/testModelR9_template.model"
+    complement_lookup_table = "../models/testModelR9_complement_pop2.model"
 
     binary = "./estimateNanoporeParams"
 
-    command = "{bin} -T {tLuT} -C {cLuT} -q {npRead} -D {threshold}" \
-              "".format(bin=binary, tLuT=template_lookup_table, cLuT=complement_lookup_table, npRead=npRead_path,
-                        threshold=threshold)
+    command = "{bin} -T {tLuT} -C {cLuT} -q {npRead}" \
+              "".format(bin=binary, tLuT=template_lookup_table, cLuT=complement_lookup_table, npRead=npRead_path)
 
     print("running command {command}".format(command=command), file=sys.stderr)
 
     os.system(command)
+    working_folder.remove_file(npRead_path)
+    working_folder.remove_file(npRead_fasta)
+    return
 
 
 def main(args):
@@ -123,12 +125,11 @@ def main(args):
     if len(fast5s) > args.nb_files:
         shuffle(fast5s)
         fast5s = fast5s[:args.nb_files]
-
     for fast5 in fast5s:
         #estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder, bwa_index=bwa_ref_index,
         #                forward_reference_path=plus_strand_sequence, backward_reference_path=minus_strand_sequence,
         #                threshold=args.threshold)
-        estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder, threshold=args.threshold)
+        estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder)
 
     temp_folder.remove_folder()
     return

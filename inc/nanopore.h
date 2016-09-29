@@ -1,7 +1,7 @@
 #ifndef NANOPORE
 #define NANOPORE
 #include "sonLibTypes.h"
-#define NB_EVENT_PARAMS 3
+#define NB_EVENT_PARAMS 4
 
 #ifndef MACHEP
 #define MACHEP 1.11022302462515654042E-16
@@ -12,8 +12,10 @@ typedef struct _nanoporeReadAdjustmentParameters {
     double scale;
     double shift;
     double var;
+    double shift_sd;
     double scale_sd;
     double var_sd;
+    double drift;
 } NanoporeReadAdjustmentParameters;
 
 typedef struct _nanoporeRead {
@@ -31,7 +33,7 @@ typedef struct _nanoporeRead {
 
     int64_t *templateEventMap;
     int64_t *templateStrandEventMap;
-    double *templateEvents; // mean, stdev, length
+    double *templateEvents; // mean, stdev, length, start_time
 
     int64_t *complementEventMap;
     int64_t *complementStrandEventMap;
@@ -50,7 +52,7 @@ typedef struct _nanoporeRead {
 typedef struct _eventKmerTuple {
     double eventMean;
     double eventSd;
-    double eventDuration;
+    double deltaTime;
     int64_t kmerIndex;
 } EventKmerTuple;
 
@@ -59,7 +61,7 @@ typedef struct _eventKmerTuple {
 // TODO refactor format so that it can handle 1D reads also
 NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile);
 
-EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double duration, int64_t kmerIndex);
+EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double deltaTime, int64_t kmerIndex);
 
 NanoporeReadAdjustmentParameters *nanopore_readAdjustmentParametersConstruct();
 
@@ -75,17 +77,30 @@ stList *nanopore_getTemplateOneDAssignments(NanoporeRead *npRead, double thresho
 
 stList *nanopore_getComplementOneDAssignments(NanoporeRead *npRead, double threshold);
 
+// Assembles eventKmerTuples from the 1D read nucleotide sequence (so you can have k-mer lengths that are different
+// from the base caller
 stList *nanopore_getOneDAssignmentsFromRead(int64_t *strandEventMap, double *events, char *strandRead,
-                                            int64_t readLength);
+                                            int64_t readLength, char *alphabet, int64_t alphabetSize,
+                                            int64_t kmerLength);
 
-stList *nanopore_complementOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore);
+void nanopore_adjustEventsForDrift(NanoporeRead *npRead);
 
-stList *nanopore_templateOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore);
+void nanopore_adjustTemplateEventsForDrift(NanoporeRead *npRead);
+
+void nanopore_adjustComplementEventsForDrift(NanoporeRead *npRead);
+
+// this is just a placeholder function that doesn't do anything. it's used in estimateNanoporeParams so that
+// the program returns 'raw' un-adjusted event means
+void nanopore_dontAdjustEvents(NanoporeRead *npRead);
 
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead);
 
-void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params,
-                                   bool drift_out, bool var_out);
+void nanopore_compute_mean_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params, bool drift_out, bool var_out);
+
+void nanopore_compute_noise_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params);
+
+void nanopore_convert_to_lognormal_params(int64_t alphabet_size, int64_t kmer_length, double *model,
+                                          stList *kmerToEventMap);
 
 void nanopore_lineq_solve(double *A, double *b, double *x_out, int64_t n);
 

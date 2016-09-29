@@ -19,6 +19,8 @@ def parse_args():
     parser.add_argument('--file_directory', '-d', action='append', default=None,
                         dest='files_dir', required=False, type=str,
                         help="directories with fast5 files to train on")
+    parser.add_argument("--file_of_files", "-fofn", action="append", required=False, default=None, dest="fofn",
+                        type=str, help="text file with absolute paths of files to use")
     parser.add_argument('--ref', '-r', action='store', default=None,
                         dest='ref', required=False, type=str,
                         help="location of refrerence sequence in FASTA")
@@ -71,8 +73,12 @@ def parse_args():
     #parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
     #                    help="Specify degenerate nucleotide options: "
     #                         "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
-    #parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
-    #                    dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
+                        dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument('--ambig_char', '-X', action='append', required=False, default=None, type=str, dest='ambig_char',
+                        help="Character to substitute at positions, default is 'X'.")
+    #parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
+    #                    required=False, default=None, help="tab separated table with regions to align to")
     args = parser.parse_args()
     return args
 
@@ -91,30 +97,50 @@ def get_2d_length(fast5):
         return read_length
 
 
-def cull_training_files(directories, training_amount):
+def cull_training_files(directories, fofns, training_amount, reference_sequences):
+    def get_file_list():
+        source_list_tups = []
+        if fofns is not None:
+            for fofn in fofns:
+                source_list_tups.append((fofn, parse_fofn(fofn)))
+            return source_list_tups
+        else:
+            assert directories is not None
+            for d in directories:
+                fast5s = [d + x for x in os.listdir(d) if x.endswith(".fast5")]
+                source_list_tups.append((d, fast5s))
+            return source_list_tups
+
     print("trainModels - culling training files.\n", end="", file=sys.stderr)
 
     training_files = []
     add_to_training_files = training_files.append
 
+    sources_and_files = get_file_list()
+
+    assert len(sources_and_files) == len(reference_sequences), "Need to have equal number of references as training " \
+                                                               "file directories."
     # loop over the directories and collect reads for training
-    for j, directory in enumerate(directories):
-        fast5s = [x for x in os.listdir(directory) if x.endswith(".fast5")]
+    for j, tup in enumerate(sources_and_files):
+        assert len(tup) == 2
+        source = tup[0]
+        fast5s = tup[1]
         shuffle(fast5s)
         total_amount = 0
         n = 0
         # loop over files and add them to training list, break when we have enough bases to complete a batch
+        # make a list of tuples [(fast5_path, (plus_ref_seq, minus_ref_seq))]
         for i in xrange(len(fast5s)):
-            add_to_training_files(directory + fast5s[i])
+            add_to_training_files((fast5s[i], reference_sequences[j]))
             n += 1
-            total_amount += get_2d_length(directory + fast5s[i])
+            total_amount += get_2d_length(fast5s[i])
             if total_amount >= training_amount:
                 break
-        print("Culled {nb_files} training files, for {bases} from {dir}.".format(nb_files=len(training_files),
-                                                                                 bases=total_amount,
-                                                                                 dir=directory),
+        print("Culled {nb_files} training files, for {bases} from {dir}.".format(nb_files=n, bases=total_amount,
+                                                                                 dir=source),
               end="\n", file=sys.stderr)
 
+    shuffle(training_files)
     return training_files
 
 
@@ -127,20 +153,17 @@ def get_expectations(work_queue, done_queue):
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
-def get_model(type, symbol_set_size, threshold, table_file=None, premade_model=None):
+def get_model(type, threshold, model_file):
     assert (type in ["threeState", "threeStateHdp"]), "Unsupported StateMachine type"
+    # todo clean this up
     if type == "threeState":
-        assert table_file is not None, "Need to have starting lookup table for {} HMM".format(type)
-        model = ContinuousPairHmm(model_type=type, symbol_set_size=symbol_set_size)
-        if premade_model is not None:
-            model.load_model(premade_model)
-        else:
-            model.parse_lookup_table(table_file=table_file)
+        assert model_file is not None, "Need to have starting lookup table for {} HMM".format(type)
+        model = ContinuousPairHmm(model_type=type)
+        model.load_model(model_file=model_file)
         return model
     if type == "threeStateHdp":
         model = HdpSignalHmm(model_type=type, threshold=threshold)
-        if premade_model is not None:
-            model.load_model(premade_model)
+        model.load_model(model_file=model_file)
         return model
 
 
@@ -154,9 +177,12 @@ def add_and_norm_expectations(path, files, model, hmm_file, update_transitions=F
     files_with_problems = 0
     for f in files:
         try:
-            model.add_expectations_file(path + f)
+            success = model.add_expectations_file(path + f)
             os.remove(path + f)
-            files_added_successfully += 1
+            if success:
+                files_added_successfully += 1
+            else:
+                files_with_problems += 1
         except Exception as e:
             print("Problem adding expectations file {file} got error {e}".format(file=path + f, e=e),
                   file=sys.stderr)
@@ -218,7 +244,10 @@ def main(args):
                iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP,
                emissions=args.emissions, transitions=args.transitions)
 
-    assert (args.files_dir is not None), "Need to specify which files to train on"
+    if args.files_dir is None and args.fofn is None:
+        print("Need to provide directory with .fast5 files of fofn", file=sys.stderr)
+        sys.exit(1)
+
     assert (args.ref is not None), "Need to provide a reference file"
     assert (args.out is not None), "Need to know the working directory for training"
 
@@ -232,13 +261,28 @@ def main(args):
     working_folder = FolderHandler()
     working_directory_path = working_folder.open_folder(args.out + "tempFiles_expectations")
 
-    # make the plus and minus strand sequences
-    plus_strand_sequence = working_folder.add_file_path("forward_reference.txt")
-    minus_strand_sequence = working_folder.add_file_path("backward_reference.txt")
-
-    make_temp_sequence(fasta=args.ref,
-                       sequence_outfile=plus_strand_sequence,
-                       rc_sequence_outfile=minus_strand_sequence)
+    # if we are performing supervised training with multiple kinds of substitutions, then we
+    # need to make a reference sequence for each one
+    if args.substitution_file is not None:
+        assert args.ambig_char is not None, "Need to provide nucleotide to substitute"
+        reference_sequences = []
+        for sub_char in args.ambig_char:
+            plus_strand_sequence = working_folder.add_file_path("forward_reference_{}.txt".format(sub_char))
+            minus_strand_sequence = working_folder.add_file_path("backward_reference_{}.txt".format(sub_char))
+            add_ambiguity_chars_to_reference(input_fasta=args.ref,
+                                             substitution_file=args.substitution_file,
+                                             sequence_outfile=plus_strand_sequence,
+                                             rc_sequence_outfile=minus_strand_sequence,
+                                             degenerate_type=None,
+                                             sub_char=sub_char)
+            reference_sequences.append((plus_strand_sequence, minus_strand_sequence))
+    else:
+        plus_strand_sequence = working_folder.add_file_path("forward_reference.txt")
+        minus_strand_sequence = working_folder.add_file_path("backward_reference.txt")
+        make_temp_sequence(fasta=args.ref,
+                           sequence_outfile=plus_strand_sequence,
+                           rc_sequence_outfile=minus_strand_sequence)
+        reference_sequences = [(plus_strand_sequence, minus_strand_sequence)]
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -246,17 +290,19 @@ def main(args):
     print("signalAlign - indexing reference, done", file=sys.stderr)
 
     # the default lookup tables are the starting conditions for the model if we're starting from scratch
-    default_template_table_path = "../../signalAlign/models/testModel_template.model"
-    default_complement_table_path = "../../signalAlign/models/testModel_complement.model"
-    assert os.path.exists(default_template_table_path) and os.path.exists(default_complement_table_path), \
+    # todo next make get default model function based on version inferred from reads
+    template_model_path = "../../signalAlign/models/testModelR73_acegot_template.model" if \
+        args.in_T_Hmm is None else args.in_T_Hmm
+    complement_model_path = "../../signalAlign/models/testModelR73_acegot_complement.model" if \
+        args.in_C_Hmm is None else args.in_C_Hmm
+
+    assert os.path.exists(template_model_path) and os.path.exists(complement_model_path), \
         "Missing default lookup tables"
 
     # make the model objects, for the threeState model, we're going to parse the lookup table or the premade
     # model, for the HDP model, we just load the transitions
-    template_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
-                               table_file=default_template_table_path, premade_model=args.in_T_Hmm)
-    complement_model = get_model(type=args.stateMachineType, symbol_set_size=46656, threshold=args.threshold,
-                                 table_file=default_complement_table_path, premade_model=args.in_C_Hmm)
+    template_model = get_model(type=args.stateMachineType, threshold=args.threshold, model_file=template_model_path)
+    complement_model = get_model(type=args.stateMachineType, threshold=args.threshold, model_file=complement_model_path)
 
     # get the input HDP, if we're using it
     if args.stateMachineType == "threeStateHdp":
@@ -278,25 +324,23 @@ def main(args):
 
     trained_models = [template_hmm, complement_hmm]
 
-    default_template_hmm = "../models/default_template.hmm"
-    default_complement_hmm = "../models/default_complement.hmm"
+    untrained_models = [template_model_path, complement_model_path]
 
-    default_models = [default_template_hmm, default_complement_hmm]
-
-    for default_model, trained_model in zip(default_models, trained_models):
+    for default_model, trained_model in zip(untrained_models, trained_models):
         assert os.path.exists(default_model), "Didn't find default model {}".format(default_model)
         copyfile(default_model, trained_model)
         assert os.path.exists(trained_model), "Problem copying default model to {}".format(trained_model)
 
-    print("Starting {iterations} iterations.\n\n\t    Running likelihoods\ni\tTempalte\tComplement".format(
+    print("Starting {iterations} iterations.\n\n\t    Running likelihoods\ni\tTemplate\tComplement".format(
         iterations=args.iter), file=sys.stdout)
 
     # start iterating
     i = 0
     while i < args.iter:
         # first cull a set of files to get expectations on
-        training_files = cull_training_files(args.files_dir, args.amount)
-
+        #training_files = cull_training_files(args.files_dir, args.amount, reference_sequences)
+        training_files = cull_training_files(directories=args.files_dir, fofns=args.fofn, training_amount=args.amount,
+                                             reference_sequences=reference_sequences)
         # setup
         workers = args.nb_jobs
         work_queue = Manager().Queue()
@@ -304,10 +348,11 @@ def main(args):
         jobs = []
 
         # get expectations for all the files in the queue
-        for fast5 in training_files:
+        # file_ref_tuple should be (fast5, (plus_ref_seq, minus_ref_seq))
+        for file_ref_tuple in training_files:
             alignment_args = {
-                "forward_reference": plus_strand_sequence,
-                "backward_reference": minus_strand_sequence,
+                "forward_reference": file_ref_tuple[1][0],   # this is the plus strand sequence
+                "backward_reference": file_ref_tuple[1][1],  # this is the minus strand sequence
                 "path_to_EC_refs": None,
                 "destination": working_directory_path,
                 "stateMachineType": args.stateMachineType,
@@ -317,8 +362,8 @@ def main(args):
                 "in_templateHdp": template_hdp,
                 "in_complementHdp": complement_hdp,
                 "banded": args.banded,
-                "sparse_output": False,
-                "in_fast5": fast5,
+                #"output_format": "full",
+                "in_fast5": file_ref_tuple[0],  # fast5
                 "threshold": args.threshold,
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,

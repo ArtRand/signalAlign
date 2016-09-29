@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "signalMachineUtils.h"
-#include "pairwiseAligner.h"
 
+#define REPORT_ADJUSTMENTS FALSE
 
 // Borrowed from Bob Stout http://stjarnhimlen.se/snippets/strrev.c
 char *signalUtils_stringReverse(char *str) {
@@ -171,7 +171,70 @@ stList *signalUtils_getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eve
     return filteredRemappedAnchors;
 }
 
-void printFoo() {
-    fprintf(stderr, "HELLO FOO!\n");
+stList *signalUtils_templateOneDAssignmentsFromRead(NanoporeRead *npRead, StateMachine *sM, double ignore) {
+    (void) ignore;
+    return nanopore_getOneDAssignmentsFromRead(npRead->templateStrandEventMap, npRead->templateEvents,
+                                               npRead->templateRead, npRead->templateReadLength,
+                                               sM->alphabet, sM->alphabetSize, sM->kmerLength);
 }
 
+stList *signalUtils_complementOneDAssignmentsFromRead(NanoporeRead *npRead, StateMachine *sM, double ignore) {
+    (void) ignore;
+    return nanopore_getOneDAssignmentsFromRead(npRead->complementStrandEventMap, npRead->complementEvents,
+                                               npRead->complementRead, npRead->complementReadLength,
+                                               sM->alphabet, sM->alphabetSize, sM->kmerLength);
+}
+
+void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
+                                        NanoporeReadAdjustmentParameters *params, double assignmentThreshold,
+                                        stList *(*assignmentFunction)(NanoporeRead *, StateMachine *, double),
+                                        void (*driftAdjustmentFunction)(NanoporeRead *)) {
+    if (REPORT_ADJUSTMENTS) {
+        st_uglyf("SENTINEL - Re-estimating parameters\n");
+        st_uglyf("SENTINEL - Before: scale: %f shift: %f var: %f drift %f\n", params->scale, params->shift, params->var,
+                 params->drift);
+        st_uglyf("SENTINEL - Before: scale_sd: %f var_sd: %f\n", params->scale_sd, params->var_sd);
+    }
+    stList *map = assignmentFunction(npRead, sM, assignmentThreshold);
+    if (REPORT_ADJUSTMENTS) {
+        st_uglyf("SENTINEL - Map is %lld long\n", stList_length(map));
+    }
+
+    nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, TRUE, TRUE);
+    nanopore_compute_noise_scale_params(sM->EMISSION_MATCH_MATRIX, map, params);
+
+    if (REPORT_ADJUSTMENTS) {
+        st_uglyf("SENTINEL - After: scale: %f shift: %f var: %f drift: %f\n", params->scale, params->shift, params->var,
+                 params->drift);
+        st_uglyf("SENTINEL - After: scale_sd: %f var_sd: %f\n", params->scale_sd, params->var_sd);
+    }
+
+    sM->scale = params->scale;
+    sM->shift = params->shift;
+    sM->var = params->var;
+
+    if ((sM->scale != params->scale) || (sM->shift != params->shift) || (sM->var != params->var)) {
+        st_errAbort("ERROR - Problem updating stateMachine\n");
+    }
+
+    driftAdjustmentFunction(npRead);
+    emissions_signal_scaleNoise(sM, *params);
+
+    stList_destruct(map);
+    return;
+}
+
+void signalUtils_estimateNanoporeParamsFromTable(const char *modelPath,
+                                                 NanoporeRead *npRead, NanoporeReadAdjustmentParameters *params,
+                                                 double assignmentThreshold,
+                                                 stList *(*assignmentFunction)(NanoporeRead *, StateMachine *, double),
+                                                 void (*driftAdjustmentFunction)(NanoporeRead *)) {
+    if (!stFile_exists(modelPath)) {
+        st_errAbort("signalUtils_estimateNanoporeParamsFromTable: didn't find table, looked here %s\n", modelPath);
+    }
+    StateMachine *sM = getStateMachine3_descaled(modelPath, *params, FALSE);
+    signalUtils_estimateNanoporeParams(sM, npRead, params, assignmentThreshold,
+                                       assignmentFunction, driftAdjustmentFunction);
+    stateMachine_destruct(sM);
+    return;
+}

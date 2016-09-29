@@ -23,7 +23,7 @@ void printStartMessage(int64_t hdpType, char *alignmentsFile, char *templateHdpO
 void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile, const char *nHdpOutFile,
                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose) {
     NanoporeHDP *nHdp = deserialize_nhdp(nHdpFile);
-    Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, nHdp);
+    Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, threeStateHdp, nHdp);
     hmmContinuous_destruct(hdpHmm, hdpHmm->type);
 
     fprintf(stderr, "signalAlign - Running Gibbs on HDP doing %"PRId64" samples %"PRId64"burn in %"PRId64"thinning\n",
@@ -38,15 +38,13 @@ void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile
 
 int main(int argc, char *argv[]) {
     int64_t hdpType = -1;
-    char *templateLookupTable = stString_print("../models/template_median68pA.model");
-    char *complementLookupTable = stString_print("../models/complement_median68pA_pop2.model");
+    char *templateLookupTable = NULL;
+    char *complementLookupTable = NULL;
     char *alignmentsFile = NULL;
-    char *templateExpectationsFile = NULL;
-    char *complementExpectationsFile = NULL;
     char *templateHdpOutfile = NULL;
     char *complementHdpOutfile = NULL;
 
-    int64_t nbSamples, burnIn, thinning, samplingGridLength, j;
+    int64_t nbSamples, burnIn, thinning, samplingGridLength, kmerLength, j;
     bool verbose = FALSE;
 
     double baseGamma = NULL_HYPERPARAMETER;
@@ -69,8 +67,9 @@ int main(int argc, char *argv[]) {
         static struct option long_options[] = {
                 {"help",                        no_argument,        0,  'h'},
                 {"verbose",                     no_argument,        0,  'o'},
+                {"kmerLength",                  required_argument,  0,  'a'},
                 {"HdpType",                     required_argument,  0,  'p'},
-                {"tempalteLookupTable",         required_argument,  0,  'T'},
+                {"templateLookupTable",         required_argument,  0,  'T'},
                 {"complementLookupTable",       required_argument,  0,  'C'},
                 {"alignments",                  required_argument,  0,  'l'},
                 {"templateExpectations",        required_argument,  0,  'E'},
@@ -95,7 +94,7 @@ int main(int argc, char *argv[]) {
                 {0, 0, 0, 0} };
 
         int option_index = 0;
-        key = getopt_long(argc, argv, "h:o:p:T:C:l:E:W:v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
+        key = getopt_long(argc, argv, "h:a:o:p:T:C:l:E:W:v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
                           long_options, &option_index);
         if (key == -1) {
             //usage();
@@ -105,11 +104,14 @@ int main(int argc, char *argv[]) {
             case 'h':
                 usage();
                 return 1;
+            case 'a':
+                j = sscanf(optarg, "%" PRIi64 "", &kmerLength);
+                assert(j == 1);
+                assert(kmerLength > 0);
+                break;
             case 'p':
                 j = sscanf(optarg, "%" PRIi64 "", &hdpType);
                 assert (j == 1);
-                assert (hdpType >= 0);
-                assert (hdpType <= 3);
                 break;
             case 'T':
                 templateLookupTable = stString_copy(optarg);
@@ -119,12 +121,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'l':
                 alignmentsFile = stString_copy(optarg);
-                break;
-            case 'E':
-                templateExpectationsFile = stString_copy(optarg);
-                break;
-            case 'W':
-                complementExpectationsFile = stString_copy(optarg);
                 break;
             case 'v':
                 templateHdpOutfile = stString_copy(optarg);
@@ -213,20 +209,26 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
-
+    
+    (void) j;
+    
     if ((templateHdpOutfile == NULL) || (complementHdpOutfile == NULL)) {
         st_errAbort("[buildHdpUtil] ERROR: Need to specify where to put the HDP files");
     }
 
+    if ((templateLookupTable == NULL) || (complementLookupTable == NULL)) {
+        st_errAbort("[buildHdpUtil] ERROR: Need lookup tables");
+    }
     printStartMessage(hdpType, alignmentsFile, templateHdpOutfile, complementHdpOutfile);
 
     // option for building from alignment
     if (alignmentsFile != NULL) {
-        if (!((hdpType >= 0) && (hdpType <= 12))) {
+        if (!((hdpType >= 0) && (hdpType <= 13))) {
             st_errAbort("Invalid HDP type");
         }
         NanoporeHdpType type = (NanoporeHdpType) hdpType;
-        nanoporeHdp_buildNanoporeHdpFromAlignment(type, templateLookupTable, complementLookupTable, alignmentsFile,
+        nanoporeHdp_buildNanoporeHdpFromAlignment(type, kmerLength,
+                                                  templateLookupTable, complementLookupTable, alignmentsFile,
                                                   templateHdpOutfile, complementHdpOutfile,
                                                   nbSamples, burnIn, thinning, verbose,
                                                   baseGamma, middleGamma, leafGamma,
@@ -234,29 +236,6 @@ int main(int argc, char *argv[]) {
                                                   middleGammaAlpha, middleGammaBeta,
                                                   leafGammaAlpha, leafGammaBeta,
                                                   samplingGridStart, samplingGridEnd, samplingGridLength);
-    } else {
-#pragma omp parallel sections
-        {
-            {
-                if (templateExpectationsFile != NULL) {
-                    if (templateHdpOutfile == NULL) {
-                        st_errAbort("Need to provide HDP file");
-                    }
-                    updateHdpFromAssignments(templateHdpOutfile, templateExpectationsFile, templateHdpOutfile,
-                                             nbSamples, burnIn, thinning, verbose);
-                }
-            }
-#pragma omp section
-            {
-                if (complementExpectationsFile != NULL) {
-                    if (complementHdpOutfile == NULL) {
-                        st_errAbort("Need to provide HDP file");
-                    }
-                    updateHdpFromAssignments(complementHdpOutfile, complementExpectationsFile, complementHdpOutfile,
-                                             nbSamples, burnIn, thinning, verbose);
-                }
-            }
-        }
-        return 0;
     }
+    return 0;
 }

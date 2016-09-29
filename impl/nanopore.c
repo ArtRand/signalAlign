@@ -40,7 +40,11 @@ static NanoporeRead *nanopore_NanoporeReadConstruct(int64_t readLength,
     npRead->complementPModel = st_malloc(npRead->nbComplementEvents * sizeof(double));
 
     npRead->scaled = TRUE;
-    // return
+
+    // initialize to 0.0 these params are not in the ONT models
+    npRead->templateParams.shift_sd = 0.0;
+    npRead->complementParams.shift_sd = 0.0;
+
     return npRead;
 }
 
@@ -59,18 +63,23 @@ static inline double nanopore_getEventDuration(double *events, int64_t index) {
     return events[2 + (index * NB_EVENT_PARAMS)];
 }
 
+static inline double nanopore_getEventDeltaTime(double *events, int64_t index) {
+    //return *(events + ((1 + index * NB_EVENT_PARAMS) + (sizeof(double))));
+    return events[3 + (index * NB_EVENT_PARAMS)];
+}
+
 static void nanopore_descaleEvents(int64_t nb_events, double *events, double scale, double shift) {
     for (int64_t i = 0; i < nb_events; i += NB_EVENT_PARAMS) {
         events[i] = (events[i] - shift) / scale;
     }
 }
 
-EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double duration, int64_t kmerIndex) {
+EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double deltaTime, int64_t kmerIndex) {
     EventKmerTuple *t = st_malloc(sizeof(EventKmerTuple));
     t->eventMean = mean;
     t->eventSd = sd;
     t->kmerIndex = kmerIndex;
-    t->eventDuration = duration;
+    t->deltaTime = deltaTime;
     return t;
 }
 
@@ -79,23 +88,40 @@ NanoporeReadAdjustmentParameters *nanopore_readAdjustmentParametersConstruct() {
     params->scale = 0.0;
     params->scale_sd = 0.0;
     params->shift = 0.0;
+    params->shift_sd = 0.0;
     params->var = 0.0;
     params->var_sd = 0.0;
+    params->drift = 0.0;
     return params;
 }
 
 NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     FILE *fH = fopen(nanoporeReadFile, "r");
+    // line 1: all tab-seperated
+    // 0 alignment read length
+    // 1 # template events
+    // 2 # complement events
+    // 3 length of template read
+    // 4 length of complement read
+    // 5 template scale
+    // 6 template shift
+    // 7 template var
+    // 8 template scale_sd
+    // 9 template var_sd
+    // 0 template drift
+    // 1 complement scale
+    // 2 complement shift
+    // 3 complement var
+    // 4 complement scale_sd
+    // 5 complement var_sd
+    // 6 complement drift
 
-    // line 1 [2D read length] [# of template events] [# of complement events]
-    //        [template scale] [template shift] [template var] [template scale_sd] [template var_sd]
-    //        [complement scale] [complement shift] [complement var] [complement scale_sd] [complement var_sd] \n
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
     int64_t npRead_readLength, npRead_nbTemplateEvents, npRead_nbComplementEvents,
             templateReadLength, complementReadLength;
 
-    if (stList_length(tokens) != 15) {
+    if (stList_length(tokens) != 17) {
         st_errAbort("nanopore_loadNanoporeReadFromFile: incorrect line 1 for file %s got %"PRId64"tokens should get 16",
                     nanoporeReadFile, stList_length(tokens));
 
@@ -149,27 +175,34 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     if (j != 1) {
         st_errAbort("error parsing nanopore template var_sd\n");
     }
-
+    j = sscanf(stList_get(tokens, 10), "%lf", &(npRead->templateParams.drift));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore template drift\n");
+    }
     // complement params
-    j = sscanf(stList_get(tokens, 10), "%lf", &(npRead->complementParams.scale));
+    j = sscanf(stList_get(tokens, 11), "%lf", &(npRead->complementParams.scale));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement scale\n");
     }
-    j = sscanf(stList_get(tokens, 11), "%lf", &(npRead->complementParams.shift));
+    j = sscanf(stList_get(tokens, 12), "%lf", &(npRead->complementParams.shift));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement shift\n");
     }
-    j = sscanf(stList_get(tokens, 12), "%lf", &(npRead->complementParams.var));
+    j = sscanf(stList_get(tokens, 13), "%lf", &(npRead->complementParams.var));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement var\n");
     }
-    j = sscanf(stList_get(tokens, 13), "%lf", &(npRead->complementParams.scale_sd));
+    j = sscanf(stList_get(tokens, 14), "%lf", &(npRead->complementParams.scale_sd));
     if (j != 1) {
         st_errAbort("error parsing nanopore complement scale_sd\n");
     }
-    j = sscanf(stList_get(tokens, 14), "%lf", &(npRead->complementParams.var_sd));
+    j = sscanf(stList_get(tokens, 15), "%lf", &(npRead->complementParams.var_sd));
     if (j != 1) {
         st_errAbort("error parsing nanopore template var_sd\n");
+    }
+    j = sscanf(stList_get(tokens, 16), "%lf", &(npRead->complementParams.drift));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore complement drift\n");
     }
 
     // cleanup line 1
@@ -260,7 +293,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     free(string);
     stList_destruct(tokens);
 
-    // line 8 [template events (mean, stddev, length)] \n
+    // line 8 [template events (mean, stddev, length, start)] \n
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check
@@ -421,13 +454,15 @@ stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSeq
         int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(nucleotideSequence + ref_idx);
         double eventMean = nanopore_getEventMean(eventSequence, eventIndex);
         double eventSd = nanopore_getEventSd(eventSequence, eventIndex);
-        double eventDuration = nanopore_getEventDuration(eventSequence, eventIndex);
-        EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDuration, kmerIndex);
+        double eventDeltaTime = nanopore_getEventDeltaTime(eventSequence, eventIndex);
+        EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDeltaTime, kmerIndex);
         stList_append(mapOfEventsToKmers, t);
     }
     return mapOfEventsToKmers;
 }
 
+// This function basically reads off the 1D alignment table, and will give back eventKmerTuples that have kmers with
+// whatever length the base caller used
 static stList *nanopore_makeEventTuplesFromOneDRead(int64_t *kmerIndices, double *events, double *probs,
                                                     int64_t numberOfEvents, double threshold) {
     stList *map = stList_construct3(0, &free);
@@ -458,37 +493,62 @@ stList *nanopore_getComplementOneDAssignments(NanoporeRead *npRead, double thres
 }
 
 stList *nanopore_getOneDAssignmentsFromRead(int64_t *strandEventMap, double *events, char *strandRead,
-                                            int64_t readLength) {
+                                            int64_t readLength, char *alphabet, int64_t alphabetSize,
+                                            int64_t kmerLength) {
+    // map of event<>kmerIndex
     stList *map = stList_construct3(0, &free);
-    int64_t rows = sequence_correctSeqLength(readLength, kmer);
-    int64_t pE = INT64_MIN;
+
+    // number of kmers there will be (this appears as rows in the .fast5 files, so I called it rows)
+    int64_t rows = readLength - (kmerLength - 1);
+
+    // see note below
+    int64_t previousEventIndex = -1;
     for (int64_t i = 0; i < rows; i++) {
         int64_t eventIndex = strandEventMap[i];
-        int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(strandRead + i);
+        int64_t kmerIndex = kmer_id(strandRead + i, alphabet, alphabetSize, kmerLength);
         double eventMean = nanopore_getEventMean(events, eventIndex);
         double eventSd = nanopore_getEventSd(events, eventIndex);
-        double eventDuration = nanopore_getEventDuration(events, eventIndex);
-        if (eventIndex > pE) {
+        double eventDeltaTime = nanopore_getEventDeltaTime(events, eventIndex);
+
+        // every event is mapped to it's highest probability position in the read so repeat events are just to fill in
+        // skipped kmers (which will have lower prob). so only collect event<>kmer matches for the first event (highest
+        // prob)
+        if (eventIndex > previousEventIndex) {
             //st_uglyf("seqIndex: %lld eventIndex: %lld mean: %f sd: %f dur: %f kmerIndex: %lld\n",
-            //         i, eventIndex, eventMean, eventSd, eventDuration, kmerIndex);
-            EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDuration, kmerIndex);
+            //         i, eventIndex, eventMean, eventSd, eventDeltaTime, kmerIndex);
+            EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDeltaTime, kmerIndex);
             stList_append(map, t);
-            pE = eventIndex;
+            previousEventIndex = eventIndex;
         }
     }
     return map;
 }
 
-stList *nanopore_templateOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore) {
-    (void) ignore;
-    return nanopore_getOneDAssignmentsFromRead(npRead->templateStrandEventMap, npRead->templateEvents,
-                                               npRead->templateRead, npRead->templateReadLength);
+static void nanopore_adjustEventsForDriftP(double *events, double drift, int64_t nbEvents) {
+    for (int64_t i = 0; i < nbEvents; i++) {
+        double deltaTime = nanopore_getEventDeltaTime(events, i);
+        events[i * NB_EVENT_PARAMS] = (events[i * NB_EVENT_PARAMS] - (deltaTime * drift));
+    }
 }
 
-stList *nanopore_complementOneDAssignmentsFromRead(NanoporeRead *npRead, double ignore) {
-    (void) ignore;
-    return nanopore_getOneDAssignmentsFromRead(npRead->complementStrandEventMap, npRead->complementEvents,
-                                               npRead->complementRead, npRead->complementReadLength);
+void nanopore_adjustEventsForDrift(NanoporeRead *npRead) {
+    nanopore_adjustEventsForDriftP(npRead->templateEvents, npRead->templateParams.drift, npRead->nbTemplateEvents);
+    nanopore_adjustEventsForDriftP(npRead->complementEvents, npRead->complementParams.drift,
+                                   npRead->nbComplementEvents);
+}
+
+void nanopore_adjustTemplateEventsForDrift(NanoporeRead *npRead) {
+    nanopore_adjustEventsForDriftP(npRead->templateEvents, npRead->templateParams.drift, npRead->nbTemplateEvents);
+}
+
+void nanopore_adjustComplementEventsForDrift(NanoporeRead *npRead) {
+    nanopore_adjustEventsForDriftP(npRead->complementEvents, npRead->complementParams.drift,
+                                   npRead->nbComplementEvents);
+}
+
+void nanopore_dontAdjustEvents(NanoporeRead *npRead) {
+    (void) npRead;
+    return;
 }
 
 void nanopore_descaleNanoporeRead(NanoporeRead *npRead) {
@@ -579,8 +639,8 @@ void nanopore_lineq_solve(double *A, double *b, double *x_out, int64_t n) {
 }
 
 // weighted least squares to compute normalization params
-void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params,
-                                   bool drift_out, bool var_out) {
+void nanopore_compute_mean_scale_params(double *model, stList *kmerToEventMap, NanoporeReadAdjustmentParameters *params,
+                                        bool drift_out, bool var_out) {
     double* XWX = NULL;
     double* XWy = NULL;
     double* beta = NULL;
@@ -588,19 +648,17 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
         st_errAbort("Cannot get scale params with no assignments\n");
     }
     if (drift_out) {
-        st_errAbort("Drift not implemented yet\n");
         XWX = (double*) calloc(9, sizeof(double));
         XWy = (double*) calloc(3, sizeof(double));
 
         for (int i = 0; i < stList_length(kmerToEventMap); i++) {
             EventKmerTuple *t = stList_get(kmerToEventMap, i);
             double event = t->eventMean;
-            double time = t->eventDuration;
+            double time = t->deltaTime;
             int64_t id = t->kmerIndex;
 
-
-            double level_mean = model[1 + (id * MODEL_PARAMS)];
-            double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
+            double level_mean = model[(id * MODEL_PARAMS)];
+            double level_sd = model[(id * MODEL_PARAMS + 1)];
 
             // weights should technically include variance parameter, but will only results in
             // some inefficiency, no bias
@@ -628,24 +686,23 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
 
         nanopore_lineq_solve(XWX, XWy, beta, 3);
 
-        // todo drift not part of C stuct yet
         params->shift = beta[0];
         params->scale = beta[1];
+        params->drift = beta[2];
 
         if (var_out) {
             double dispersion = 0.0;
             for (int64_t i = 0; i < stList_length(kmerToEventMap); i++) {
                 EventKmerTuple *t = stList_get(kmerToEventMap, i);
-                //int64_t id = kmer_id(read_kmers[i], alphabet, alphabet_size, kmer_length);
+
                 int64_t id = t->kmerIndex;
 
-
-                double level_mean = model[1 + (id * MODEL_PARAMS)];
-                double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
+                double level_mean = model[(id * MODEL_PARAMS)];
+                double level_sd = model[(id * MODEL_PARAMS + 1)];
                 double level_var = level_sd * level_sd;
 
                 double event = t->eventMean;
-                double time = t->eventDuration;
+                double time = t->deltaTime;
 
                 double predicted_val = beta[0] + beta[1] * level_mean + beta[2] * time;
                 double residual = event - predicted_val;
@@ -664,9 +721,9 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
             double event = t->eventMean;
             int64_t id = t->kmerIndex;
 
-            double level_mean = model[1 + (id * MODEL_PARAMS)];
+            double level_mean = model[(id * MODEL_PARAMS)];
 
-            double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
+            double level_sd = model[(id * MODEL_PARAMS + 1)];
             // weights should technically include variance parameter, but will only results in
             // some inefficiency, no bias
             double inv_var = 1.0 / (level_sd * level_sd);
@@ -696,9 +753,9 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
 
                 int64_t id = t->kmerIndex;
 
-                double level_mean = model[1 + (id * MODEL_PARAMS)];
+                double level_mean = model[(id * MODEL_PARAMS)];
 
-                double level_sd = model[1 + (id * MODEL_PARAMS + 1)];
+                double level_sd = model[(id * MODEL_PARAMS + 1)];
                 double level_var = level_sd * level_sd;
 
                 double event = t->eventMean;
@@ -713,4 +770,100 @@ void nanopore_compute_scale_params(double *model, stList *kmerToEventMap, Nanopo
     free(XWX);
     free(XWy);
     free(beta);
+}
+
+void nanopore_compute_noise_scale_params(double *model, stList *kmerToEventMap,
+                                         NanoporeReadAdjustmentParameters *params) {
+    double* XWX = NULL;
+    double* XWy = NULL;
+    double* beta = NULL;
+    if (stList_length(kmerToEventMap) == 0) {
+        st_errAbort("Cannot get scale params with no assignments\n");
+    }
+
+    XWX = (double*) calloc(4, sizeof(double));
+    XWy = (double*) calloc(2, sizeof(double));
+
+    for (int i = 0; i < stList_length(kmerToEventMap); i++) {
+        EventKmerTuple *t = stList_get(kmerToEventMap, i);
+
+        double noise = t->eventSd;
+        int64_t id = t->kmerIndex;
+
+        double noise_mean = model[(id * MODEL_PARAMS + 2)];
+
+        double noise_sd = model[(id * MODEL_PARAMS + 3)];
+        // weights should technically include variance parameter, but will only results in
+        // some inefficiency, no bias
+        double inv_var = 1.0 / (noise_sd * noise_sd);
+
+        double scaled_mean = noise_mean * inv_var;
+
+        XWX[0] += inv_var;
+        XWX[1] += scaled_mean;
+        XWX[3] += scaled_mean * noise_mean;
+
+        XWy[0] += inv_var * noise;
+        XWy[1] += scaled_mean * noise;
+    }
+    XWX[2] = XWX[1];
+
+    beta = (double*) malloc(sizeof(double) * 2);
+
+    nanopore_lineq_solve(XWX, XWy, beta, 2);
+
+    params->shift_sd = beta[0];
+    params->scale_sd = beta[1];
+
+    double dispersion = 0.0;
+    for (int64_t i = 0; i < stList_length(kmerToEventMap); i++) {
+        EventKmerTuple *t = stList_get(kmerToEventMap, i);
+
+        int64_t id = t->kmerIndex;
+
+        double nosie_mean = model[(id * MODEL_PARAMS + 2)];
+        double noise_sd = model[(id * MODEL_PARAMS + 3)];
+
+        double level_var = noise_sd * noise_sd;
+
+        double event = t->eventSd;
+
+        double predicted_val = beta[0] + beta[1] * nosie_mean;
+        double residual = event - predicted_val;
+        dispersion += (residual * residual) / level_var;
+    }
+    params->var_sd = sqrt(dispersion / stList_length(kmerToEventMap));
+
+    free(XWX);
+    free(XWy);
+    free(beta);
+}
+
+void nanopore_convert_to_lognormal_params(int64_t alphabet_size, int64_t kmer_length, double *model,
+                                          stList *kmerToEventMap) {
+    int64_t num_kmers = 1;
+    for (int64_t i = 0; i < alphabet_size; i++) {
+        num_kmers *= kmer_length;
+    }
+
+    for (int64_t i = 0; i < num_kmers; i++) {
+        double noise_sd = model[(i * MODEL_PARAMS + 3)];
+        double untrans_var = noise_sd * noise_sd;
+        double untrans_mean = model[(i * MODEL_PARAMS + 2)];
+
+        double trans_var = log(1.0 + untrans_var / (untrans_mean * untrans_mean));
+        double trans_mean = log(untrans_mean - trans_var / 2.0);
+
+        //noise_sds[i] = sqrt(trans_var);
+        model[(i * MODEL_PARAMS + 3)] = sqrt(trans_var);
+
+        //noise_means[i] = trans_mean;
+        model[(i * MODEL_PARAMS + 2)] = trans_mean;
+    }
+
+    for (int i = 0; i < stList_length(kmerToEventMap); i ++) {
+        EventKmerTuple *t = stList_get(kmerToEventMap, i);
+        t->eventSd = log(t->eventSd);
+        //read_noises[i] = log(read_noises[i]);
+    }
 }

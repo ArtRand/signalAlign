@@ -5,7 +5,15 @@ import os
 import pandas as pd
 import numpy as np
 from random import shuffle
+from serviceCourse.parsers import read_fasta
 
+
+def get_first_sequence(input_fasta):
+    input_sequence = ""
+    for header, comment, sequence in read_fasta(input_fasta):
+        input_sequence += sequence
+        break
+    return input_sequence
 
 def parse_alignment_file(alignment_file):
     data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
@@ -106,8 +114,8 @@ class KmerHistogram(object):
 
 
 class CallMethylation(object):
-    def __init__(self, sequence, alignment_file, degenerate_type, label=None, positions=None, threshold=0.0,
-                 out_file=None):
+    def __init__(self, sequence, alignment_file, degenerate_type, kmer_length, label=None, positions=None,
+                 threshold=0.0, out_file=None):
         self.sequence = sequence
         self.forward = ".forward." in alignment_file
         self.alignment_file = alignment_file
@@ -120,6 +128,7 @@ class CallMethylation(object):
         self.positions = positions
         self.degenerate = degenerate_type
         self.threshold = threshold
+        self.kmer_length = kmer_length
 
         if label is not None:
             self.label = label
@@ -143,9 +152,8 @@ class CallMethylation(object):
     def find_occurences(self, ch):
         return [i for i, letter in enumerate(self.sequence) if letter == ch]
 
-    @staticmethod
-    def get_range(position):
-        return range(position - 5, position + 1)
+    def get_range(self, position):
+        return range(position - (self.kmer_length - 1), position + 1)
 
     def call_methyls(self, positions=None, threshold=0.0):
         if positions is None:
@@ -172,7 +180,9 @@ class CallMethylation(object):
                     else {"A": 0, "C": 0, "G": 0, "T": 0}
 
                 for r in select.itertuples():
-                    offset = site - r[1] if regular_offset is True else 5 - (site - r[1])
+                    #kmer_length = len(r[5])
+                    #offset = site - r[1] if regular_offset is True else 5 - (site - r[1])
+                    offset = site - r[1] if regular_offset is True else (self.kmer_length - 1) - (site - r[1])
                     call = r[5][offset]
                     marginal_probs[call] += r[4]
 

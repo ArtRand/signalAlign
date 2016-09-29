@@ -7,11 +7,10 @@
 #include "stateMachine.h"
 #include "CuTest.h"
 #include "pairwiseAligner.h"
-//#include "discreteHmm.h"
-//#include "continuousHmm.h"
 #include "randomSequences.h"
 
 // helper functions
+/*
 static void print_stateMachine_transitions(StateMachine *sM) {
     StateMachine3_HDP *sMhdp = (StateMachine3_HDP *)sM;
     st_uglyf("Match continue %f\n", exp(sMhdp->TRANSITION_MATCH_CONTINUE));
@@ -26,6 +25,7 @@ static void print_stateMachine_transitions(StateMachine *sM) {
     st_uglyf("gap Y to match %f\n", exp(sMhdp->TRANSITION_MATCH_FROM_GAP_Y));
     st_uglyf("gap Y from gap X %f\n", exp(sMhdp->TRANSITION_GAP_SWITCH_TO_Y));
 }
+*/
 
 static inline char *homopolymer(char base, int64_t repeat) {
     char *homopolymer = (char *)st_malloc(sizeof(char) * (repeat + 1));
@@ -44,8 +44,8 @@ static inline char *homopolymer(char base, int64_t repeat) {
 //////////////////////////////////////////////Function Tests/////////////////////////////////////////////////////////
 static void test_getKmerWithBoundsCheck(CuTest *testCase) {
     char *nucleotides = stString_print("ATGCATAGC");
-    Sequence *sX = sequence_constructKmerSequence(sequence_correctSeqLength(strlen(nucleotides), kmer),nucleotides,
-                                                  sequence_getKmer, sequence_sliceNucleotideSequence,
+    Sequence *sX = sequence_constructKmerSequence(sequence_correctSeqLength(strlen(nucleotides), kmer, KMER_LENGTH),
+                                                  nucleotides, sequence_getKmer, sequence_sliceNucleotideSequence,
                                                   THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
     //ATGCAT
     // TGCATA
@@ -61,9 +61,11 @@ static void test_getKmerWithBoundsCheck(CuTest *testCase) {
 }
 
 static void test_findDegeneratePositions(CuTest *testCase) {
-    stList *noMethyls = path_findDegeneratePositions("ATGCAC");
+    char *noXs = "ATGCAC";
+    char *withXs = "ATGXAX";
+    stList *noMethyls = path_findDegeneratePositions(noXs, strlen(noXs));
     CuAssertTrue(testCase, stList_length(noMethyls) == 0);
-    stList *methyls = path_findDegeneratePositions("ATGXAX");
+    stList *methyls = path_findDegeneratePositions(withXs, strlen(withXs));
     CuAssertTrue(testCase, stList_length(methyls) == 2);
     int64_t methyl_1 = *(int64_t *)stList_get(methyls, 0);
     int64_t methyl_2 = *(int64_t *)stList_get(methyls, 1);
@@ -74,11 +76,11 @@ static void test_findDegeneratePositions(CuTest *testCase) {
 }
 
 static void test_checkPathConstruct(CuTest *testCase) {
-    Path *path = path_construct(NULL, 3);
+    Path *path = path_construct(NULL, 3, KMER_LENGTH);
     CuAssert(testCase, "",path->kmer == NULL);
     path_destruct(path);
     char *tS = getRandomSequence(KMER_LENGTH);
-    path = path_construct(tS, 3);
+    path = path_construct(tS, 3, KMER_LENGTH);
     CuAssertStrEquals(testCase, tS, path->kmer);
     CuAssertIntEquals(testCase, path->stateNumber, 3);
     double *cells = path_getCell(path);
@@ -91,7 +93,7 @@ static void test_checkPathConstruct(CuTest *testCase) {
         CuAssertDblEquals(testCase, cells[i], (double )i, 0.0);
     }
 
-    Path *copy = path_construct(tS, 3);
+    Path *copy = path_construct(tS, 3, KMER_LENGTH);
     path_copyCells(path, copy);
     double *copyCells = path_getCell(copy);
     for (int64_t i = 0; i < 3; i++) {
@@ -103,11 +105,11 @@ static void test_checkPathConstruct(CuTest *testCase) {
 }
 
 static void test_pathLegalTransitions(CuTest *testCase) {
-    Path *path0 = path_construct(NULL, 3);
-    Path *path1 = path_construct("AAETTT", 3);
-    Path *path2 = path_construct("AETTTC", 3);
-    Path *path3 = path_construct("AETTTC", 2);
-    Path *path4 = path_construct("ACTTTC", 3);
+    Path *path0 = path_construct(NULL, 3, KMER_LENGTH);
+    Path *path1 = path_construct("AAETTT", 3, KMER_LENGTH);
+    Path *path2 = path_construct("AETTTC", 3, KMER_LENGTH);
+    Path *path3 = path_construct("AETTTC", 2, KMER_LENGTH);
+    Path *path4 = path_construct("ACTTTC", 3, KMER_LENGTH);
     CuAssertTrue(testCase, path_checkLegal(path0, path1) == TRUE);
     CuAssertTrue(testCase, path_checkLegal(path1, path0) == TRUE);
     CuAssertTrue(testCase, path_checkLegal(path1, path2) == TRUE);
@@ -166,7 +168,7 @@ static void test_getKmerIndex(CuTest *testCase) {
 
 static void test_substitutedKmers(CuTest *testCase) {
     char *ambigKmer = "ATGXAX";
-    stList *positions = path_findDegeneratePositions(ambigKmer);
+    stList *positions = path_findDegeneratePositions(ambigKmer, strlen(ambigKmer));
     char *pattern = "CE";
     char *kmer = hdCell_getSubstitutedKmer(positions, 2, pattern, ambigKmer);
     CuAssertTrue(testCase, stList_length(positions) == 2);

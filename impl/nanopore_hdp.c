@@ -12,7 +12,7 @@
 #define ALIGNMENT_SIGNAL_COL 13
 #define NUM_ALIGNMENT_COLS 15
 
-#define MODEL_ROW_HEADER_LENGTH 1
+#define MODEL_ROW_HEADER_LENGTH 0
 #define MODEL_MEAN_ENTRY 0
 #define MODEL_NOISE_ENTRY 1
 #define MODEL_ENTRY_LENGTH 5
@@ -23,15 +23,11 @@
 #include <string.h>
 #include <inttypes.h>
 #include "pairwiseAligner.h"
-//#include "hdp.h"
 #include "hdp_math_utils.h"
-//#include "nanopore_hdp.h"
-//#include "fastCMaths.h"
-//#include "sonLib.h"
+
 
 NanoporeHDP* package_nanopore_hdp(HierarchicalDirichletProcess* hdp, const char* alphabet, int64_t alphabet_size,
                                   int64_t kmer_length) {
-    
     NanoporeHDP* nhdp = (NanoporeHDP*) malloc(sizeof(NanoporeHDP));
     
     // copy and sort alphabet
@@ -121,11 +117,30 @@ void finalize_nhdp_distributions(NanoporeHDP* nhdp) {
 
 void normal_inverse_gamma_params_from_minION(const char* model_filepath, double* mu_out, double* nu_out,
                                              double* alpha_out, double* beta_out) {
-    
+    // model format:
+    // stateNumber \t alphabetSize \t alphabet \t kmerSize
+    // [level_mean, level_stdv, noise_mean, noise_stdv, noise_lambda]
     FILE* model_file = fopen(model_filepath, "r");
     
     char* line = stFile_getLineFromFile(model_file);
     stList* tokens = stString_split(line);
+
+    if (stList_length(tokens) != 4) {
+        st_errAbort("normal_inverse_gamma_params_from_minION: Model format has changed invalid model"
+                            "found here %s\n", model_filepath);
+    }
+    free(line);
+    stList_destruct(tokens);
+
+    // ignore transitions line
+    line = stFile_getLineFromFile(model_file);
+    tokens = stString_split(line);
+    if (stList_length(tokens) != 10) {
+        st_errnoAbort("More than 3-state hmm transitions parameters found\n");
+    }
+
+    line = stFile_getLineFromFile(model_file);
+    tokens = stString_split(line);
     
     int64_t table_length = (stList_length(tokens) - MODEL_ROW_HEADER_LENGTH) / MODEL_ENTRY_LENGTH;
     double* means = (double*) malloc(sizeof(double) * table_length);
@@ -359,8 +374,9 @@ int64_t* kmer_to_word(char* kmer, char* alphabet, int64_t alphabet_size, int64_t
         while (kmer[i] != alphabet[j]) {
             j++;
             if (j == alphabet_size) {
-                fprintf(stderr, "vanillaAlign - ERROR: K-mer contains character outside alphabet. "
-                        "Got offending kmer is: %s. alphabet is %s\n", kmer, alphabet);
+                fprintf(stderr, "[signalAlign] - ERROR: K-mer contains character outside alphabet. "
+                        "Got offending kmer is: %s. alphabet is %s kmer length %"PRId64"\n",
+                        kmer, alphabet, kmer_length);
                 exit(EXIT_FAILURE);
             }
         }
@@ -1110,7 +1126,7 @@ static void nanoporeHdp_checkTwoLevelPriorParameters(double baseGammaAlpha, doub
 }
 
 
-static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile,
+static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile, int64_t kmerLength,
                                                double baseGamma, double middleGamma, double leafGamma,
                                                double baseGammaAlpha, double baseGammaBeta,
                                                double middleGammaAlpha, double middleGammaBeta,
@@ -1123,7 +1139,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
                                 "for this NanoporeHdpType\n");
         }
 
-        NanoporeHDP *nHdp = flat_hdp_model(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+        NanoporeHDP *nHdp = flat_hdp_model(METHYL_HYDROXY_CYTOSINE_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, kmerLength,
                                            baseGamma, leafGamma,
                                            samplingGridStart, samplingGridEnd, samplingGridLength, modelFile);
 
@@ -1132,7 +1148,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
     if (nHdpType == singleLevelPrior) {
         nanoporeHdp_checkTwoLevelPriorParameters(baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta);
 
-        NanoporeHDP *nHdp = flat_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+        NanoporeHDP *nHdp = flat_hdp_model_2(METHYL_HYDROXY_CYTOSINE_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, kmerLength,
                                              baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta,
                                              samplingGridStart, samplingGridEnd, samplingGridLength,
                                              modelFile);
@@ -1140,7 +1156,15 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
     }
     if (nHdpType == singleLevelPrior2) {
         nanoporeHdp_checkTwoLevelPriorParameters(baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta);
-        NanoporeHDP *nHdp = flat_hdp_model_2(FIVE_LETTER_ALPHA, SYMBOL_NUMBER, KMER_LENGTH,
+        NanoporeHDP *nHdp = flat_hdp_model_2(METHYL_CYTOSINE_ALPHA, SYMBOL_NUMBER, kmerLength,
+                                             baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta,
+                                             samplingGridStart, samplingGridEnd, samplingGridLength,
+                                             modelFile);
+        return nHdp;
+    }
+    if (nHdpType == singleLevelPriorEcoli) {
+        nanoporeHdp_checkTwoLevelPriorParameters(baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta);
+        NanoporeHDP *nHdp = flat_hdp_model_2(METHYL_CYTOSINE_ADENOSINE_ALPHA, SYMBOL_NUMBER_METHYL_CA, kmerLength,
                                              baseGammaAlpha, baseGammaBeta, leafGammaAlpha, leafGammaBeta,
                                              samplingGridStart, samplingGridEnd, samplingGridLength,
                                              modelFile);
@@ -1149,7 +1173,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
     if (nHdpType == multisetFixed) {
         nanoporeHdp_checkThreeLevelFixedParameters(baseGamma, middleGamma, leafGamma);
 
-        NanoporeHDP *nHdp = multiset_hdp_model(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+        NanoporeHDP *nHdp = multiset_hdp_model(METHYL_HYDROXY_CYTOSINE_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, kmerLength,
                                                baseGamma, middleGamma, leafGamma,
                                                samplingGridStart, samplingGridEnd, samplingGridLength,
                                                modelFile);
@@ -1160,7 +1184,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
                                                    middleGammaAlpha, middleGammaBeta,
                                                    leafGammaAlpha, leafGammaBeta);
 
-        NanoporeHDP *nHdp = multiset_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+        NanoporeHDP *nHdp = multiset_hdp_model_2(METHYL_HYDROXY_CYTOSINE_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, kmerLength,
                                                  baseGammaAlpha, baseGammaBeta,
                                                  middleGammaAlpha, middleGammaBeta,
                                                  leafGammaAlpha, leafGammaBeta,
@@ -1173,7 +1197,19 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
                                                    middleGammaAlpha, middleGammaBeta,
                                                    leafGammaAlpha, leafGammaBeta);
 
-        NanoporeHDP *nHdp = multiset_hdp_model_2(FIVE_LETTER_ALPHA, SYMBOL_NUMBER, KMER_LENGTH,
+        NanoporeHDP *nHdp = multiset_hdp_model_2(METHYL_CYTOSINE_ALPHA, SYMBOL_NUMBER, kmerLength,
+                                                 baseGammaAlpha, baseGammaBeta,
+                                                 middleGammaAlpha, middleGammaBeta,
+                                                 leafGammaAlpha, leafGammaBeta,
+                                                 samplingGridStart, samplingGridEnd, samplingGridLength,
+                                                 modelFile);
+        return nHdp;
+    }
+    if (nHdpType == multisetPriorEcoli) {
+        nanoporeHdp_checkThreeLevelPriorParameters(baseGammaAlpha, baseGammaBeta,
+                                                   middleGammaAlpha, middleGammaBeta,
+                                                   leafGammaAlpha, leafGammaBeta);
+        NanoporeHDP *nHdp = multiset_hdp_model_2(METHYL_CYTOSINE_ADENOSINE_ALPHA, SYMBOL_NUMBER_METHYL_CA, kmerLength,
                                                  baseGammaAlpha, baseGammaBeta,
                                                  middleGammaAlpha, middleGammaBeta,
                                                  leafGammaAlpha, leafGammaBeta,
@@ -1184,7 +1220,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
     if (nHdpType == compFixed) {
         nanoporeHdp_checkThreeLevelFixedParameters(baseGamma, middleGamma, leafGamma);
 
-        NanoporeHDP *nHdp = purine_composition_hdp_model(PURINES, 2, PYRIMIDINES, 4, KMER_LENGTH,
+        NanoporeHDP *nHdp = purine_composition_hdp_model(PURINES, 2, PYRIMIDINES, 4, kmerLength,
                                                          baseGamma, middleGamma, leafGamma,
                                                          samplingGridStart, samplingGridEnd,
                                                          samplingGridLength, modelFile);
@@ -1194,7 +1230,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         nanoporeHdp_checkThreeLevelPriorParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
                                                    middleGammaBeta, leafGammaAlpha, leafGammaBeta);
 
-        NanoporeHDP *nHdp = purine_composition_hdp_model_2(PURINES, 2, PYRIMIDINES, 4, KMER_LENGTH,
+        NanoporeHDP *nHdp = purine_composition_hdp_model_2(PURINES, 2, PYRIMIDINES, 4, kmerLength,
                                                            baseGammaAlpha, baseGammaBeta,
                                                            middleGammaAlpha, middleGammaBeta,
                                                            leafGammaAlpha, leafGammaBeta,
@@ -1206,7 +1242,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
     if (nHdpType == middleNtsFixed) {
         nanoporeHdp_checkThreeLevelFixedParameters(baseGamma, middleGamma, leafGamma);
 
-        NanoporeHDP *nHdp = middle_2_nts_hdp_model(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+        NanoporeHDP *nHdp = middle_2_nts_hdp_model(METHYL_HYDROXY_CYTOSINE_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, kmerLength,
                                                    baseGamma, middleGamma, leafGamma,
                                                    samplingGridStart, samplingGridEnd, samplingGridLength,
                                                    modelFile);
@@ -1217,7 +1253,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         nanoporeHdp_checkThreeLevelPriorParameters(baseGammaAlpha, baseGammaBeta, middleGammaAlpha,
                                                    middleGammaBeta, leafGammaAlpha, leafGammaBeta);
 
-        NanoporeHDP *nHdp = middle_2_nts_hdp_model_2(SIX_LETTER_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+        NanoporeHDP *nHdp = middle_2_nts_hdp_model_2(METHYL_HYDROXY_CYTOSINE_ALPHA, SYMBOL_NUMBER_EPIGENETIC_C, kmerLength,
                                                      baseGammaAlpha, baseGammaBeta,
                                                      middleGammaAlpha, middleGammaBeta,
                                                      leafGammaAlpha, leafGammaBeta,
@@ -1231,7 +1267,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         // {0, 1, 1, 2, 1, 3}
         int64_t groups[6] = {0, 1, 1, 2, 1, 3};
 
-        NanoporeHDP *nHdp = group_multiset_hdp_model(SIX_LETTER_ALPHA, groups, SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+        NanoporeHDP *nHdp = group_multiset_hdp_model(METHYL_HYDROXY_CYTOSINE_ALPHA, groups, SYMBOL_NUMBER_EPIGENETIC_C, kmerLength,
                                                      baseGamma, middleGamma, leafGamma,
                                                      samplingGridStart, samplingGridEnd, samplingGridLength,
                                                      modelFile);
@@ -1244,8 +1280,8 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         // {0, 1, 1, 2, 1, 3}
         int64_t groups[6] = {0, 1, 1, 2, 1, 3};
 
-        NanoporeHDP *nHdp = group_multiset_hdp_model_2(SIX_LETTER_ALPHA, groups,
-                                                       SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
+        NanoporeHDP *nHdp = group_multiset_hdp_model_2(METHYL_HYDROXY_CYTOSINE_ALPHA, groups,
+                                                       SYMBOL_NUMBER_EPIGENETIC_C, kmerLength,
                                                        baseGammaAlpha, baseGammaBeta,
                                                        middleGammaAlpha, middleGammaBeta,
                                                        leafGammaAlpha, leafGammaBeta,
@@ -1259,7 +1295,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
     }
 }
 
-void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
+void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kmerLength,
                                                const char *templateModelFile, const char* complementModelFile,
                                                const char *alignments,
                                                const char *templateHDP, const char *complementHDP,
@@ -1275,7 +1311,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
  {
     {
         fprintf(stderr, "Updating Template HDP from alignments...\n");
-        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile,
+        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile, kmerLength,
                                                         baseGamma, middleGamma, leafGamma,
                                                         baseGammaAlpha, baseGammaBeta,
                                                         middleGammaAlpha, middleGammaBeta,
@@ -1296,7 +1332,7 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
 #pragma omp section
     {
         fprintf(stderr, "Updating Complement HDP from alignments...\n");
-        NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile,
+        NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile, kmerLength,
                                                         baseGamma, middleGamma, leafGamma,
                                                         baseGammaAlpha, baseGammaBeta,
                                                         middleGammaAlpha, middleGammaBeta,

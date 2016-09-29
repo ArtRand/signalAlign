@@ -44,7 +44,7 @@ static double test_inverseGaussianPdf(double x, double mu, double lambda) {
 
 Sequence *makeTestKmerSequence() {
     char *s = "ATGXAXA"; // has 2 6mers
-    int64_t lX = sequence_correctSeqLength(strlen(s), kmer);
+    int64_t lX = sequence_correctSeqLength(strlen(s), kmer, KMER_LENGTH);
     Sequence *seq = sequence_construct(lX, s, sequence_getKmer, kmer);
     seq->degenerateBases = "CEO";
     seq->nbDegenerateBases = 3;
@@ -52,7 +52,7 @@ Sequence *makeTestKmerSequence() {
 }
 
 Sequence *makeKmerSequence(char *nucleotides) {
-    int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer);
+    int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer, KMER_LENGTH);
     Sequence *seq = sequence_constructKmerSequence(lX, nucleotides,
                                                    sequence_getKmer, sequence_sliceNucleotideSequence,
                                                    THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
@@ -60,7 +60,7 @@ Sequence *makeKmerSequence(char *nucleotides) {
 }
 
 //////////////////////////////////////////////Function Tests/////////////////////////////////////////////////////////
-
+/*  Old test that I'm keeping around in case I re-instate the duration model
 static void test_poissonPosteriorProb(CuTest *testCase) {
     double event1[] = {62.784241, 0.664989, 0.00332005312085};
     double test0 = emissions_signal_getDurationProb(event1, 0);
@@ -76,69 +76,38 @@ static void test_poissonPosteriorProb(CuTest *testCase) {
     CuAssertTrue(testCase, test4 > test5);
     //st_uglyf("0 - %f\n1 - %f\n2 - %f\n3 - %f\n4 - %f\n5 - %f\n", test0, test1, test2, test3, test4, test5);
 }
+*/
 
-static void test_getLogGaussPdfMatchProb(CuTest *testCase) {
-    // standard normal distribution
-    double eventModel[] = {0, 0, 1.0};
+static void test_stateMachine3EmissionsPdfs(CuTest *testCase) {
+    // test Gaussian distribution PDF
     double control = test_standardNormalPdf(0);
-    st_uglyf("contol: %f\n", control);
-    char *kmer1 = "AAAAAA";
-    double event1[] = {0};
-    double test = emissions_signal_logGaussMatchProb(eventModel, kmer1, event1);
-    st_uglyf("test: %f\n", test);
-    double expTest = exp(test);
-    CuAssertDblEquals(testCase, expTest, control, 0.001);
-    CuAssertDblEquals(testCase, test, log(control), 0.001);
+    double obs = emissions_signal_logGaussianProbabilityDensity(0, 0, 1);
+    CuAssertDblEquals(testCase, log(control), obs, 0.001);
+    CuAssertDblEquals(testCase, control, exp(obs), 0.001);
+    st_randomSeed(5);
+    double sigma = 0.0;
+    while (sigma <= 0.1) {
+        sigma = st_random();
+    }
+    double mu = rand_uniform2(0, 10);
+    double posOrNeg = st_random();
+    double x = 0.0;
 
-    char *modelFile = stString_print("../models/testModel_template.model");
-    //StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
-    StateMachine *sM = getStateMachine3(modelFile);
-    double event2[] = {62.784241};
-    double control2 = test_normalPdf(62.784241, sM->EMISSION_MATCH_MATRIX[1], sM->EMISSION_MATCH_MATRIX[2]);
-    double test2 = emissions_signal_logGaussMatchProb(sM->EMISSION_MATCH_MATRIX, kmer1, event2);
-    CuAssertDblEquals(testCase, test2, log(control2), 0.001);
-    stateMachine_destruct(sM);
-}
-
-static void test_bivariateGaussPdfMatchProb(CuTest *testCase) {
-    // standard normal distribution
-    double eventModel[] = {0, 0, 1.0, 0, 1.0};
-    double control = test_standardNormalPdf(0);
-    double controlSq = control * control;
-    char *kmer1 = "AAAAAA";
-    double event1[] = {0, 0}; // mean noise
-    double test = emissions_signal_getBivariateGaussPdfMatchProb(eventModel, kmer1, event1);
-    double eTest = exp(test);
-    CuAssertDblEquals(testCase, controlSq, eTest, 0.001);
-
-    char *modelFile = stString_print("../models/testModel_template.model");
-    //StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
-    StateMachine *sM = getStateMachine3(modelFile);
-    double event2[] = {62.784241, 0.664989};
-    double control2a = test_normalPdf(62.784241, sM->EMISSION_MATCH_MATRIX[1], sM->EMISSION_MATCH_MATRIX[2]);
-    double control2b = test_normalPdf(0.664989, sM->EMISSION_MATCH_MATRIX[3], sM->EMISSION_MATCH_MATRIX[4]);
-    double control2Sq = control2a * control2b;
-    double test2 = emissions_signal_getBivariateGaussPdfMatchProb(sM->EMISSION_MATCH_MATRIX, kmer1, event2);
-    double eTest2 = exp(test2);
-    CuAssertDblEquals(testCase, eTest2, control2Sq, 0.001);
-    stateMachine_destruct(sM);
-}
-
-static void test_twoDistributionPdf(CuTest *testCase) {
-    // load up a stateMachine
-    char *modelFile = stString_print("../models/testModel_template.model");
-    //StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
-    StateMachine *sM = getStateMachine3(modelFile);
-    double event[] = {62.784241, 0.664989}; // level_mean and noise_mean for AAAAAA
-    char *kmer1 = "AAAAAA";
-
-    // get a sample match prob
-    double test = emissions_signal_getEventMatchProbWithTwoDists(sM->EMISSION_MATCH_MATRIX, kmer1, event);
-    double control_level = test_normalPdf(62.784241, sM->EMISSION_MATCH_MATRIX[1], sM->EMISSION_MATCH_MATRIX[2]);
-    double control_noise = test_inverseGaussianPdf(0.664989, sM->EMISSION_MATCH_MATRIX[3], sM->EMISSION_MATCH_MATRIX[5]);
-    double control_prob = log(control_level) + log(control_noise);
-    CuAssertDblEquals(testCase, test, control_prob, 0.001);
-    stateMachine_destruct(sM);
+    if (posOrNeg > 0.5) {
+        x = mu - st_random();
+    } else {
+        x = mu + st_random();
+    }
+    control = test_normalPdf(x, mu, sigma);
+    obs = emissions_signal_logGaussianProbabilityDensity(x, mu, sigma);
+    CuAssertDblEquals(testCase, log(control), obs, 0.001);
+    CuAssertDblEquals(testCase, control, exp(obs), 0.001);
+    // test Inverse Gaussian PDF
+    double lambda = st_random();
+    control = test_inverseGaussianPdf(x, mu, lambda);
+    obs = emissions_signal_logInverseGaussianProbabilityDensity(x, mu, lambda);
+    CuAssertDblEquals(testCase, log(control), obs, 0.001);
+    CuAssertDblEquals(testCase, control, exp(obs), 0.001);
 }
 
 static bool testDiagonalsEqual(Diagonal d1, Diagonal d2) {
@@ -210,7 +179,7 @@ static void test_referenceSequence(CuTest *testCase) {
     // test slicing
     int64_t r = st_randomInt(0, length);
     Sequence *slice = testSequence->sliceFcn(testSequence, 10, length - r);
-    CuAssertStrEquals(testCase, (char *)(testSequence->elements + 10), slice->elements);
+    CuAssertStrEquals(testCase, ((char *)testSequence->elements + 10), slice->elements);
     CuAssertStrEquals(testCase, testSequence->degenerateBases, slice->degenerateBases);
     CuAssert(testCase, "slice sequence type fail",testSequence->type == slice->type);
 
@@ -263,37 +232,57 @@ static void test_loadNanoporeRead(CuTest *testCase) {
     FILE *fH = fopen(tempFile, "w");
 
     // write line 1
-    fprintf(fH, "%"PRId64"\t""%"PRId64"\t""%"PRId64"\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t\n",
-            length, length, length, param, param, param, param, param, param, param, param, param, param);
+    fprintf(fH, "%"PRId64"\t""%"PRId64"\t""%"PRId64"\t""%"PRId64"\t""%"PRId64""
+                    "\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n",
+            length, length, length, length, length,
+            param, param, param, param, param, param, param, param, param, param, param, param);
 
-    // write line 2 2D read
+    // line 2 2D (alignment table) read sequence
     fprintf(fH, "%s\n", read);
 
-    // write line 3 template event map
+    // line 3 template read
+    fprintf(fH, "%s\n", read);
+
+    // line 4 template 'strand' map
     for (int64_t i = 0; i < length; i++) {
         fprintf(fH, "%"PRId64"\t", i);
     }
     fprintf(fH, "\n");
 
-    // write line 4 template events
-    for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
-        fprintf(fH, "%"PRId64"\t", i);
-    }
-    fprintf(fH, "\n");
+    // line 5 complement read
+    fprintf(fH, "%s\n", read);
 
-    // write line 5 complement event map
+    // line 6 complement 'stand' map
     for (int64_t i = 0; i < length; i++) {
         fprintf(fH, "%"PRId64"\t", i);
     }
     fprintf(fH, "\n");
 
-    // write line 6 complement events
+    // line 7 template 2D 'event' map
+    for (int64_t i = 0; i < length; i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // line 8 template events
     for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
         fprintf(fH, "%"PRId64"\t", i);
     }
     fprintf(fH, "\n");
 
-    // line 7 template model_state
+    // line 9 complement 2D 'event' map
+    for (int64_t i = 0; i < length; i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // line 10 complement events
+    for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
+        fprintf(fH, "%"PRId64"\t", i);
+    }
+    fprintf(fH, "\n");
+
+    // line 11 template model_state
     char *kmer;
     for (int64_t i = 0; i < length; i++) {
         kmer = (char *)stList_get(kmers, i);
@@ -301,21 +290,20 @@ static void test_loadNanoporeRead(CuTest *testCase) {
     }
     fprintf(fH, "\n");
 
-    // line 8 pModel template
+    // line 12 pModel template
     for (int64_t i = 0; i < length; i++) {
         fprintf(fH, "%f\t", prob);
     }
     fprintf(fH, "\n");
 
-    // line 9 complement model_state
-    *kmer;
+    // line 13 complement model_state
     for (int64_t i = 0; i < length; i++) {
         kmer = (char *)stList_get(kmers, i);
         fprintf(fH, "%s\t", kmer);
     }
     fprintf(fH, "\n");
 
-    // line 10 pModel complement
+    // line 14 pModel complement
     for (int64_t i = 0; i < length; i++) {
         fprintf(fH, "%f\t", prob);
     }
@@ -325,23 +313,32 @@ static void test_loadNanoporeRead(CuTest *testCase) {
 
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile);
     CuAssertTrue(testCase, npRead->readLength == length);
+    CuAssertTrue(testCase, npRead->templateReadLength == length);
+    CuAssertTrue(testCase, npRead->complementReadLength == length);
+    CuAssertTrue(testCase, npRead->nbTemplateEvents == length);
+    CuAssertTrue(testCase, npRead->nbComplementEvents == length);
+
     CuAssertTrue(testCase, npRead->templateParams.scale == param);
     CuAssertTrue(testCase, npRead->templateParams.shift == param);
     CuAssertTrue(testCase, npRead->templateParams.var == param);
     CuAssertTrue(testCase, npRead->templateParams.scale_sd == param);
     CuAssertTrue(testCase, npRead->templateParams.var_sd == param);
+
     CuAssertTrue(testCase, npRead->complementParams.scale == param);
     CuAssertTrue(testCase, npRead->complementParams.shift == param);
     CuAssertTrue(testCase, npRead->complementParams.var == param);
     CuAssertTrue(testCase, npRead->complementParams.scale_sd == param);
     CuAssertTrue(testCase, npRead->complementParams.var_sd == param);
-    CuAssertTrue(testCase, npRead->nbTemplateEvents == length);
-    CuAssertTrue(testCase, npRead->nbComplementEvents == length);
+
     CuAssertStrEquals(testCase, npRead->twoDread, read);
+    CuAssertStrEquals(testCase, npRead->templateRead, read);
+    CuAssertStrEquals(testCase, npRead->complementRead, read);
 
     for (int64_t i = 0; i < length; i++) {
         CuAssertTrue(testCase, npRead->templateEventMap[i] == i);
         CuAssertTrue(testCase, npRead->complementEventMap[i] == i);
+        CuAssertTrue(testCase, npRead->templateStrandEventMap[i] == i);
+        CuAssertTrue(testCase, npRead->complementStrandEventMap[i] == i);
     }
     for (int64_t i = 0; i < (length * NB_EVENT_PARAMS); i++) {
         CuAssertTrue(testCase, npRead->templateEvents[i] == i);
@@ -550,9 +547,9 @@ static void test_hdCellConstruct(CuTest *testCase) {
     char *ambigKmer = "ATGXAXAAAAAA";
     int64_t nbCytosines = 3;
     char *cytosines = "CEO";
-    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines);
-    Path *path2 = hdCell_getPath(cell, 8);
+    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines, KMER_LENGTH);
     Path *path = hdCell_getPath(cell, 0);
+    Path *path2 = hdCell_getPath(cell, 8);
     CuAssertTrue(testCase, hdCell_getPath(cell, 9) == NULL);
     CuAssertIntEquals(testCase, 9, (int )cell->numberOfPaths);
     CuAssertStrEquals(testCase, path->kmer, "ATGCAC");
@@ -564,7 +561,7 @@ static void test_hdCellConstructWorstCase(CuTest *testCase) {
     char *ambigKmer = "XXXXXX";
     int64_t nbCytosines = 3;
     char *cytosines = "CEO";
-    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines);
+    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines, KMER_LENGTH);
     Path *path = hdCell_getPath(cell, 0);
     Path *path2 = hdCell_getPath(cell, 728);
     CuAssertIntEquals(testCase, 729, (int )cell->numberOfPaths);
@@ -575,14 +572,14 @@ static void test_hdCellConstructWorstCase(CuTest *testCase) {
 
 static void test_dpDiagonal(CuTest *testCase) {
     // load model and make stateMachine
-    char *testModel = stString_print("../../signalAlign/models/testModel_template.model");
-    StateMachine *sM = getStateMachine3(testModel);
+    char *testModelPath = stString_print("../../signalAlign/models/testModelR73_acegot_template.model");
+    StateMachine *sM = getStateMachine3(testModelPath);
 
     Diagonal diagonal = diagonal_construct(3, -1, 1); // makes a diagonal with 2 cells
 
     Sequence *seq = makeTestKmerSequence();  // ATGXAXA
 
-    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber, seq);
+    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber, sM->kmerLength, seq);
 
     //Get cell
     HDCell *c1 = dpDiagonal_getCell(dpDiagonal, -1);
@@ -612,7 +609,7 @@ static void test_dpDiagonal(CuTest *testCase) {
     CuAssertTrue(testCase, dpDiagonal_equals(dpDiagonal, dpDiagonal2));
     //Check it runs
     CuAssertDblEquals(testCase, totalProb, dpDiagonal_dotProduct(dpDiagonal, dpDiagonal2), 0.001);
-
+    free(testModelPath);
     dpDiagonal_destruct(dpDiagonal);
     dpDiagonal_destruct(dpDiagonal2);
 
@@ -626,7 +623,7 @@ static void test_dpMatrix(CuTest *testCase) {
     //           GCAATT 2
     Sequence *sX = makeKmerSequence(s);
 
-    DpMatrix *dpMatrix = dpMatrix_construct(lX + lY, 5);
+    DpMatrix *dpMatrix = dpMatrix_construct(lX + lY, 5, KMER_LENGTH);
 
     // check initialization
     CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), 0);
@@ -702,7 +699,7 @@ static void test_getBlastPairs(CuTest *testCase) {
         free(sY);
     }
 }
-
+/*
 static void test_filterToRemoveOverlap(CuTest *testCase) {
     for (int64_t i = 0; i < 5; i++) {
         //Make random pairs
@@ -762,7 +759,7 @@ static void test_filterToRemoveOverlap(CuTest *testCase) {
 
     }
 }
-
+*/
 static void test_getBlastPairsWithRecursion(CuTest *testCase) {
     /*
      * Test the blast heuristic to get the different pairs.
@@ -786,13 +783,14 @@ static void test_getBlastPairsWithRecursion(CuTest *testCase) {
 
 CuSuite *signalPairwiseAlignerTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
+
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_logAdd);
     SUITE_ADD_TEST(suite, test_Sequence);
     SUITE_ADD_TEST(suite, test_referenceSequence);
     SUITE_ADD_TEST(suite, test_eventSequence);
-    //SUITE_ADD_TEST(suite, test_loadNanoporeRead);
+    SUITE_ADD_TEST(suite, test_loadNanoporeRead);
     SUITE_ADD_TEST(suite, test_getSplitPoints);
     SUITE_ADD_TEST(suite, test_hdCellConstruct);
     SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);
@@ -802,11 +800,7 @@ CuSuite *signalPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
 
     //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);  // wonky
-
-    //SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
-    //SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
-    //SUITE_ADD_TEST(suite, test_twoDistributionPdf);
+    SUITE_ADD_TEST(suite, test_stateMachine3EmissionsPdfs);
     //SUITE_ADD_TEST(suite, test_poissonPosteriorProb);
-    //SUITE_ADD_TEST(suite, test_strawMan_cell);
     return suite;
 }
