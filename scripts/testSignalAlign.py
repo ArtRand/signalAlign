@@ -44,7 +44,7 @@ class SignalAlignAlignmentTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree("./signalAlign_unittest/")
 
-    def check_alignments(self, true_alignments, reads, reference, kmer_length):
+    def check_alignments(self, true_alignments, reads, reference, kmer_length, extra_args=None):
 
         def get_kmer(start):
             return referece_sequence[start:start + kmer_length]
@@ -54,6 +54,9 @@ class SignalAlignAlignmentTest(unittest.TestCase):
 
         alignment_command = "./runSignalAlign -d={reads} -r={ref} -smt=threeState -o={testDir} " \
                             "".format(reads=reads, ref=reference, testDir="./signalAlign_unittest/")
+        if extra_args is not None:
+            alignment_command += extra_args
+
         null_output = open(os.devnull, 'w')
         result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
 
@@ -65,7 +68,8 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         referece_sequence = get_first_sequence(reference)
 
         self.assertTrue(len(test_alignments) == len(glob.glob(true_alignments + "*.tsv")),
-                        "Didn't make all alignments")
+                        "Didn't make all alignments got {got} should be {should}".format(got=len(test_alignments),
+                                                                                         should=len(glob.glob(true_alignments + "*.tsv"))))
 
         for alignment in test_alignments:
             alignment_file = alignment.split("/")[-1]
@@ -99,6 +103,26 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         self.check_alignments(true_alignments=ecoli_true_alignments, reads=ecoli_reads,
                               reference=ecoli_reference, kmer_length=6)
 
+    def test_pUC_r9_reads_5mer(self):
+        pUC_true_alignments = SIGNALALIGN_ROOT + "tests/test_alignments/pUC_5mer_tempFiles_alignment/"
+        pUC_reads = SIGNALALIGN_ROOT + "tests/minion_test_reads/pUC/"
+        pUC_reference = SIGNALALIGN_ROOT + "tests/test_sequences/pUC19_SspI.fa"
+        self.check_alignments(true_alignments=pUC_true_alignments,
+                              reads=pUC_reads,
+                              reference=pUC_reference,
+                              kmer_length=5,
+                              extra_args="-T=../models/testModelR9_5mer_acegot_template.model "
+                                         "-C=../models/testModelR9_5mer_acegot_complement.model ")
+
+    def test_pUC_r9_reads_6mer(self):
+        pUC_true_alignments = SIGNALALIGN_ROOT + "tests/test_alignments/pUC_6mer_tempFiles_alignment/"
+        pUC_reads = SIGNALALIGN_ROOT + "tests/minion_test_reads/pUC/"
+        pUC_reference = SIGNALALIGN_ROOT + "tests/test_sequences/pUC19_SspI.fa"
+        self.check_alignments(true_alignments=pUC_true_alignments,
+                              reads=pUC_reads,
+                              reference=pUC_reference,
+                              kmer_length=6)
+
 
 class signalAlign_EM_test(unittest.TestCase):
     def setUp(self):
@@ -119,10 +143,12 @@ class signalAlign_EM_test(unittest.TestCase):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
+    #testSuite.addTest(LibTest('test_signalAlign_library'))
+    #testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
-    testSuite.addTest(signalAlign_EM_test('test_EM'))
+    #testSuite.addTest(signalAlign_EM_test('test_EM'))
 
     testRunner = unittest.TextTestRunner(verbosity=1)
     testRunner.run(testSuite)
