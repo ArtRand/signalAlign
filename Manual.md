@@ -1,6 +1,7 @@
 ## SignalAlign Manual
 
-#### Art Rand
+**Outdated for R9 refactor**
+**NB: all or most of the commands listed in this manual should work. There has been extra functionality added to address R9 reads and other base modifications. I will update this manual ASAP**
 Updated 5/5/16
 
 ### Introduction
