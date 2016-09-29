@@ -76,17 +76,17 @@ class SignalAlignAlignmentTest(unittest.TestCase):
             expected = parse_alignment_full(true_alignments + alignment_file)
             obs = parse_alignment_full(alignment)
             self.assertTrue(len(obs) == len(expected))
-            #for row in obs.itertuples():
-            #    ref_pos = row[1]
-            #    obs_kmer = row[2]
-            #    strand = row[3]
-            #    exp_kmer = get_kmer(ref_pos)
-            #    self.assertTrue(obs_kmer == exp_kmer, msg="kmer at index {idx} on strand {strand} is {obs} should be "
-            #                                              "{exp}, file {f}".format(idx=ref_pos,
-            #                                                                       strand=strand,
-            #                                                                       obs=obs_kmer,
-            #                                                                       exp=exp_kmer,
-            #                                                                       f=alignment))
+            for row in obs.itertuples():
+                ref_pos = row[1]
+                obs_kmer = row[2]
+                strand = row[3]
+                exp_kmer = get_kmer(ref_pos)
+                self.assertTrue(obs_kmer == exp_kmer, msg="kmer at index {idx} on strand {strand} is {obs} should be "
+                                                          "{exp}, file {f}".format(idx=ref_pos,
+                                                                                   strand=strand,
+                                                                                   obs=obs_kmer,
+                                                                                   exp=exp_kmer,
+                                                                                   f=alignment))
             #self.assertTrue(expected.equals(obs), msg="{} is not the same".format(alignment_file))
 
     def test_zymo_reads(self):
