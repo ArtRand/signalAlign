@@ -1317,33 +1317,33 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
     int64_t totalPosteriorCalculations = 0;
 
     while (1) { //Loop that moves through the matrix forward
-
         Diagonal diagonal = bandIterator_getNext(forwardBandIterator);
 
         //Forward calculation
-        dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, diagonal, sX)); // added sX here
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, diagonal, sX));
         diagonalCalculationForward(sM, diagonal_getXay(diagonal), forwardDpMatrix, sX, sY);
 
         //Condition true at the end of the matrix
         bool atEnd = diagonal_getXay(diagonal) == diagonalNumber;
+
         //Condition true when we want to do an intermediate traceback.
         bool tracebackPoint = diagonal_getXay(diagonal) >= tracedBackTo + p->minDiagsBetweenTraceBack
                               && diagonal_getWidth(diagonal) <= p->diagonalExpansion * 2 + 1;
 
-        //Traceback
+        // Traceback
         if (atEnd || tracebackPoint) {
-            //Initialise the last row (until now) of the backward matrix to represent an end point
-            dpDiagonal_initialiseValues(dpMatrix_createDiagonal(backwardDpMatrix, diagonal, sX), sM, // added sX here
+            // Initialise the last row (until now) of the backward matrix to represent an end point
+            dpDiagonal_initialiseValues(dpMatrix_createDiagonal(backwardDpMatrix, diagonal, sX), sM,
                                         (atEnd && alignmentHasRaggedRightEnd) ? sM->raggedEndStateProb : sM->endStateProb);
 
-            //This is a diagonal between the place we trace back to and where we trace back from
+            // This is a diagonal between the place we trace back to and where we trace back from
             if (diagonal_getXay(diagonal) > tracedBackTo + 1) {
                 DpDiagonal *j = dpMatrix_getDiagonal(forwardDpMatrix, diagonal_getXay(diagonal) - 1);
                 assert(j != NULL);
-                dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, j->diagonal, sX)); // added sX here
+                dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, j->diagonal, sX));
             }
 
-            //Do walk back
+            // Do walk back
             BandIterator *backwardBandIterator = bandIterator_clone(forwardBandIterator);
             Diagonal diagonal2 = bandIterator_getPrevious(backwardBandIterator);
             assert(diagonal_getXay(diagonal2) == diagonal_getXay(diagonal));
@@ -1355,7 +1355,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
                 if (diagonal_getXay(diagonal2) > tracedBackTo + 2) {
                     DpDiagonal *j = dpMatrix_getDiagonal(forwardDpMatrix, diagonal_getXay(diagonal2) - 2);
                     assert(j != NULL);
-                    dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, j->diagonal, sX)); // added sX here
+                    dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, j->diagonal, sX));
                 }
                 if (diagonal_getXay(diagonal2) > tracedBackTo + 1) {
                     diagonalCalculationBackward(sM, diagonal_getXay(diagonal2), backwardDpMatrix, sX, sY);

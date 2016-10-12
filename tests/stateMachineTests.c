@@ -452,11 +452,11 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixForward, 0), sM, sM->startStateProb);
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
 
-    //Forward algorithm
+    // Forward algorithm
     for (int64_t i = 1; i <= lX + lY; i++) {
         diagonalCalculationForward(sM, i, dpMatrixForward, SsX, SsY);
     }
-    //Backward algorithm
+    // Backward algorithm
     for (int64_t i = lX + lY; i > 0; i--) {
         diagonalCalculationBackward(sM, i, dpMatrixBackward, SsX, SsY);
     }

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <CuTest.h>
 #include "sonLib.h"
 #include "CuTest.h"
 #include "sonLibCommon.h"
@@ -21,7 +22,7 @@ CuSuite *stateMachineAlignmentTestSuite(void);
 //CuSuite* pairwiseAlignmentLongTestSuite(void);  // legacy to remind myself
 
 
-int stBaseAlignerRunAllTests(void) {
+CuSuite *stBaseAlignerRunAllTests(void) {
     CuString *output = CuStringNew();
     CuSuite *suite = CuSuiteNew();
     CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
@@ -38,12 +39,17 @@ int stBaseAlignerRunAllTests(void) {
     CuSuiteSummary(suite, output);
     CuSuiteDetails(suite, output);
     printf("%s\n", output->buffer);
-    return suite->failCount > 0;
+    CuStringDelete(output);
+
+    return suite;
 }
 
 int main(int argc, char *argv[]) {
     if(argc == 2) {
         st_setLogLevelFromString(argv[1]);
     }
-  return stBaseAlignerRunAllTests();
+    CuSuite *allTests = stBaseAlignerRunAllTests();
+    int good = allTests->failCount > 0;
+    CuSuiteDelete(allTests);
+    return good;
 }
