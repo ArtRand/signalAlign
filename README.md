@@ -25,11 +25,11 @@ These steps were tested in both a Linux and OS X Sierra environment using Docker
 https://docs.docker.com/installation/
 
 To download signalAlign Docker container:
-
-docker pull mitenjain/signalalign
+    
+    docker pull mitenjain/signalalign
 
 To run signalAlign from the container:
 
-docker run mitenjain/signalalign runSignalAlign
+    docker run mitenjain/signalalign runSignalAlign
 
 *Code in this repo is based on cPecan (https://github.com/benedictpaten/cPecan)*
