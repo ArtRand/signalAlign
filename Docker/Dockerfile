@@ -27,3 +27,4 @@ ENV PATH "$ROOT/bin:$PATH"
 # set signalAlign bin as workDir
 WORKDIR /home/signalAlign/bin/
 
+
