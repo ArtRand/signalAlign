@@ -20,4 +20,13 @@ Nanopore sequencing is based on the principal of isolating a nanopore in a membr
 3. Test the installation by running `make test`
 4. All of the programs can be found in the `/bin/` directory
 
+### Using Docker
+These steps were tested in both a Linux and OS X Sierra environment using Docker: https://docs.docker.com/installation/
+
+To download signalAlign Docker container:
+docker pull mitenjain/signalalign
+
+To run signalAlign from the container:
+docker run mitenjain/signalalign runSignalAlign
+
 *Code in this repo is based on cPecan (https://github.com/benedictpaten/cPecan)*
