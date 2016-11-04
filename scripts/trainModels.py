@@ -15,56 +15,53 @@ from shutil import copyfile
 
 def parse_args():
     parser = ArgumentParser (description=__doc__)
-
+    # required arguments
     parser.add_argument('--file_directory', '-d', action='append', default=None,
-                        dest='files_dir', required=False, type=str,
+                        dest='files_dir', required=True, type=str,
                         help="directories with fast5 files to train on")
-    parser.add_argument("--file_of_files", "-fofn", action="append", required=False, default=None, dest="fofn",
-                        type=str, help="text file with absolute paths of files to use")
     parser.add_argument('--ref', '-r', action='store', default=None,
                         dest='ref', required=False, type=str,
                         help="location of refrerence sequence in FASTA")
     parser.add_argument('--output_location', '-o', action='store', dest='out', default=None,
                         required=False, type=str,
                         help="directory to put the trained model, and use for working directory.")
+    # optional arguments
+    parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
+                        default="threeState", required=False,
+                        help="StateMachine options: threeState, threeStateHdp")
+    parser.add_argument("--file_of_files", "-fofn", action="append", required=False, default=None, dest="fofn",
+                        type=str, help="text file with absolute paths of files to use")
     parser.add_argument('--iterations', '-i', action='store', dest='iter', default=10,
                         required=False, type=int, help='number of iterations to perform')
-    parser.add_argument('--train_amount', '-a', action='store', dest='amount', default=15,
+    parser.add_argument('--train_amount', '-a', action='store', dest='amount', default=15000,
                         required=False, type=int,
                         help="limit the total length of sequence to use in training (batch size).")
-    parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
-                        required=False, default=None, help="number of diagonals to expand around each anchor")
-    parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
-                        required=False, default=None, help='amount to remove from an anchor constraint')
-    parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
-                        default=0.5, help="posterior match probability threshold")
-    parser.add_argument('--verbose', action='store_true', default=False, dest='verbose')
     parser.add_argument('--emissions', action='store_true', default=False, dest='emissions',
                         help="Flag to train emissions, False by default")
     parser.add_argument('--transitions', action='store_true', default=False, dest='transitions',
                         help='Flag to train transitions, False by default')
-
+    parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
+                        default=0.5, help="posterior match probability threshold")
+    parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
+                        required=False, default=None, help="number of diagonals to expand around each anchor")
+    parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
+                        required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for complement events, if you don't want the default")
-    parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
-                        default=True, help='flag, turn off banding')
-    parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False, default=4,
-                        type=int, help="number of jobs to run concurrently")
-    parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
-                        default="threeState", required=False,
-                        help="StateMachine options: threeState, threeStateHdp")
     parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None,
                         help="path to template HDP model to use")
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
                         help="path to complement HDP model to use")
-
+    parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False, default=4,
+                        type=int, help="number of jobs to run concurrently")
     parser.add_argument('--test', action='store_true', default=False, dest='test')
 
     # gibbs
+    parser.add_argument('--verbose', action='store_true', default=False, dest='verbose')
     parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
     parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
     parser.add_argument('--min_assignments', action='store', type=int, default=30000, dest='min_assignments',
@@ -361,7 +358,7 @@ def main(args):
                 "in_complementHmm": complement_hmm,
                 "in_templateHdp": template_hdp,
                 "in_complementHdp": complement_hdp,
-                "banded": args.banded,
+                "banded": True, #args.banded,
                 #"output_format": "full",
                 "in_fast5": file_ref_tuple[0],  # fast5
                 "threshold": args.threshold,

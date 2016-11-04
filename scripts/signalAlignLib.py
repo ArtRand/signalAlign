@@ -739,7 +739,8 @@ class NanoporeRead(object):
 
     def write_npRead(self, out_file):
         if self.is_open is False:
-            print("problem opeining file {filename}".format(filename=self.filename), file=sys.stderr)
+            print("[SignalAlign:write_npRead]: problem opeining file {filename}"
+                  "".format(filename=self.filename), file=sys.stderr)
             self.close()
             return False
 

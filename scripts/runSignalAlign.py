@@ -13,30 +13,34 @@ from random import shuffle
 
 def parse_args():
     parser = ArgumentParser(description=__doc__)
-
+    # required arguments
     parser.add_argument('--file_directory', '-d', action='store',
-                        dest='files_dir', required=False, type=str, default=None,
+                        dest='files_dir', required=True, type=str, default=None,
                         help="directory with MinION fast5 reads to align")
-    parser.add_argument('--file_of_files', '-fofn', action='store', dest='fofn', required=False, type=str, default=None,
-                        help="text file containing absolute paths to files to use")
     parser.add_argument('--ref', '-r', action='store',
                         dest='ref', required=True, type=str,
                         help="reference sequence to align to, in FASTA")
+    parser.add_argument('--output_location', '-o', action='store', dest='out',
+                        required=True, type=str, default=None,
+                        help="directory to put the alignments")
+    # optional arguments
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for complement events, if you don't want the default")
-    parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None,
+    parser.add_argument('--template_hdp', '-tH', action='store', dest='templateHDP', default=None,
                         help="template serialized HDP file")
-    parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
+    parser.add_argument('--complement_hdp', '-cH', action='store', dest='complementHDP', default=None,
                         help="complement serialized HDP file")
     parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
                         help="Specify degenerate nucleotide options: "
                              "variant -> {ACGT}, cytosine2 -> {CE} cytosine3 -> {CEO} adenosine -> {AI}")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", help="decide which model to use, threeState by default")
+    parser.add_argument('--file_of_files', '-fofn', action='store', dest='fofn', required=False, type=str, default=None,
+                        help="text file containing absolute paths to files to use")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
                         default=None, help="posterior match probability threshold, Default: 0.01")
     parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
@@ -45,6 +49,8 @@ def parse_args():
                         required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
                         required=False, default=None, help="tab separated table with regions to align to")
+    parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
+                        dest='substitution_file', help="Ambiguity positions")
     # depreciated
     #parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
     #                    default=True, help='flag, turn off banding')
@@ -52,18 +58,13 @@ def parse_args():
                         default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
-    parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
-                        dest='substitution_file', help="Ambiguity positions")
     parser.add_argument('--ambig_char', '-X', action='store', required=False, default="X", type=str, dest='ambig_char',
                         help="Character to substitute at positions, default is 'X'.")
     parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
                         help="output format: full, variantCaller, or assignments. Default: full")
     parser.add_argument('--error_correct', action='store_true', default=False, required=False,
                         dest='error_correct', help="Enable error correction")
-    parser.add_argument('--output_location', '-o', action='store', dest='out',
-                        required=True, type=str, default=None,
-                        help="directory to put the alignments")
-
+    
     args = parser.parse_args()
     return args
 
@@ -155,9 +156,11 @@ def main(args):
     temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
 
     if args.error_correct is True:
-        write_degenerate_reference_set(input_fasta=args.ref, out_path=temp_dir_path)
-        plus_strand_sequence = None
-        minus_strand_sequence = None
+        print("[runSignalAlign]:ERROR: Error correction not implemented, yet\n", file=sys.stderr)
+        sys.exit(1)
+        #write_degenerate_reference_set(input_fasta=args.ref, out_path=temp_dir_path)
+        #plus_strand_sequence = None
+        #minus_strand_sequence = None
     else:
         # parse the substitution file, if given
         plus_strand_sequence = temp_folder.add_file_path("forward_reference.txt")
@@ -201,7 +204,7 @@ def main(args):
     if nb_files < len(fast5s):
         shuffle(fast5s)
         fast5s = fast5s[:nb_files]
-    print("Got {} files to align".format(len(fast5s)), file=sys.stdout)
+    print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     for fast5 in fast5s:
         alignment_args = {
             "forward_reference": plus_strand_sequence,
