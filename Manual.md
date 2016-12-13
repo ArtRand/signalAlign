@@ -1,7 +1,7 @@
 ## SignalAlign Manual
 
 **UPDATED for R9 refactor**
-Updated 10/3/16
+Updated 10/12/16 - Working to integrate new matrichor base caller
 
 ### Introduction
 SignalAlign is a hidden Markov model (HMM) software package for aligning the ionic current signal from the Oxford Nanopore Technologies (ONT) MinION to a reference sequence and inferring properties of the reference sequence.
