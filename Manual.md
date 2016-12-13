@@ -4,7 +4,7 @@
 Updated 10/3/16
 
 ### Introduction
-SignalAlign is a hidden Markov model (HMM) software package for aligning ionic current from the Oxford Nanopore Technologies (ONT) MinION to a reference sequence and inferring properties of the reference sequence.
+SignalAlign is a hidden Markov model (HMM) software package for aligning the ionic current signal from the Oxford Nanopore Technologies (ONT) MinION to a reference sequence and inferring properties of the reference sequence.
 
 ### Installation
 1. Recursively clone this repo `git clone --recursive https://github.com/ArtRand/signalAlign.git`
@@ -26,11 +26,11 @@ SignalAlign is a hidden Markov model (HMM) software package for aligning ionic c
 
 ### Description of programs
 * runSignalAlign
-    * Aligns ionic current events from a directory of base-called MinION reads (.fast5) to a reference sequence. With appropriate inputs, characters in the reference sequence can be flagged as _ambiguous_, meaning multiple bases will be probabilistically aligned to a position. Right now, the program the program supports aligning cytosine variants (5-mC and 5-hmC) and adenine variants (6-mA) to a position.
+    * Aligns ionic current events from a directory of basecalled MinION reads (.fast5) to a reference sequence. With appropriate inputs, characters in the reference sequence can be flagged as _ambiguous_, meaning multiple bases will be probabilistically aligned to a position. Right now, the program the program supports aligning cytosine variants (5-mC and 5-hmC) and adenine variants (6-mA) to a position.
 * trainModels
-    * Trains the transitions and/or emissions of the HMM. Uses a directory of base-called reads and a reference sequence to learn transition parameters to the model. Once enough assignments have been accumulated it will (optionally) rebuild a hierarchical Dirichlet process (HDP) from these assignments.
+    * Trains the transitions and/or emissions of the HMM. Uses a directory of basecalled reads and a reference sequence to learn transition parameters to the model. Once enough assignments have been accumulated it will (optionally) rebuild a hierarchical Dirichlet process (HDP) from these assignments.
 * hdp_pipeline
-    * Recommended method for building HDP models. Uses a directory of _alignments_ to make a new HDP model.
+    * Recommended method for building HDP models. Uses a directory of _alignments_ to make a new HDP model, also see the [pipeline examples](https://github.com/ArtRand/signalAlign_notebook/blob/master/experiment_scripts/BuildModels.py#L512) for detailed instructions. 
 
 ### runSignalAlign
 #### Input
