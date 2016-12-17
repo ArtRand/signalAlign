@@ -263,15 +263,18 @@ def exonerated_bwa(bwa_index, query, target_regions=None):
 
 def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
     # align with bwa
-    command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
+    #command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
+    ok = Bwa.align(bwa_index=bwa_index, query=query, output_sam_path=temp_sam_path)
+    if not ok:
+        return False, False
 
     # this is a small SAM file that comes from bwa
     # TODO need try/catch here
-    aln = subprocess.check_output(command.split())
-    assert(not os.path.exists(temp_sam_path))
-    with open(temp_sam_path, 'w') as fH:
-        fH.write(aln)
-    assert(os.path.exists(temp_sam_path))
+    #aln = subprocess.check_output(command.split())
+    #assert(not os.path.exists(temp_sam_path))
+    #with open(temp_sam_path, 'w') as fH:
+    #    fH.write(aln)
+    #assert(os.path.exists(temp_sam_path))
 
     # 7 = flag
     # 11 = cigar
@@ -399,19 +402,39 @@ class TargetRegions(object):
 
 
 class Bwa(object):
-    """run BWA, mostly used to make index files
-    """
+    """BWA"""
     def __init__(self, target):
         self.target = target
         self.db_handle = ''
 
-    def build_index(self, destination):
-        # make a place to put the database
-        path_to_bwa_index = destination
+    def build_index(self, destination, output=None):
+        self.db_handle = destination + '/temp_bwaIndex'
+        #os.system("bwa index -p {0} {1}".format(self.db_handle, self.target))
+        cmd = "bwa index -p {0} {1}".format(self.db_handle, self.target)
+        try:
+            subprocess.check_call(cmd.split(), stdout=output)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+    
+    @staticmethod
+    def suffixes():
+        return [".amb", ".ann", ".bwt", ".pac", ".sa"]
 
-        # build database
-        self.db_handle = path_to_bwa_index + '/temp_bwaIndex'
-        os.system("bwa index -p {0} {1}".format(self.db_handle, self.target))
+    @staticmethod
+    def align(bwa_index, query, output_sam_path):
+        for suff in Bwa.suffixes():
+            assert os.path.exists(bwa_index + suff),\
+                "[Bwa::align] Didn't find index files {}".format(bwa_index)
+        assert os.path.exists(query), "[Bwa::align] Didn't find query file {}".format(query)
+        cmd = "bwa mem -x ont2d {idx} {query}".format(idx=bwa_index, query=query)
+        try:
+            with open(output_sam_path, 'w') as fH:
+                fH.write(subprocess.check_output(cmd.split()))
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
 
 
 class NanoporeRead(object):

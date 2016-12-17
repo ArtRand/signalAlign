@@ -17,6 +17,10 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${
       #nanoporeParams
 	cd externalTools && make all
 
+clean_light:
+	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
+	rm -f ${libPath}/signalAlignLib.a
+
 clean :
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
 	#rm -r ${signalAlignBin}
