@@ -295,9 +295,14 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
             sam_cigar      = aligned_segment.cigarstring
         n_aligned_segments += 1
     
+    if n_aligned_segments > 1:
+        print("[exonerated_bwa_pysam]WARNING more than 1 mapping")
+
     query_start, query_end, reference_start, reference_end, cigar_string = parse_cigar(sam_cigar, reference_pos)
     
     strand = ""
+    assert(flag is not None)
+
     if int(flag) == 16:
         # todo redo this swap
         strand = "-"
@@ -309,6 +314,9 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
     elif int(flag) != 0 and int(flag) != 16:
         print("unknown alignment flag, exiting", file=sys.stderr)
         return False, False
+
+    assert(reference_name is not None)
+    assert(query_name is not None)
 
     completeCigarString = "cigar: %s %i %i + %s %i %i %s 1 %s" % (
     query_name, query_start, query_end, reference_name, reference_start, reference_end, strand, cigar_string)
@@ -981,6 +989,7 @@ class SignalAlignment(object):
         # read-specific files, could be removed later but are kept right now to make it easier to rerun commands
         temp_np_read = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
         temp_2d_read = temp_folder.add_file_path("temp_2Dseq_{read}.fa".format(read=read_label))
+        temp_samfile = temp_folder.add_file_path("temp_sam_file_{read}.sam".format(read=read_label))
 
         # make the npRead and fasta
         success, version, pop1_complement = get_npRead_2dseq_and_models(fast5=self.in_fast5,
@@ -1004,9 +1013,10 @@ class SignalAlignment(object):
             stateMachineType_flag = ""
 
         # get orientation and cigar from BWA this serves as the guide alignment
-        cigar_string, strand = exonerated_bwa(bwa_index=self.bwa_index, query=temp_2d_read,
-                                              target_regions=self.target_regions)
-                                              #work_dir=temp_folder)
+        cigar_string, strand = exonerated_bwa_pysam(bwa_index=self.bwa_index, 
+                                                    query=temp_2d_read,
+                                                    temp_sam_path=temp_samfile,
+                                                    target_regions=self.target_regions)
 
         # this gives the format: /directory/for/files/file.model.orientation.tsv
         posteriors_file_path = ''
