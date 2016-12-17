@@ -60,9 +60,9 @@ def cull_fast5_files(path_to_files, maximum_files):
     return fast5s
 
 
-def get_bwa_index(reference, dest):
+def get_bwa_index(reference, dest, output=None):
     bwa = Bwa(reference)
-    bwa.build_index(dest)
+    bwa.build_index(dest, output=output)
     bwa_ref_index = dest + "temp_bwaIndex"
     return bwa_ref_index
 
@@ -263,24 +263,9 @@ def exonerated_bwa(bwa_index, query, target_regions=None):
 
 def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
     # align with bwa
-    #command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
     ok = Bwa.align(bwa_index=bwa_index, query=query, output_sam_path=temp_sam_path)
     if not ok:
         return False, False
-
-    # this is a small SAM file that comes from bwa
-    # TODO need try/catch here
-    #aln = subprocess.check_output(command.split())
-    #assert(not os.path.exists(temp_sam_path))
-    #with open(temp_sam_path, 'w') as fH:
-    #    fH.write(aln)
-    #assert(os.path.exists(temp_sam_path))
-
-    # 7 = flag
-    # 11 = cigar
-    # 9 = start
-    # 6.split()[-1] = query name
-    # 8 = reference name
 
     sam = pysam.Samfile(temp_sam_path, 'r')
 
@@ -304,7 +289,7 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
     query_start, query_end, reference_start, reference_end, cigar_string = parse_cigar(sam_cigar, reference_pos)
     
     strand = ""
-    assert(flag is not None)
+    assert(flag is not None), "[exonerated_bwa_pysam] ERROR flag is None"
 
     if int(flag) == 16:
         # todo redo this swap
@@ -318,8 +303,8 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
         print("unknown alignment flag, exiting", file=sys.stderr)
         return False, False
 
-    assert(reference_name is not None)
-    assert(query_name is not None)
+    assert(reference_name is not None), "[exonerated_bwa_pysam] ERROR reference_name is None"
+    assert(query_name is not None), "[exonerated_bwa_pysam] ERROR query_name is None"
 
     completeCigarString = "cigar: %s %i %i + %s %i %i %s 1 %s" % (
     query_name, query_start, query_end, reference_name, reference_start, reference_end, strand, cigar_string)
@@ -411,10 +396,16 @@ class Bwa(object):
         self.db_handle = destination + '/temp_bwaIndex'
         #os.system("bwa index -p {0} {1}".format(self.db_handle, self.target))
         cmd = "bwa index -p {0} {1}".format(self.db_handle, self.target)
+        if output is None:
+            output = open(os.devnull, 'w')
+        else:
+            output = open(output, 'w')
         try:
-            subprocess.check_call(cmd.split(), stdout=output)
+            subprocess.check_call(cmd.split(), stdout=output, stderr=output)
+            output.close()
             return True
         except subprocess.CalledProcessError:
+            output.close()
             return False
     
     @staticmethod
@@ -422,17 +413,23 @@ class Bwa(object):
         return [".amb", ".ann", ".bwt", ".pac", ".sa"]
 
     @staticmethod
-    def align(bwa_index, query, output_sam_path):
+    def align(bwa_index, query, output_sam_path, outerr=None):
         for suff in Bwa.suffixes():
             assert os.path.exists(bwa_index + suff),\
-                "[Bwa::align] Didn't find index files {}".format(bwa_index)
+                "[Bwa::align] Didn't find index files {}".format(bwa_index + suff)
         assert os.path.exists(query), "[Bwa::align] Didn't find query file {}".format(query)
         cmd = "bwa mem -x ont2d {idx} {query}".format(idx=bwa_index, query=query)
+        if outerr is None:
+            outerr = open(os.devnull, 'w')
+        else:
+            outerr = open(outerr, 'w')
         try:
             with open(output_sam_path, 'w') as fH:
-                fH.write(subprocess.check_output(cmd.split()))
+                fH.write(subprocess.check_output(cmd.split(), stderr=outerr))
+            outerr.close()
             return True
         except subprocess.CalledProcessError:
+            outerr.close()
             return False
 
 
