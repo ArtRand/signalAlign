@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import sys
-sys.path.append("../")
 import unittest
 import glob
 import os
@@ -10,6 +9,7 @@ import pandas as pd
 import numpy as np
 from subprocess import call
 from alignmentAnalysisLib import get_first_sequence
+from signalAlignLib import get_bwa_index, exonerated_bwa, exonerated_bwa_pysam
 
 SIGNALALIGN_ROOT = "../"
 ZYMO_C_READS = SIGNALALIGN_ROOT + "tests/minion_test_reads/C/"
@@ -35,6 +35,33 @@ class LibTest(unittest.TestCase):
         command = "./signalAlignLibTests"
         result = call(command, shell=True, bufsize=-1, stdout=sys.stdout, stderr=sys.stderr)
         self.assertTrue(result == 0, "signalAlign Library Tests Fail")
+
+
+class signalAlignLibTests(unittest.TestCase):
+    def setUp(self):
+        self.work_dir = "./signalAlign_pylibTest/"
+        os.makedirs(self.work_dir)
+        
+    
+    def tearDown(self):
+        shutil.rmtree(self.work_dir)
+
+    def test_pysam(self):
+        # index the reference
+        bwa_index = get_bwa_index(ZYMO_REFERENCE, self.work_dir)
+        print(bwa_index)
+        # run through known function
+        single_read = SIGNALALIGN_ROOT + "tests/minion_test_reads/single_zymoC_read.fa"
+        self.assertTrue(os.path.exists(single_read))
+        expected_cigar, expected_strand = exonerated_bwa(bwa_index=bwa_index, 
+                                                         query=single_read)
+
+        pysam_cigar, pysam_strand = exonerated_bwa_pysam(bwa_index=bwa_index, 
+                                                         query=single_read, 
+                                                         target_regions=None, 
+                                                         temp_sam_path=self.work_dir + "TESTSAM.sam")
+        self.assertTrue(pysam_cigar == expected_cigar)
+        self.assertTrue(pysam_strand == expected_strand)
 
 
 class SignalAlignAlignmentTest(unittest.TestCase):
@@ -143,12 +170,13 @@ class signalAlign_EM_test(unittest.TestCase):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    testSuite.addTest(signalAlignLibTests("test_pysam"))
+    #testSuite.addTest(LibTest('test_signalAlign_library'))
+    #testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
+    #testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    #testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
-    testSuite.addTest(signalAlign_EM_test('test_EM'))
+    #testSuite.addTest(signalAlign_EM_test('test_EM'))
 
     testRunner = unittest.TextTestRunner(verbosity=1)
     testRunner.run(testSuite)

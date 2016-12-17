@@ -51,9 +51,6 @@ def parse_args():
                         required=False, default=None, help="tab separated table with regions to align to")
     parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
-    # depreciated
-    #parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
-    #                    default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
@@ -64,6 +61,7 @@ def parse_args():
                         help="output format: full, variantCaller, or assignments. Default: full")
     parser.add_argument('--error_correct', action='store_true', default=False, required=False,
                         dest='error_correct', help="Enable error correction")
+    parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)
     
     args = parser.parse_args()
     return args
@@ -219,7 +217,6 @@ def main(args):
             "in_complementHdp": args.complementHDP,
             "banded": True, #args.banded,
             "output_format": args.outFmt,
-            #"in_fast5": args.files_dir + fast5,
             "in_fast5": fast5,
             "threshold": args.threshold,
             "diagonal_expansion": args.diag_expansion,
