@@ -3,7 +3,6 @@
 """
 from __future__ import print_function
 import sys
-sys.path.append("../")
 from signalAlignLib import *
 from multiprocessing import Process, Queue, current_process, Manager
 from serviceCourse.file_handlers import FolderHandler
@@ -62,7 +61,7 @@ def parse_args():
     parser.add_argument('--error_correct', action='store_true', default=False, required=False,
                         dest='error_correct', help="Enable error correction")
     parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)
-    
+
     args = parser.parse_args()
     return args
 
@@ -135,7 +134,7 @@ def main(args):
 #   Non-default complement HMM: {inChmm}
 #   Template HDP: {tHdp}
 #   Complement HDP: {cHdp}
-    """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files, #banding=args.banded,
+    """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files,
                inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType, regions=args.target_regions,
                tHdp=args.templateHDP, cHdp=args.complementHDP)
 
@@ -153,26 +152,11 @@ def main(args):
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
 
-    if args.error_correct is True:
-        print("[runSignalAlign]:ERROR: Error correction not implemented, yet\n", file=sys.stderr)
-        sys.exit(1)
-        #write_degenerate_reference_set(input_fasta=args.ref, out_path=temp_dir_path)
-        #plus_strand_sequence = None
-        #minus_strand_sequence = None
-    else:
-        # parse the substitution file, if given
-        plus_strand_sequence = temp_folder.add_file_path("forward_reference.txt")
-        minus_strand_sequence = temp_folder.add_file_path("backward_reference.txt")
-        if args.substitution_file is not None:
-            add_ambiguity_chars_to_reference(input_fasta=args.ref,
-                                             substitution_file=args.substitution_file,
-                                             sequence_outfile=plus_strand_sequence,
-                                             rc_sequence_outfile=minus_strand_sequence,
-                                             degenerate_type=args.degenerate,
-                                             sub_char=args.ambig_char)
-        else:
-            make_temp_sequence(fasta=args.ref, sequence_outfile=plus_strand_sequence,
-                               rc_sequence_outfile=minus_strand_sequence)
+    reference_map = process_reference_fasta(fasta=args.ref,
+                                            work_folder=temp_folder,
+                                            substitution_file=args.substitution_file,
+                                            degenerate_type=args.degenerate,
+                                            sub_char=args.ambig_char)
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -180,7 +164,6 @@ def main(args):
     print("signalAlign - indexing reference, done", file=sys.stderr)
 
     # parse the target regions, if provided
-    # TODO make this the same as the 'labels' file
     if args.target_regions is not None:
         target_regions = TargetRegions(args.target_regions)
     else:
@@ -205,8 +188,7 @@ def main(args):
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     for fast5 in fast5s:
         alignment_args = {
-            "forward_reference": plus_strand_sequence,
-            "backward_reference": minus_strand_sequence,
+            "reference_map": reference_map,
             "path_to_EC_refs": (temp_dir_path if args.error_correct else None),
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
@@ -215,7 +197,6 @@ def main(args):
             "in_complementHmm": args.in_C_Hmm,
             "in_templateHdp": args.templateHDP,
             "in_complementHdp": args.complementHDP,
-            "banded": True, #args.banded,
             "output_format": args.outFmt,
             "in_fast5": fast5,
             "threshold": args.threshold,
@@ -224,9 +205,9 @@ def main(args):
             "target_regions": target_regions,
             "degenerate": degenerate_enum(args.degenerate),
         }
-        #alignment = SignalAlignment(**alignment_args)
-        #alignment.run()
-        work_queue.put(alignment_args)
+        alignment = SignalAlignment(**alignment_args)
+        alignment.run()
+        #work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))

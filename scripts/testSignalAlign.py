@@ -41,8 +41,7 @@ class signalAlignLibTests(unittest.TestCase):
     def setUp(self):
         self.work_dir = "./signalAlign_pylibTest/"
         os.makedirs(self.work_dir)
-        
-    
+
     def tearDown(self):
         shutil.rmtree(self.work_dir)
 
@@ -52,13 +51,13 @@ class signalAlignLibTests(unittest.TestCase):
         # run through known function
         single_read = SIGNALALIGN_ROOT + "tests/minion_test_reads/single_zymoC_read.fa"
         self.assertTrue(os.path.exists(single_read))
-        expected_cigar, expected_strand = exonerated_bwa(bwa_index=bwa_index, 
+        expected_cigar, expected_strand = exonerated_bwa(bwa_index=bwa_index,
                                                          query=single_read)
 
-        pysam_cigar, pysam_strand = exonerated_bwa_pysam(bwa_index=bwa_index, 
-                                                         query=single_read, 
-                                                         target_regions=None, 
-                                                         temp_sam_path=self.work_dir + "TESTSAM.sam")
+        pysam_cigar, pysam_strand, _ = exonerated_bwa_pysam(bwa_index=bwa_index,
+                                                            query=single_read,
+                                                            target_regions=None,
+                                                            temp_sam_path=self.work_dir + "TESTSAM.sam")
         self.assertTrue(pysam_cigar == expected_cigar)
         self.assertTrue(pysam_strand == expected_strand)
 
@@ -169,13 +168,13 @@ class signalAlign_EM_test(unittest.TestCase):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
+    #testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(signalAlignLibTests("test_pysam"))
     testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    #testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    #testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
-    testSuite.addTest(signalAlign_EM_test('test_EM'))
+    #testSuite.addTest(signalAlign_EM_test('test_EM'))
 
     testRunner = unittest.TextTestRunner(verbosity=1)
     testRunner.run(testSuite)

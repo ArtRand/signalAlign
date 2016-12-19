@@ -2,7 +2,6 @@
 """
 from __future__ import print_function, division
 import sys
-sys.path.append("../")
 import os
 import pysam
 import h5py
@@ -31,7 +30,7 @@ def parse_fofn(fofn_file):
 
 def kmer_iterator(dna, k):
     for i in xrange(len(dna)):
-        kmer = dna[i:(i+k)]
+        kmer = dna[i:(i + k)]
         if len(kmer) == k:
             yield kmer
 
@@ -113,11 +112,93 @@ def parse_substitution_file(substitution_file):
     return (forward_sub, forward_pos), (backward_sub, backward_pos)
 
 
+def parse_substitution_file2(substitution_file):
+    assert os.path.isfile(substitution_file), "[parse_substitution_file2]Didn't find "\
+        "substitution_file here {}".format(substitution_file)
+    # keep track of the contig header, so we can group the substitution positions by header
+    positions = {}
+    header = None
+    with open(substitution_file, 'r') as fH:
+        for line in fH:
+            line = line.split()
+            this_header = line[0]
+            if header != this_header:  # we're at a new entry
+                positions[header] = {"forward": map(np.int64, line[1:])}
+                header = this_header
+                continue
+            if header == this_header:  # we're at the backward positions
+                positions[header] = {"backward": map(np.int64, line[1:])}
+                continue
+    return positions
+
+
+def process_reference_fasta(fasta, work_folder,
+                            substitution_file=None, degenerate_type=None, sub_char=None):
+    """loops over all of the contigs in the reference file, writes the forward and backward sequences
+    as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
+    names as keys and the paths to the processed sequence as keys
+    """
+    def add_ambiguity_positions(positions):
+        # type: (dict<string, dict<string, list>>, string)
+        def check_substitution(position, seq):
+            sub_out = seq[position]
+            if sub_out == sub_char:
+                return True  # no change
+            if sub_char == "I" and sub_out != "A":
+                return False
+            if (sub_char == "E" or sub_char == "O") and sub_out != "C":
+                return False
+            if sub_char == "X":
+                if degenerate_type is None:
+                    return False
+                if sub_out == "C" and degenerate_type not in ["cytosine2", "cytosine3"]:
+                    return False
+                if sub_out == "A" and degenerate_type not in ["adenosine"]:
+                    return False
+            return True
+
+        def make_substitutions(positions, sequence_as_list):
+            for pos in positions:
+                ok = check_substitution(position=pos, seq=sequence_as_list)
+                assert ok, "[process_reference_fasta.make_substitutions]Cannot sub {orig} for {sub} at"\
+                           "{position}".format(orig=sequence_as_list[pos], sub=sub_char, position=pos)
+                sequence_as_list[pos] = sub_char
+            return ''.join(sequence_as_list)
+
+        # make into a mutable list
+        seq_li      = list(fw_sequence)
+        comp_seq_li = list(complement_sequence)
+
+        fw_subed_sequence = make_substitutions(positions[header]["forward"], seq_li)
+        bw_subed_sequence = make_substitutions(positions[header]["backward"], comp_seq_li)
+
+        return fw_subed_sequence, bw_subed_sequence
+
+    ref_sequence_map = {}
+    for header, comment, fw_sequence in read_fasta(fasta):
+        fw_path = work_folder.add_file_path("{seq_name}.forward.txt".format(seq_name=header))
+        bw_path = work_folder.add_file_path("{seq_name}.backward.txt".format(seq_name=header))
+        complement_sequence = reverse_complement(fw_sequence, reverse=False, complement=True)
+
+        if substitution_file is not None:
+            positions = parse_substitution_file2(substitution_file)
+            fw_sequence, complement_sequence = add_ambiguity_positions(positions)
+
+        with open(fw_path, 'w') as fH:
+            print(fw_sequence, end='\n', file=fH)
+        with open(bw_path, 'w') as fH:
+            print(complement_sequence, end='\n', file=fH)
+
+        ref_sequence_map[header] = {"forward": fw_path, "backward": bw_path}
+
+    return ref_sequence_map
+
+
 def make_temp_sequence(fasta, sequence_outfile, rc_sequence_outfile):
     """extract the sequence from a fasta and put into a simple file that is used by signalAlign
     """
-    assert (not os.path.isfile(sequence_outfile)), "ERROR: forward file already exists"
-    assert (not os.path.isfile(rc_sequence_outfile)), "ERROR: backward file already exists"
+    assert not os.path.isfile(sequence_outfile), "[make_temp_sequence]ERROR: forward file already exists"
+    assert not os.path.isfile(rc_sequence_outfile), "[make_temp_sequence]ERROR: backward file already exists"
 
     for header, comment, sequence in read_fasta(fasta):
         print(sequence, end='\n', file=open(sequence_outfile, 'w'))
@@ -230,11 +311,12 @@ def exonerated_bwa(bwa_index, query, target_regions=None):
     command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
 
     # this is a small SAM file that comes from bwa
-    aln = subprocess.check_output(command.split())
+    nul = open(os.devnull, 'w')
+    aln = subprocess.check_output(command.split(), stderr=nul)
     aln = aln.split("\t")  # split
-    
+    nul.close()
     query_start, query_end, reference_start, reference_end, cigar_string = parse_cigar(aln[11], int(aln[9]))
-    
+
     strand = ""
     if int(aln[7]) == 16:
         # todo redo this swap
@@ -249,7 +331,7 @@ def exonerated_bwa(bwa_index, query, target_regions=None):
         return False, False
 
     completeCigarString = "cigar: %s %i %i + %s %i %i %s 1 %s" % (
-    aln[6].split()[-1], query_start, query_end, aln[8], reference_start, reference_end, strand, cigar_string)
+        aln[6].split()[-1], query_start, query_end, aln[8], reference_start, reference_end, strand, cigar_string)
     
     if target_regions is not None:
         keep = target_regions.check_aligned_region(reference_start, reference_end)
@@ -266,28 +348,24 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
     ok = Bwa.align(bwa_index=bwa_index, query=query, output_sam_path=temp_sam_path)
     if not ok:
         return False, False
-
     sam = pysam.Samfile(temp_sam_path, 'r')
-
     n_aligned_segments = 0
-    
     query_name, flag, reference_name, reference_pos, sam_cigar = None, None, None, None, None
-    
+
     for aligned_segment in sam:
-        if not aligned_segment.is_secondary and\
-        not aligned_segment.is_unmapped:
+        if not aligned_segment.is_secondary and not aligned_segment.is_unmapped:
             query_name     = aligned_segment.qname
             flag           = aligned_segment.flag
             reference_name = sam.getrname(aligned_segment.rname)
             reference_pos  = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start
             sam_cigar      = aligned_segment.cigarstring
         n_aligned_segments += 1
-    
+
     if n_aligned_segments > 1:
-        print("[exonerated_bwa_pysam]WARNING more than 1 mapping")
+        print("[exonerated_bwa_pysam]WARNING more than 1 mapping, taking the first one heuristically")
 
     query_start, query_end, reference_start, reference_end, cigar_string = parse_cigar(sam_cigar, reference_pos)
-    
+
     strand = ""
     assert(flag is not None), "[exonerated_bwa_pysam] ERROR flag is None"
 
@@ -307,7 +385,7 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
     assert(query_name is not None), "[exonerated_bwa_pysam] ERROR query_name is None"
 
     completeCigarString = "cigar: %s %i %i + %s %i %i %s 1 %s" % (
-    query_name, query_start, query_end, reference_name, reference_start, reference_end, strand, cigar_string)
+        query_name, query_start, query_end, reference_name, reference_start, reference_end, strand, cigar_string)
 
     if target_regions is not None:
         keep = target_regions.check_aligned_region(reference_start, reference_end)
@@ -316,7 +394,7 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
         else:
             pass
 
-    return completeCigarString, strand
+    return completeCigarString, strand, reference_name
 
 
 def default_template_model_from_version(version):
@@ -431,7 +509,6 @@ class Bwa(object):
         except subprocess.CalledProcessError:
             outerr.close()
             return False
-
 
 
 class NanoporeRead(object):
@@ -950,24 +1027,35 @@ class NanoporeRead(object):
 
 
 class SignalAlignment(object):
-    def __init__(self, in_fast5, forward_reference, backward_reference, path_to_EC_refs, destination, stateMachineType,
-                 banded, bwa_index, in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
-                 threshold, diagonal_expansion, constraint_trim, degenerate,
-                 target_regions=None, output_format="full"):
-        self.in_fast5 = in_fast5  # fast5 file to align
-        self.forward_reference = forward_reference  # forward 'FASTA-oriented' reference
-        self.backward_reference = backward_reference  # complement of the forward reference
-        self.path_to_EC_refs = path_to_EC_refs  # place where the reference sequence with ambiguous characters is
-        self.destination = destination  # place where the alignments go, should already exist
-        self.stateMachineType = stateMachineType  # flag for signalMachine
-        self.banded = banded  # use banded or not
-        self.bwa_index = bwa_index  # index of reference sequence
-        self.threshold = threshold  # min posterior probability to keep
+    def __init__(self,
+                 in_fast5,
+                 reference_map,
+                 path_to_EC_refs,
+                 destination,
+                 stateMachineType,
+                 bwa_index,
+                 in_templateHmm,
+                 in_complementHmm,
+                 in_templateHdp,
+                 in_complementHdp,
+                 threshold,
+                 diagonal_expansion,
+                 constraint_trim,
+                 degenerate,
+                 target_regions=None,
+                 output_format="full"):
+        self.in_fast5           = in_fast5            # fast5 file to align
+        self.reference_map      = reference_map       # map with paths to reference sequences
+        self.path_to_EC_refs    = path_to_EC_refs     # place where the reference sequence with ambiguous characters is
+        self.destination        = destination         # place where the alignments go, should already exist
+        self.stateMachineType   = stateMachineType    # flag for signalMachine
+        self.bwa_index          = bwa_index           # index of reference sequence
+        self.threshold          = threshold           # min posterior probability to keep
         self.diagonal_expansion = diagonal_expansion  # alignment algorithm param
-        self.constraint_trim = constraint_trim  # alignment algorithm param
-        self.target_regions = target_regions  # only signal-align reads that map to these positions
-        self.output_format = output_format  # smaller output files
-        self.degenerate = degenerate  # set of nucleotides for degenerate characters
+        self.constraint_trim    = constraint_trim     # alignment algorithm param
+        self.target_regions     = target_regions      # only signal-align reads that map to these positions
+        self.output_format      = output_format       # smaller output files
+        self.degenerate         = degenerate          # set of nucleotides for degenerate characters
 
         # if we're using an input hmm, make sure it exists
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -991,19 +1079,19 @@ class SignalAlignment(object):
 
     def run(self, get_expectations=False):
         if get_expectations:
-            assert self.in_templateHmm is not None and self.in_complementHmm is not None, "Need HMM files for model " \
-                                                                                          "training"
+            assert self.in_templateHmm is not None and self.in_complementHmm is not None,\
+                "Need HMM files for model training"
         # file checks
         if os.path.isfile(self.in_fast5) is False:
-            print("signalAlign - problem with file path {file}".format(file=self.in_fast5))
+            print("signalAlign - did not find .fast5 at{file}".format(file=self.in_fast5))
             return False
 
         # containers and defaults
-        read_label = self.in_fast5.split("/")[-1]      # used in the posteriors file as identifier
-        read_name = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
+        read_label = self.in_fast5.split("/")[-1]       # used in the posteriors file as identifier
+        read_name  = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
 
         # object for handling temporary files
-        temp_folder = FolderHandler()
+        temp_folder   = FolderHandler()
         temp_dir_path = temp_folder.open_folder(self.destination + "tempFiles_{readLabel}".format(readLabel=read_label))
 
         # read-specific files, could be removed later but are kept right now to make it easier to rerun commands
@@ -1012,11 +1100,11 @@ class SignalAlignment(object):
         temp_samfile = temp_folder.add_file_path("temp_sam_file_{read}.sam".format(read=read_label))
 
         # make the npRead and fasta
-        success, version, pop1_complement = get_npRead_2dseq_and_models(fast5=self.in_fast5,
-                                                                        npRead_path=temp_np_read,
-                                                                        twod_read_path=temp_2d_read)
+        ok, version, pop1_complement = get_npRead_2dseq_and_models(fast5=self.in_fast5,
+                                                                   npRead_path=temp_np_read,
+                                                                   twod_read_path=temp_2d_read)
 
-        if success is False:
+        if not ok:
             print("file {file} does not have 2D or is corrupt".format(file=read_label), file=sys.stderr)
             return False
 
@@ -1033,10 +1121,15 @@ class SignalAlignment(object):
             stateMachineType_flag = ""
 
         # get orientation and cigar from BWA this serves as the guide alignment
-        cigar_string, strand = exonerated_bwa_pysam(bwa_index=self.bwa_index, 
-                                                    query=temp_2d_read,
-                                                    temp_sam_path=temp_samfile,
-                                                    target_regions=self.target_regions)
+        cigar_string, strand, mapped_refernce = exonerated_bwa_pysam(bwa_index=self.bwa_index,
+                                                                     query=temp_2d_read,
+                                                                     temp_sam_path=temp_samfile,
+                                                                     target_regions=self.target_regions)
+
+        if mapped_refernce not in self.reference_map.keys():
+            print("[SignalAlignment] Reference {ref} not found in contigs"
+                  "{keys}".format(ref=mapped_refernce, keys=self.reference_map.keys()))
+            return False
 
         # this gives the format: /directory/for/files/file.model.orientation.tsv
         posteriors_file_path = ''
@@ -1089,19 +1182,14 @@ class SignalAlignment(object):
               "".format(t=self.in_templateHmm, c=self.in_complementHmm), file=sys.stderr)
 
         # reference sequences
-        if self.forward_reference is not None or self.backward_reference is not None:
-            assert self.forward_reference is not None and self.backward_reference is not None, \
-                "Need forward and backward reference sequences"
-            forward_ref_flag = "-f {f_ref} ".format(f_ref=self.forward_reference)
-            backward_ref_flag = "-b {b_ref} ".format(b_ref=self.backward_reference)
-            error_correct_ref_path = ""
-        else:
-            assert self.forward_reference is None and self.backward_reference is None, \
-                "Erroneously gave forward and backward references when trying to do error correction"
-            assert self.path_to_EC_refs is not None, "Need to provide path to ambiguous reference sequences"
-            forward_ref_flag = ""
-            backward_ref_flag = ""
-            error_correct_ref_path = "-p {path}".format(path=self.path_to_EC_refs)
+        assert self.reference_map[mapped_refernce]["forward"] is not None
+        assert self.reference_map[mapped_refernce]["backward"] is not None
+        forward_reference = self.reference_map[mapped_refernce]["forward"]
+        backward_reference = self.reference_map[mapped_refernce]["backward"]
+        assert os.path.isfile(forward_reference)
+        assert os.path.isfile(backward_reference)
+        forward_ref_flag = "-f {f_ref} ".format(f_ref=forward_reference)
+        backward_ref_flag = "-b {b_ref} ".format(b_ref=backward_reference)
 
         # input HDPs
         if (self.in_templateHdp is not None) and (self.in_complementHdp is not None):
@@ -1128,11 +1216,8 @@ class SignalAlignment(object):
         else:
             trim_flag = ""
 
-        # banded alignment
-        if self.banded is True:
-            pass
-        else:
-            trim_flag = "-m 9999"
+        # NOTE: to turn off banded alignment, uncomment this flag, it just trimms away all of the anchors
+        #trim_flag = "-m 9999"
 
         # output format
         fmts = {"full": 0, "variantCaller": 1, "assignments": 2}
@@ -1152,7 +1237,7 @@ class SignalAlignment(object):
             complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
 
             command = \
-                "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref}{eC} -q {npRead} " \
+                "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} " \
                 "-t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag,
@@ -1161,14 +1246,14 @@ class SignalAlignment(object):
                         templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, eC=error_correct_ref_path)
+                        trim=trim_flag, degen=degenerate_flag, sparse=out_fmt)
         else:
             command = \
-                "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref}{eC} -q {npRead} " \
+                "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} " \
                 "-u {posteriors} {hdp}-L {readLabel}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
-                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, eC=error_correct_ref_path,
+                        f_ref=forward_ref_flag, b_ref=backward_ref_flag,
                         readLabel=read_label, npRead=temp_np_read,
                         t_model=template_model_flag, c_model=complement_model_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
