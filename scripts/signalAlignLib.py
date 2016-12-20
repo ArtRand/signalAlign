@@ -572,10 +572,10 @@ class NanoporeRead(object):
 
         self.version = self.fastFive[twoD_address].attrs["dragonet version"]
 
-        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4"]
+        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0"]
         if self.version not in supported_versions:
             print("[NanoporeRead::initialize_twoD]Unsupported Version {} (1.15.0, 1.19.0, 1.20.0, "
-                  "1.22.2, 1.22.4 supported)".format(self.version), file=sys.stdout)
+                  "1.22.2, 1.22.4, 1.23.0 supported)".format(self.version), file=sys.stdout)
             self.close()
             return False
 
@@ -624,7 +624,7 @@ class NanoporeRead(object):
             self.complement_read = self.fastFive[oneD_address + "/BaseCalled_complement/Fastq"][()].split()[2]
             return True
 
-        elif self.version == "1.22.2" or self.version == "1.22.4":
+        elif self.version == "1.22.2" or self.version == "1.22.4" or self.version == "1.23.0":
             self.template_event_table_address = oneD_address + '/BaseCalled_template/Events'
             self.template_model_address = ""
             self.template_model_id = None
