@@ -14,6 +14,7 @@ SignalAlign is a hidden Markov model (HMM) software package for aligning the ion
 5. run `make`
 6. Test the installation by running `make test`
 7. All of the programs can be found in the `/bin/` directory
+8. If python can't find the modules in the repo, add the directory to the PYTHONPATH like so: `export PYTHONPATH="$PYTHONPATH:$(pwd)"`
 
 ### Quick Start
 1. Install
