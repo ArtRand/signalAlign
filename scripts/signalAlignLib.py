@@ -554,11 +554,38 @@ class NanoporeRead(object):
             return False
 
     def initialize_twoD(self, get_sequence=False):
-        # init
         self.has2D = False
         self.has2D_alignment_table = False
 
-        twoD_alignment_table_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Alignment"
+        def get_latest_basecall_edition(address):
+            highest = 0
+            while(highest < 10):
+                if address.format(highest) in self.fastFive:
+                    highest += 1
+                    continue
+                else:
+                    return highest - 1
+
+        highest_2d_basecall = get_latest_basecall_edition("/Analyses/Basecall_2D_00{}")
+        twoD_address = "/Analyses/Basecall_2D_00{}".format(highest_2d_basecall)
+        assert(twoD_address in self.fastFive), "[NanoporeRead::initialize_twoD] Didn't find two D address"
+
+        self.version = self.fastFive[twoD_address].attrs["dragonet version"]
+
+        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4"]
+        if self.version not in supported_versions:
+            print("[NanoporeRead::initialize_twoD]Unsupported Version {} (1.15.0, 1.19.0, 1.20.0, "
+                  "1.22.2, 1.22.4 supported)".format(self.version), file=sys.stdout)
+            self.close()
+            return False
+
+        if self.version == "1.15.0":
+            oneD_address = "/Analyses/Basecall_2D_00{}".format(highest_2d_basecall)
+        else:
+            highest_1d_basecall = get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
+            oneD_address = "/Analyses/Basecall_1D_00{}".format(highest_1d_basecall)
+
+        twoD_alignment_table_address = twoD_address + "/BaseCalled_2D/Alignment"
         if twoD_alignment_table_address in self.fastFive:
             self.twoD_alignment_table = self.fastFive[twoD_alignment_table_address]
             if len(self.twoD_alignment_table) > 0:
@@ -566,54 +593,47 @@ class NanoporeRead(object):
             self.kmer_length = len(self.twoD_alignment_table[0][2])
 
         if get_sequence is True:
-            twoD_read_sequence_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Fastq"
+            twoD_read_sequence_address = twoD_address + "/BaseCalled_2D/Fastq"
             if twoD_read_sequence_address in self.fastFive:
                 self.has2D = True
                 self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
                 self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
 
-        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4"]
-        self.version = self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"]
-
-        if self.version not in supported_versions:
-            print("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)", file=sys.stdout)
-            return False
-
         # initialize version-specific paths
         if self.version == "1.15.0":
-            self.template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
-            self.template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
-            self.template_model_id = self.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_template")
-            self.template_read = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Fastq"][()].split()[2]
+            self.template_event_table_address = twoD_address + '/BaseCalled_template/Events'
+            self.template_model_address = twoD_address + "/BaseCalled_template/Model"
+            self.template_model_id = self.get_model_id(twoD_address + "/Summary/basecall_1d_template")
+            self.template_read = self.fastFive[twoD_address + "/BaseCalled_template/Fastq"][()].split()[2]
 
-            self.complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
-            self.complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
-            self.complement_model_id = self.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_complement")
-            self.complement_read = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Fastq"][()].split()[2]
+            self.complement_event_table_address = twoD_address + '/BaseCalled_complement/Events'
+            self.complement_model_address = twoD_address + "/BaseCalled_complement/Model"
+            self.complement_model_id = self.get_model_id(twoD_address + "/Summary/basecall_1d_complement")
+            self.complement_read = self.fastFive[twoD_address + "/BaseCalled_complement/Fastq"][()].split()[2]
             return True
 
         elif self.version == "1.19.0" or self.version == "1.20.0":
-            self.template_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_template/Events'
-            self.template_model_address = "/Analyses/Basecall_1D_000/BaseCalled_template/Model"
-            self.template_model_id = self.get_model_id("/Analyses/Basecall_1D_000/Summary/basecall_1d_template")
-            self.template_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_template/Fastq"][()].split()[2]
+            self.template_event_table_address = oneD_address + '/BaseCalled_template/Events'
+            self.template_model_address = oneD_address + "/BaseCalled_template/Model"
+            self.template_model_id = self.get_model_id(oneD_address + "/Summary/basecall_1d_template")
+            self.template_read = self.fastFive[oneD_address + "/BaseCalled_template/Fastq"][()].split()[2]
 
-            self.complement_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_complement/Events'
-            self.complement_model_address = "/Analyses/Basecall_1D_000/BaseCalled_complement/Model"
-            self.complement_model_id = self.get_model_id("/Analyses/Basecall_1D_000/Summary/basecall_1d_complement")
-            self.complement_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_complement/Fastq"][()].split()[2]
+            self.complement_event_table_address = oneD_address + '/BaseCalled_complement/Events'
+            self.complement_model_address = oneD_address + "/BaseCalled_complement/Model"
+            self.complement_model_id = self.get_model_id(oneD_address + "/Summary/basecall_1d_complement")
+            self.complement_read = self.fastFive[oneD_address + "/BaseCalled_complement/Fastq"][()].split()[2]
             return True
 
         elif self.version == "1.22.2" or self.version == "1.22.4":
-            self.template_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_template/Events'
+            self.template_event_table_address = oneD_address + '/BaseCalled_template/Events'
             self.template_model_address = ""
             self.template_model_id = None
-            self.template_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_template/Fastq"][()].split()[2]
+            self.template_read = self.fastFive[oneD_address + "/BaseCalled_template/Fastq"][()].split()[2]
 
-            self.complement_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_complement/Events'
+            self.complement_event_table_address = oneD_address + '/BaseCalled_complement/Events'
             self.complement_model_address = ""
             self.complement_model_id = None
-            self.complement_read = self.fastFive["/Analyses/Basecall_1D_000/BaseCalled_complement/Fastq"][()].split()[2]
+            self.complement_read = self.fastFive[oneD_address + "/BaseCalled_complement/Fastq"][()].split()[2]
             return True
         else:
             print("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)", file=sys.stdout)
