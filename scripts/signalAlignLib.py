@@ -123,11 +123,11 @@ def parse_substitution_file2(substitution_file):
             line = line.split()
             this_header = line[0]
             if header != this_header:  # we're at a new entry
-                positions[header] = {"forward": map(np.int64, line[1:])}
+                positions[this_header] = {"forward": map(np.int64, line[1:])}
                 header = this_header
                 continue
             if header == this_header:  # we're at the backward positions
-                positions[header] = {"backward": map(np.int64, line[1:])}
+                positions[header]["backward"] = map(np.int64, line[1:])
                 continue
     return positions
 
@@ -269,7 +269,7 @@ def add_ambiguity_chars_to_reference(input_fasta, substitution_file, sequence_ou
 
 
 def parse_cigar(cigar_string, ref_start):
-    assert(cigar_string is not None)
+    assert(cigar_string is not None), "ERROR got cigar {}".format(cigar_string)
     assert(ref_start is not None)
     # use a regular expression to parse the string into operations and lengths
     cigar_tuples = re.findall(r'([0-9]+)([MIDNSHPX=])', cigar_string)
@@ -344,22 +344,40 @@ def exonerated_bwa(bwa_index, query, target_regions=None):
 
 
 def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
+    # type: (string, string, string, TargetRegions)
+    """Aligns the read sequnece with BWA to get the guide alignment,
+    returns the CIGAR (in exonerate format), the strand (plus or minus) and the
+    contig mapped to if the read aligned. Returns (False, False, False) if there
+    is a problem with any of the steps or if the read maps to a region not included
+    within TargetRegions
+    """
     # align with bwa
     ok = Bwa.align(bwa_index=bwa_index, query=query, output_sam_path=temp_sam_path)
     if not ok:
-        return False, False
+        return False, False, False
     sam = pysam.Samfile(temp_sam_path, 'r')
     n_aligned_segments = 0
     query_name, flag, reference_name, reference_pos, sam_cigar = None, None, None, None, None
 
     for aligned_segment in sam:
         if not aligned_segment.is_secondary and not aligned_segment.is_unmapped:
-            query_name     = aligned_segment.qname
-            flag           = aligned_segment.flag
-            reference_name = sam.getrname(aligned_segment.rname)
-            reference_pos  = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start
-            sam_cigar      = aligned_segment.cigarstring
-        n_aligned_segments += 1
+            if n_aligned_segments == 0:
+                query_name     = aligned_segment.qname
+                flag           = aligned_segment.flag
+                reference_name = sam.getrname(aligned_segment.rname)
+                reference_pos  = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start
+                sam_cigar      = aligned_segment.cigarstring
+            n_aligned_segments += 1
+
+    if n_aligned_segments == 0:
+        print("[exonerated_bwa_pysam]Read has no aligned segments")
+        return False, False, False
+
+    if sam_cigar is None:
+        print("[exonerated_bwa_pysam]DEBUG: query name: {qn} flag {fl} reference name {rn} "
+              "reference pos {rp} sam cigar {cig} n_aligned {nal}"
+              "".format(qn=query_name, fl=flag, rn=reference_name, rp=reference_pos, cig=sam_cigar,
+                        nal=n_aligned_segments))
 
     if n_aligned_segments > 1:
         print("[exonerated_bwa_pysam]WARNING more than 1 mapping, taking the first one heuristically")
@@ -370,7 +388,6 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
     assert(flag is not None), "[exonerated_bwa_pysam] ERROR flag is None"
 
     if int(flag) == 16:
-        # todo redo this swap
         strand = "-"
         temp = reference_start
         reference_start = reference_end
@@ -378,8 +395,9 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
     if int(flag) == 0:
         strand = "+"
     elif int(flag) != 0 and int(flag) != 16:
-        print("unknown alignment flag, exiting", file=sys.stderr)
-        return False, False
+        print("[exonerated_bwa_pysam]ERROR unexpected alignment flag {flag}, not continuing with signal alignment"
+              " for {query}".format(flag=flag, query=query_name), file=sys.stderr)
+        return False, False, False
 
     assert(reference_name is not None), "[exonerated_bwa_pysam] ERROR reference_name is None"
     assert(query_name is not None), "[exonerated_bwa_pysam] ERROR query_name is None"
@@ -390,7 +408,9 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
     if target_regions is not None:
         keep = target_regions.check_aligned_region(reference_start, reference_end)
         if keep is False:
-            return False, False
+            print("[exonerated_bwa_pysam]Read does not map witin the target regions, passing "
+                  "on signal-level alignment", file=sys.stderr)
+            return False, False, False
         else:
             pass
 
@@ -1078,6 +1098,7 @@ class SignalAlignment(object):
             self.in_complementHdp = None
 
     def run(self, get_expectations=False):
+        print("[SignalAlign::run]Starting on {read}".format(read=self.in_fast5), file=sys.stderr)
         if get_expectations:
             assert self.in_templateHmm is not None and self.in_complementHmm is not None,\
                 "Need HMM files for model training"
@@ -1106,6 +1127,7 @@ class SignalAlignment(object):
 
         if not ok:
             print("file {file} does not have 2D or is corrupt".format(file=read_label), file=sys.stderr)
+            temp_folder.remove_folder()            
             return False
 
         # add an indicator for the model being used
@@ -1127,8 +1149,14 @@ class SignalAlignment(object):
                                                                      target_regions=self.target_regions)
 
         if mapped_refernce not in self.reference_map.keys():
-            print("[SignalAlignment] Reference {ref} not found in contigs"
-                  "{keys}".format(ref=mapped_refernce, keys=self.reference_map.keys()))
+            if mapped_refernce is False:
+                print("[SignalAlignment::run]Read {read} didn't map"
+                      "".format(read=read_label), file=sys.stderr)
+            else:
+                print("[SignalAlignment::run]Reference {ref} not found in contigs"
+                      "{keys}".format(ref=mapped_refernce, keys=self.reference_map.keys()),
+                      file=sys.stderr)
+            temp_folder.remove_folder()
             return False
 
         # this gives the format: /directory/for/files/file.model.orientation.tsv
@@ -1136,7 +1164,6 @@ class SignalAlignment(object):
 
         # forward strand
         if strand == "+":
-            #forward = True
             if self.output_format == "full":
                 posteriors_file_path = self.destination + read_name + model_label + ".forward.tsv"
             elif self.output_format == "variantCaller":
@@ -1146,7 +1173,6 @@ class SignalAlignment(object):
 
         # backward strand
         if strand == "-":
-            #forward = False
             if self.output_format == "full":
                 posteriors_file_path = self.destination + read_name + model_label + ".backward.tsv"
             elif self.output_format == "variantCaller":
@@ -1156,7 +1182,7 @@ class SignalAlignment(object):
 
         # didn't map
         elif (strand != "+") and (strand != "-"):
-            print("signalAlign - {read} didn't map got flag: {flag}".format(read=read_label, flag=strand),
+            print("[SignalAlignment::run]- {read} gave unrecognizable strand flag: {flag}".format(read=read_label, flag=strand),
                   file=sys.stderr)
             temp_folder.remove_folder()
             return False

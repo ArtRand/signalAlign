@@ -205,9 +205,9 @@ def main(args):
             "target_regions": target_regions,
             "degenerate": degenerate_enum(args.degenerate),
         }
-        alignment = SignalAlignment(**alignment_args)
-        alignment.run()
-        #work_queue.put(alignment_args)
+        #alignment = SignalAlignment(**alignment_args)
+        #alignment.run()
+        work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))
@@ -222,8 +222,6 @@ def main(args):
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
     print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
 
-    if args.outFmt == "variantCaller":
-        concat_variant_call_files(temp_dir_path)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

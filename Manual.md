@@ -1,16 +1,19 @@
 ## SignalAlign Manual
 
 **UPDATED for R9 refactor**
-Updated 10/12/16 - Working to integrate new matrichor base caller
+Updated 12/19/16 - Working to integrate new matrichor base caller, and multi-contig reference sequences
 
 ### Introduction
 SignalAlign is a hidden Markov model (HMM) software package for aligning the ionic current signal from the Oxford Nanopore Technologies (ONT) MinION to a reference sequence and inferring properties of the reference sequence.
 
 ### Installation
 1. Recursively clone this repo `git clone --recursive https://github.com/ArtRand/signalAlign.git`
-2. cd into the directory and run `make`
-3. Test the installation by running `make test`
-4. All of the programs can be found in the `/bin/` directory
+2. Make a virtual environment in the directory `virtualenv venv`
+3. Activate it `. venv/bin/activate`
+4. Pip install the requirements `pip install -r requirements.txt`
+5. run `make`
+6. Test the installation by running `make test`
+7. All of the programs can be found in the `/bin/` directory
 
 ### Quick Start
 1. Install
@@ -168,10 +171,10 @@ An example command that would produce methylation call probabilities in _E. coli
 ./runSignalAlign \
 > -d ../tests/minion_test_reads/ecoli/ \
 > -r ../tests/test_sequences/E.coli_K12.fasta \
-> -T ../../HDP_models/ecoli_models/template_trained.hmm \
-> -C ../../HDP_models/ecoli_models/complement_trained.hmm \
-> -tH ../../HDP_models/ecoli_models/template.multisetPrior2.nhdp \
-> -cH ../../HDP_models/ecoli_models/complement.multisetPrior2.nhdp \
+> -T ../../HDP_models/ecoli_r7.3_models/template_trained.hmm \
+> -C ../../HDP_models/ecoli_r7.3_models/complement_trained.hmm \
+> -tH ../../HDP_models/ecoli_r7.3_models/template.multisetPrior2.nhdp \
+> -cH ../../HDP_models/ecoli_r7.3_models/complement.multisetPrior2.nhdp \
 > -x cytosine2 \
 > -smt=threeStateHdp \
 > -q ../tests/test_regions/test_sites_bal_1.tgt \

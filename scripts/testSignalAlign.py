@@ -116,13 +116,13 @@ class SignalAlignAlignmentTest(unittest.TestCase):
 
     def test_zymo_reads(self):
         zymo_true_alignments = SIGNALALIGN_ROOT + "tests/test_alignments/zymo_C_test_alignments_sm3/" \
-                                                            "tempFiles_alignment/"
+                                                  "tempFiles_alignment/"
         self.check_alignments(true_alignments=zymo_true_alignments, reads=ZYMO_C_READS,
                               reference=ZYMO_REFERENCE, kmer_length=6)
 
     def test_ecoli_reads(self):
         ecoli_true_alignments = SIGNALALIGN_ROOT + "tests/test_alignments/ecoli_test_alignments_sm3/" \
-                                                             "tempFiles_alignment/"
+                                                   "tempFiles_alignment/"
         ecoli_reads = SIGNALALIGN_ROOT + "tests/minion_test_reads/ecoli/"
         ecoli_reference = SIGNALALIGN_ROOT + "tests/test_sequences/E.coli_K12.fasta"
         self.check_alignments(true_alignments=ecoli_true_alignments, reads=ecoli_reads,
@@ -168,13 +168,13 @@ class signalAlign_EM_test(unittest.TestCase):
 
 def main():
     testSuite = unittest.TestSuite()
-    #testSuite.addTest(LibTest('test_signalAlign_library'))
+    testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(signalAlignLibTests("test_pysam"))
     testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
-    #testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    #testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
-    #testSuite.addTest(signalAlign_EM_test('test_EM'))
+    testSuite.addTest(signalAlign_EM_test('test_EM'))
 
     testRunner = unittest.TextTestRunner(verbosity=1)
     testRunner.run(testSuite)
