@@ -77,7 +77,7 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         assert len(glob.glob(reads + "*.fast5")) > 0, "Didn't find zymo test MinION reads"
         assert os.path.isfile(reference), "Didn't find zymo reference sequence"
 
-        alignment_command = "./runSignalAlign -d={reads} -r={ref} -smt=threeState -o={testDir} " \
+        alignment_command = "./runSignalAlign --2d -d={reads} -r={ref} -smt=threeState -o={testDir} " \
                             "".format(reads=reads, ref=reference, testDir="./signalAlign_unittest/")
         if extra_args is not None:
             alignment_command += extra_args

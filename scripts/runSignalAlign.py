@@ -23,6 +23,7 @@ def parse_args():
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
     # optional arguments
+    parser.add_argument("--2d", action='store_true', dest="twoD", default=False)
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -204,10 +205,11 @@ def main(args):
             "constraint_trim": args.constraint_trim,
             "target_regions": target_regions,
             "degenerate": degenerate_enum(args.degenerate),
+            "twoD_chemistry": args.twoD,
         }
-        #alignment = SignalAlignment(**alignment_args)
-        #alignment.run()
-        work_queue.put(alignment_args)
+        alignment = SignalAlignment(**alignment_args)
+        alignment.run()
+        #work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))

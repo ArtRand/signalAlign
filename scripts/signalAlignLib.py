@@ -66,6 +66,13 @@ def get_bwa_index(reference, dest, output=None):
     return bwa_ref_index
 
 
+def prepareOneD(fast5, npRead_path, oneD_read_path):
+    out_file  = open(npRead_path, "w")
+    read_file = open(oneD_read_path, "w")
+    npRead    = NanoporeRead(fast5, False)
+    ok        = npRead.write_npRead(out_file=out_file)
+
+
 def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
     """process a MinION .fast5 file into a npRead file for use with signalAlign also extracts
     the 2D read into fasta format
@@ -75,7 +82,7 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
     temp_fasta = open(twod_read_path, "w")
 
     # load MinION read
-    npRead = NanoporeRead(fast5)
+    npRead = NanoporeRead(fast5, True)
 
     # only working with 2D reads right now
     if npRead.has2D_alignment_table is False:
@@ -532,17 +539,39 @@ class Bwa(object):
 
 
 class NanoporeRead(object):
-    def __init__(self, fast_five_file):
+    def __init__(self, fast_five_file, twoD=False):
         # load the fast5
         self.filename = fast_five_file
         self.is_open = self.open()
-        self.template_event_map = []
-        self.complement_event_map = []
+        self.alignment_table_sequence = ""     # the sequence made by assembling the alignment table
+        self.template_events = []              # template event sequence
+        self.complement_events = []            # complement event sequence
+        self.template_read = ""                # template strand fastq sequence
+        self.complement_read = ""              # complement strand fastq sequence
+        self.template_strand_event_map = []    # map of events to kmers in the 1D template read
+        self.complement_strand_event_map = []  # map of events to kmers in the 1D complement read
+        self.template_event_map = []           # map of template events to kmers in 2D read
+        self.complement_event_map = []         # map of complement events to kmers in 2D read
         self.stay_prob = 0
-        self.skip_prob_bins = []
         self.template_model_name = ""
         self.complement_model_name = ""
-        self.initialize_twoD()
+        self.template_scale = 1
+        self.template_shift = 1
+        self.template_drift = 0
+        self.template_var = 1
+        self.template_scale_sd = 1
+        self.template_var_sd = 1
+        self.complement_scale = 1
+        self.complement_shift = 1
+        self.complement_drift = 0
+        self.complement_var = 1
+        self.complement_scale_sd = 1
+        self.complement_var_sd = 1
+        self.twoD = twoD
+        if self.twoD:
+            self.initialize_twoD()
+        else:
+            self.initialize()
 
     def open(self):
         try:
@@ -553,20 +582,32 @@ class NanoporeRead(object):
             print("Error opening file {filename}".format(filename=self.filename), file=sys.stderr)
             return False
 
+    def get_latest_basecall_edition(self, address):
+        highest = 0
+        while(highest < 10):
+            if address.format(highest) in self.fastFive:
+                highest += 1
+                continue
+            else:
+                return highest - 1
+
+    def initialize(self):
+        highest_1d_basecall = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
+        oneD_root_address = "/Analyses/Basecall_1D_00{}".format(highest_1d_basecall)
+        self.version = self.fastFive[oneD_root_address].attrs["dragonet version"]
+        assert(self.version == "1.23.0"), "Unsupported version {}".format(self.version)
+        self.template_event_table_address = oneD_root_address + '/BaseCalled_template/Events'
+        self.template_model_address = oneD_root_address + "/BaseCalled_template/Model"
+        self.template_model_id = self.get_model_id(oneD_root_address + "/Summary/basecall_1d_template")
+        self.template_read = self.fastFive[oneD_root_address + "/BaseCalled_template/Fastq"][()].split()[2]
+        self.kmer_length = len(self.fastFive[self.template_event_table_address][0][4])
+        return
+
     def initialize_twoD(self, get_sequence=False):
         self.has2D = False
         self.has2D_alignment_table = False
 
-        def get_latest_basecall_edition(address):
-            highest = 0
-            while(highest < 10):
-                if address.format(highest) in self.fastFive:
-                    highest += 1
-                    continue
-                else:
-                    return highest - 1
-
-        highest_2d_basecall = get_latest_basecall_edition("/Analyses/Basecall_2D_00{}")
+        highest_2d_basecall = self.get_latest_basecall_edition("/Analyses/Basecall_2D_00{}")
         twoD_address = "/Analyses/Basecall_2D_00{}".format(highest_2d_basecall)
         assert(twoD_address in self.fastFive), "[NanoporeRead::initialize_twoD] Didn't find two D address"
 
@@ -704,10 +745,14 @@ class NanoporeRead(object):
             padding = final_event_index * (self.kmer_length - 1)
             event_map = event_map + padding
             return event_map
+
         self.template_strand_event_map = make_map(self.template_events)
-        self.complement_strand_event_map = make_map(self.complement_events)
         assert len(self.template_strand_event_map) == len(self.template_read)
-        assert len(self.complement_strand_event_map) == len(self.complement_read)
+
+        if self.twoD:
+            self.complement_strand_event_map = make_map(self.complement_events)
+            assert len(self.complement_strand_event_map) == len(self.complement_read)
+
         return True
 
     def get_twoD_event_map(self):
@@ -850,12 +895,6 @@ class NanoporeRead(object):
 
         if self.template_model_address not in self.fastFive:
             self.has_template_model = False
-            self.template_scale = 1
-            self.template_shift = 1
-            self.template_drift = 0
-            self.template_var = 1
-            self.template_scale_sd = 1
-            self.template_var_sd = 1
         return
 
     def get_complement_model_adjustments(self):
@@ -870,12 +909,6 @@ class NanoporeRead(object):
 
         if self.complement_model_address not in self.fastFive:
             self.has_complement_model = False
-            self.complement_scale = 1
-            self.complement_shift = 1
-            self.complement_drift = 0
-            self.complement_var = 1
-            self.complement_scale_sd = 1
-            self.complement_var_sd = 1
         return
 
     @staticmethod
@@ -954,17 +987,23 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        twoD_map_check = self.get_twoD_event_map()
+        if self.twoD:
+            twoD_map_check          = self.get_twoD_event_map()
+            complement_events_check = self.get_complement_events()
+        else:
+            twoD_map_check          = True
+            complement_events_check = True
+
         template_events_check = self.get_template_events()
-        complement_events_check = self.get_complement_events()
-        oneD_event_map_check = self.init_1d_event_maps()
+        oneD_event_map_check  = self.init_1d_event_maps()
 
         proceed = False not in [twoD_map_check, template_events_check, complement_events_check, oneD_event_map_check]
 
         if proceed:
             # get model params
             self.get_template_model_adjustments()
-            self.get_complement_model_adjustments()
+            if self.twoD:
+                self.get_complement_model_adjustments()
 
             # transform events
             # drift adjustment happens within signalMachine now
@@ -994,7 +1033,8 @@ class NanoporeRead(object):
             print(self.complement_var, end=' ', file=out_file)                 # 3complement var
             print(self.complement_scale_sd, end=' ', file=out_file)            # 4complement scale_sd
             print(self.complement_var_sd, end=' ', file=out_file)              # 5complement var_sd
-            print(self.complement_drift, end='\n', file=out_file)              # 6complement_drift
+            print(self.complement_drift, end=' ', file=out_file)               # 6complement_drift
+            print((1 if self.twoD else 0), end='\n', file=out_file)            # has 2D
 
             # line 2 alignment table sequence
             print(self.alignment_table_sequence, end='\n', file=out_file)
@@ -1032,9 +1072,12 @@ class NanoporeRead(object):
             print("", end="\n", file=out_file)
 
             # line 10 complement events
-            complement_start_time = self.complement_events[0]['start']
-            for mean, stdev, length, start in self.complement_events['mean', 'stdv', 'length', 'start']:
-                print(mean, stdev, length, (start - complement_start_time), sep=' ', end=' ', file=out_file)
+            if self.twoD:
+                complement_start_time = self.complement_events[0]['start']
+                for mean, stdev, length, start in self.complement_events['mean', 'stdv', 'length', 'start']:
+                    print(mean, stdev, length, (start - complement_start_time), sep=' ', end=' ', file=out_file)
+            else:
+                pass
             print("", end="\n", file=out_file)
 
             # line 11 model_state (template)
@@ -1048,13 +1091,15 @@ class NanoporeRead(object):
             print("", end="\n", file=out_file)
 
             # line 13 model_state (complement)
-            for _ in self.complement_events['model_state']:
-                print(_, sep=' ', end=' ', file=out_file)
+            if self.twoD:
+                for _ in self.complement_events['model_state']:
+                    print(_, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
             # line 14 p(model) (complement)
-            for _ in self.complement_events['p_model_state']:
-                print(_, sep=' ', end=' ', file=out_file)
+            if self.twoD:
+                for _ in self.complement_events['p_model_state']:
+                    print(_, sep=' ', end=' ', file=out_file)
             print("", end="\n", file=out_file)
 
             return True
@@ -1082,6 +1127,7 @@ class SignalAlignment(object):
                  diagonal_expansion,
                  constraint_trim,
                  degenerate,
+                 twoD_chemistry,
                  target_regions=None,
                  output_format="full"):
         self.in_fast5           = in_fast5            # fast5 file to align
@@ -1096,6 +1142,7 @@ class SignalAlignment(object):
         self.target_regions     = target_regions      # only signal-align reads that map to these positions
         self.output_format      = output_format       # smaller output files
         self.degenerate         = degenerate          # set of nucleotides for degenerate characters
+        self.twoD_chemistry     = twoD_chemistry      # flag for 2D sequencing runs
 
         # if we're using an input hmm, make sure it exists
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -1137,17 +1184,22 @@ class SignalAlignment(object):
 
         # read-specific files, could be removed later but are kept right now to make it easier to rerun commands
         temp_np_read = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
-        temp_2d_read = temp_folder.add_file_path("temp_2Dseq_{read}.fa".format(read=read_label))
+        read_fasta   = temp_folder.add_file_path("temp_seq_{read}.fa".format(read=read_label))
         temp_samfile = temp_folder.add_file_path("temp_sam_file_{read}.sam".format(read=read_label))
 
         # make the npRead and fasta
-        ok, version, pop1_complement = get_npRead_2dseq_and_models(fast5=self.in_fast5,
-                                                                   npRead_path=temp_np_read,
-                                                                   twod_read_path=temp_2d_read)
+        ## XXX check for chemistry, given as input
+        if not self.twoD_chemistry:
+            prepareOneD(fast5=self.in_fast5, npRead_path=temp_np_read, oneD_read_path=read_fasta)
+            assert False, "BREAKPOINT"
+        else:
+            ok, version, pop1_complement = get_npRead_2dseq_and_models(fast5=self.in_fast5,
+                                                                       npRead_path=temp_np_read,
+                                                                       twod_read_path=read_fasta)
 
         if not ok:
             print("file {file} does not have 2D or is corrupt".format(file=read_label), file=sys.stderr)
-            temp_folder.remove_folder()            
+            temp_folder.remove_folder()
             return False
 
         # add an indicator for the model being used
