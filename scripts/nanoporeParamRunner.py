@@ -4,7 +4,7 @@ from __future__ import print_function
 import sys
 import os
 from random import shuffle
-from signalAlignLib import get_npRead_2dseq_and_models, exonerated_bwa
+from signalAlignLib import get_npRead_2dseq_and_models, exonerated_bwa, prepareOneD
 from argparse import ArgumentParser
 from serviceCourse.file_handlers import FolderHandler
 
@@ -82,22 +82,25 @@ def estimate_params_with_anchors(fast5, working_folder, bwa_index, forward_refer
     os.system(command)
 
 
-def estimate_params(fast5, working_folder):
+def estimate_params(fast5, working_folder, twoD=False):
     assert (isinstance(working_folder, FolderHandler))
 
     read_name = fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
 
     npRead_path = working_folder.add_file_path(read_name + ".npRead")
-    npRead_fasta = working_folder.add_file_path(read_name + ".2dSeq.fasta")
+    npRead_fasta = working_folder.add_file_path(read_name + ".seq.fasta")
 
-    success, def_template_model, def_complement_model = get_npRead_2dseq_and_models(fast5=fast5,
-                                                                                    npRead_path=npRead_path,
-                                                                                    twod_read_path=npRead_fasta)
+    if twoD:
+        success, def_template_model, def_complement_model = get_npRead_2dseq_and_models(fast5=fast5,
+                                                                                        npRead_path=npRead_path,
+                                                                                        twod_read_path=npRead_fasta)
+    else:
+        success = prepareOneD(fast5=fast5, npRead_path=npRead_path, oneD_read_path=npRead_fasta)
     if success is False:
         return False
 
     # input (match) models
-    template_lookup_table = "../models/testModelR9_template.model"
+    template_lookup_table = "../models/testModelR9p4_acegt_template.model"
     complement_lookup_table = "../models/testModelR9_complement_pop2.model"
 
     binary = "./estimateNanoporeParams"

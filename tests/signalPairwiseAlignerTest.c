@@ -220,6 +220,14 @@ static void test_eventSequence(CuTest *testCase) {
 
 }
 
+static void test_1dNanoporeRead(CuTest *testCase) {
+    char *tempFile = stString_print("../tests/test_npReads/r9p4_oneD.npRead");
+    CuAssertTrue(testCase, stFile_exists(tempFile));
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile);
+    CuAssertTrue(testCase, npRead->twoD == FALSE);
+
+}
+
 static void test_loadNanoporeRead(CuTest *testCase) {
     int64_t length = 4096;
     char *read = getRandomSequence(length);
@@ -227,15 +235,16 @@ static void test_loadNanoporeRead(CuTest *testCase) {
     double prob = 1.0;
     char *tempFile = stString_print("./tempRead.npread");
     stList *kmers = path_listPotentialKmers(KMER_LENGTH, strlen(CANONICAL_NUCLEOTIDES), CANONICAL_NUCLEOTIDES);
+    int twodFlag = 1;
 
     CuAssertTrue(testCase, !stFile_exists(tempFile));
     FILE *fH = fopen(tempFile, "w");
 
     // write line 1
     fprintf(fH, "%"PRId64"\t""%"PRId64"\t""%"PRId64"\t""%"PRId64"\t""%"PRId64""
-                    "\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n",
+                    "\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%i\n",
             length, length, length, length, length,
-            param, param, param, param, param, param, param, param, param, param, param, param);
+            param, param, param, param, param, param, param, param, param, param, param, param, twodFlag);
 
     // line 2 2D (alignment table) read sequence
     fprintf(fH, "%s\n", read);
@@ -329,6 +338,7 @@ static void test_loadNanoporeRead(CuTest *testCase) {
     CuAssertTrue(testCase, npRead->complementParams.var == param);
     CuAssertTrue(testCase, npRead->complementParams.scale_sd == param);
     CuAssertTrue(testCase, npRead->complementParams.var_sd == param);
+    CuAssertTrue(testCase, npRead->twoD);
 
     CuAssertStrEquals(testCase, npRead->twoDread, read);
     CuAssertStrEquals(testCase, npRead->templateRead, read);
@@ -791,6 +801,7 @@ CuSuite *signalPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_referenceSequence);
     SUITE_ADD_TEST(suite, test_eventSequence);
     SUITE_ADD_TEST(suite, test_loadNanoporeRead);
+    SUITE_ADD_TEST(suite, test_1dNanoporeRead);
     SUITE_ADD_TEST(suite, test_getSplitPoints);
     SUITE_ADD_TEST(suite, test_hdCellConstruct);
     SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);
@@ -800,7 +811,9 @@ CuSuite *signalPairwiseAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
 
     //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);  // wonky
+    
     SUITE_ADD_TEST(suite, test_stateMachine3EmissionsPdfs);
+    
     //SUITE_ADD_TEST(suite, test_poissonPosteriorProb);
     return suite;
 }

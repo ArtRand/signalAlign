@@ -168,9 +168,9 @@ class signalAlign_EM_test(unittest.TestCase):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
-    testSuite.addTest(signalAlignLibTests("test_pysam"))
-    testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
+    #testSuite.addTest(LibTest('test_signalAlign_library'))
+    #testSuite.addTest(signalAlignLibTests("test_pysam"))
+    #testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))

@@ -71,7 +71,9 @@ def prepareOneD(fast5, npRead_path, oneD_read_path):
     read_file = open(oneD_read_path, "w")
     npRead    = NanoporeRead(fast5, False)
     ok        = npRead.write_npRead(out_file=out_file)
-
+    read_file.close()
+    out_file.close()
+    return ok
 
 def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
     """process a MinION .fast5 file into a npRead file for use with signalAlign also extracts
@@ -623,7 +625,7 @@ class NanoporeRead(object):
         if self.version == "1.15.0":
             oneD_address = "/Analyses/Basecall_2D_00{}".format(highest_2d_basecall)
         else:
-            highest_1d_basecall = get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
+            highest_1d_basecall = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
             oneD_address = "/Analyses/Basecall_1D_00{}".format(highest_1d_basecall)
 
         twoD_alignment_table_address = twoD_address + "/BaseCalled_2D/Alignment"
@@ -1183,18 +1185,18 @@ class SignalAlignment(object):
         temp_dir_path = temp_folder.open_folder(self.destination + "tempFiles_{readLabel}".format(readLabel=read_label))
 
         # read-specific files, could be removed later but are kept right now to make it easier to rerun commands
-        temp_np_read = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
+        temp_npRead  = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
         read_fasta   = temp_folder.add_file_path("temp_seq_{read}.fa".format(read=read_label))
         temp_samfile = temp_folder.add_file_path("temp_sam_file_{read}.sam".format(read=read_label))
 
         # make the npRead and fasta
         ## XXX check for chemistry, given as input
         if not self.twoD_chemistry:
-            prepareOneD(fast5=self.in_fast5, npRead_path=temp_np_read, oneD_read_path=read_fasta)
+            prepareOneD(fast5=self.in_fast5, npRead_path=temp_npRead, oneD_read_path=read_fasta)
             assert False, "BREAKPOINT"
         else:
             ok, version, pop1_complement = get_npRead_2dseq_and_models(fast5=self.in_fast5,
-                                                                       npRead_path=temp_np_read,
+                                                                       npRead_path=temp_npRead,
                                                                        twod_read_path=read_fasta)
 
         if not ok:
@@ -1216,7 +1218,7 @@ class SignalAlignment(object):
 
         # get orientation and cigar from BWA this serves as the guide alignment
         cigar_string, strand, mapped_refernce = exonerated_bwa_pysam(bwa_index=self.bwa_index,
-                                                                     query=temp_2d_read,
+                                                                     query=read_fasta,
                                                                      temp_sam_path=temp_samfile,
                                                                      target_regions=self.target_regions)
 
@@ -1340,7 +1342,7 @@ class SignalAlignment(object):
                 "-t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag,
                         f_ref=forward_ref_flag, b_ref=backward_ref_flag,
-                        npRead=temp_np_read, readLabel=read_label,
+                        npRead=temp_npRead, readLabel=read_label,
                         templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
@@ -1352,7 +1354,7 @@ class SignalAlignment(object):
                 "-u {posteriors} {hdp}-L {readLabel}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
                         f_ref=forward_ref_flag, b_ref=backward_ref_flag,
-                        readLabel=read_label, npRead=temp_np_read,
+                        readLabel=read_label, npRead=temp_npRead,
                         t_model=template_model_flag, c_model=complement_model_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag)

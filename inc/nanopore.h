@@ -47,6 +47,7 @@ typedef struct _nanoporeRead {
     double *complementPModel;
 
     bool scaled;
+    int twoD;
 } NanoporeRead;
 
 typedef struct _eventKmerTuple {

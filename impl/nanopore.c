@@ -121,8 +121,8 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     int64_t npRead_readLength, npRead_nbTemplateEvents, npRead_nbComplementEvents,
             templateReadLength, complementReadLength;
 
-    if (stList_length(tokens) != 17) {
-        st_errAbort("nanopore_loadNanoporeReadFromFile: incorrect line 1 for file %s got %"PRId64"tokens should get 16",
+    if (stList_length(tokens) != 18) {
+        st_errAbort("nanopore_loadNanoporeReadFromFile: incorrect line 1 for file %s got %"PRId64"tokens should get 18",
                     nanoporeReadFile, stList_length(tokens));
 
     }
@@ -204,25 +204,31 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     if (j != 1) {
         st_errAbort("error parsing nanopore complement drift\n");
     }
+    j = sscanf(stList_get(tokens, 17), "%i", &(npRead->twoD));
+    if (j != 1) {
+        st_errAbort("error parsing 'has twoD'\n");
+    }
 
     // cleanup line 1
     free(string);
     stList_destruct(tokens);
 
-    // line 2 [2D read sequence] \n
+    // line 2 [2D read sequence] (alignment table sequence) \n
     string = stFile_getLineFromFile(fH);
-    j = sscanf(string, "%s", npRead->twoDread);
-    if (j != 1) {
-        st_errAbort("error parsing read from npRead file\n");
-    }
-    npRead->twoDread[npRead->readLength] = '\0';
+    if (npRead->twoD) {
+        j = sscanf(string, "%s", npRead->twoDread);
+        if (j != 1) {
+            st_errAbort("error parsing read from npRead file, got %s\n", string);
+        }
+        npRead->twoDread[npRead->readLength] = '\0';
+    } 
     free(string);
 
     // line 3 [template read] \n
     string = stFile_getLineFromFile(fH);
     j = sscanf(string, "%s", npRead->templateRead);
     if (j != 1) {
-        st_errAbort("error parsing template read from npRead file\n");
+        st_errAbort("error parsing template read from npRead file got %s \n", string);
     }
     npRead->templateRead[npRead->templateReadLength] = '\0';
     free(string);
@@ -247,12 +253,14 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     stList_destruct(tokens);
 
     // line 5 [complement read] \n
-    string = stFile_getLineFromFile(fH);
-    j = sscanf(string, "%s", npRead->complementRead);
-    if (j != 1) {
-        st_errAbort("error parsing template read from npRead file\n");
+    string = stFile_getLineFromFile(fH);    
+    if (npRead->twoD) {
+        j = sscanf(string, "%s", npRead->complementRead);
+        if (j != 1) {
+            st_errAbort("error parsing complement read from npRead file got %s \n", string);
+        }
+        npRead->complementRead[npRead->complementReadLength] = '\0';
     }
-    npRead->complementRead[npRead->complementReadLength] = '\0';
     free(string);
 
     // line 6 [complement strand event map] \n
