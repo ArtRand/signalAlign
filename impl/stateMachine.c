@@ -1634,7 +1634,7 @@ StateMachine *getStateMachine3_descaled(const char *modelFile, NanoporeReadAdjus
 
     sM->scale = npp.scale;
     sM->shift = npp.shift;
-    sM->var = npp.var;
+    sM->var   = npp.var;
 
     if (scaleNoise) {
         emissions_signal_scaleNoise(sM, npp);

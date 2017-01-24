@@ -71,9 +71,18 @@ def prepareOneD(fast5, npRead_path, oneD_read_path):
     read_file = open(oneD_read_path, "w")
     npRead    = NanoporeRead(fast5, False)
     ok        = npRead.write_npRead(out_file=out_file)
+    if not ok:
+        npRead.close()
+        read_file.close()
+        out_file.close()
+        return False, None, False
+    write_fasta(id=fast5, sequence=npRead.template_read, destination=read_file)
+    version = npRead.version
     read_file.close()
     out_file.close()
-    return ok
+    npRead.close()
+    return True, version, False
+
 
 def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path):
     """process a MinION .fast5 file into a npRead file for use with signalAlign also extracts
@@ -427,14 +436,17 @@ def exonerated_bwa_pysam(bwa_index, query, temp_sam_path, target_regions=None):
 
 
 def default_template_model_from_version(version):
-    supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4"]
-    assert version in supported_versions
+    supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0"]
+    assert version in supported_versions, "got version {}".format(version)
     version_index = supported_versions.index(version)
-
     if version_index <= 2:
         r7_3_default_template_model = "../models/testModelR73_acegot_template.model"
         assert os.path.exists(r7_3_default_template_model), "Didn't find default template R7.3 model"
         return r7_3_default_template_model
+    elif version_index == 5:
+        r94_default_template_model = "../models/testModelR9p4_acegt_template.model"
+        assert os.path.exists(r94_default_template_model), "Didn't find default R9.4 model"
+        return r94_default_template_model
     else:
         r9_default_template_model = "../models/testModelR9_template.model"
         assert os.path.exists(r9_default_template_model), "Didn't find default template R9 model"
@@ -443,7 +455,7 @@ def default_template_model_from_version(version):
 
 def default_complement_model_from_version(version, pop1_complement=False):
     supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4"]
-    assert version in supported_versions
+    assert version in supported_versions, "got version {}".format(version)
     version_index = supported_versions.index(version)
 
     if version_index <= 2:
@@ -1192,8 +1204,7 @@ class SignalAlignment(object):
         # make the npRead and fasta
         ## XXX check for chemistry, given as input
         if not self.twoD_chemistry:
-            prepareOneD(fast5=self.in_fast5, npRead_path=temp_npRead, oneD_read_path=read_fasta)
-            assert False, "BREAKPOINT"
+            ok, version, pop_1 = prepareOneD(fast5=self.in_fast5, npRead_path=temp_npRead, oneD_read_path=read_fasta)
         else:
             ok, version, pop1_complement = get_npRead_2dseq_and_models(fast5=self.in_fast5,
                                                                        npRead_path=temp_npRead,
@@ -1271,13 +1282,21 @@ class SignalAlignment(object):
         # input (match) models
         if self.in_templateHmm is None:
             self.in_templateHmm = default_template_model_from_version(version=version)
-        if self.in_complementHmm is None:
-            self.in_complementHmm = default_complement_model_from_version(version=version,
-                                                                          pop1_complement=pop1_complement)
+        if self.twoD_chemistry:
+            if self.in_complementHmm is None:
+                self.in_complementHmm = default_complement_model_from_version(version=version,
+                                                                              pop1_complement=pop1_complement)
 
-        assert self.in_templateHmm is not None and self.in_complementHmm is not None
+        assert self.in_templateHmm is not None
+        if self.twoD_chemistry:
+            assert self.in_complementHmm is not None
+
         template_model_flag = "-T {} ".format(self.in_templateHmm)
-        complement_model_flag = "-C {} ".format(self.in_complementHmm)
+        if self.twoD_chemistry:
+            complement_model_flag = "-C {} ".format(self.in_complementHmm)
+        else:
+            complement_model_flag = ""
+
         print("signalAlign - NOTICE: template model {t} complement model {c}"
               "".format(t=self.in_templateHmm, c=self.in_complementHmm), file=sys.stderr)
 
@@ -1331,30 +1350,35 @@ class SignalAlignment(object):
             degenerate_flag = "-o {} ".format(self.degenerate)
         else:
             degenerate_flag = ""
+
+        if self.twoD_chemistry:
+            twoD_flag = "--twoD"
+        else:
+            twoD_flag = ""
         # commands
         if get_expectations:
             template_expectations_file_path = self.destination + read_name + ".template.expectations"
             complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
 
             command = \
-                "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
+                "echo {cigar} | {vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} " \
                 "-t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag,
                         f_ref=forward_ref_flag, b_ref=backward_ref_flag,
-                        npRead=temp_npRead, readLabel=read_label,
+                        npRead=temp_npRead, readLabel=read_label, td=twoD_flag,
                         templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag, degen=degenerate_flag, sparse=out_fmt)
         else:
             command = \
-                "echo {cigar} | {vA} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
+                "echo {cigar} | {vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} " \
                 "-u {posteriors} {hdp}-L {readLabel}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
                         f_ref=forward_ref_flag, b_ref=backward_ref_flag,
-                        readLabel=read_label, npRead=temp_npRead,
+                        readLabel=read_label, npRead=temp_npRead, td=twoD_flag,
                         t_model=template_model_flag, c_model=complement_model_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag)

@@ -60,6 +60,14 @@ NanoporeRead *loadTestR9NanoporeRead() {
     return npRead;
 }
 
+NanoporeRead *loadTestR94NanopreRead(CuTest *testCase) {
+    char *npReadFile = stString_print("../tests/test_npReads/r9p4_oneD.npRead");
+    CuAssertTrue(testCase, stFile_exists(npReadFile));
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    free(npReadFile);
+    return npRead;
+}
+
 StateMachine *loadScaledStateMachine3(NanoporeRead *npRead) {
     char *templateModelFile = stString_print("../../signalAlign/models/testModelR73_acegot_template.model");
     StateMachine *sMt = getStateMachine3(templateModelFile);
@@ -97,6 +105,14 @@ StateMachine *load5merR9DescaledStateMachine3(NanoporeRead *npRead) {
     return sM;
 }
 
+StateMachine *loadR94DescaledStateMachine3(CuTest *testCase, NanoporeRead *npRead) {
+    char *templateModelFile = stString_print("../models/testModelR9p4_acegt_template.model");
+    CuAssertTrue(testCase, stFile_exists(templateModelFile));
+    StateMachine *sM = getStateMachine3_descaled(templateModelFile, npRead->templateParams, FALSE);
+    free(templateModelFile);
+    return sM;
+}
+
 StateMachine *loadStateMachineHdp(NanoporeRead *npRead) {
     char *modelFile = stString_print("../../signalAlign/models/testModelR73_acegot_template.model");
     NanoporeHDP *nHdp = deserialize_nhdp("../../signalAlign/models/templateSingleLevelFixed.nhdp");
@@ -110,6 +126,13 @@ stList *getRemappedAnchors(Sequence *ref, NanoporeRead *npRead, PairwiseAlignmen
 
     // remap and filter
     stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
+    return filteredRemappedAnchors;
+}
+
+stList *get1dRemappedAnchors(Sequence *ref, NanoporeRead *npRead, PairwiseAlignmentParameters *p) {
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters((char *)ref->elements, npRead->templateRead, p);
+    stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateStrandEventMap);
     stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
     return filteredRemappedAnchors;
 }
@@ -677,7 +700,6 @@ static inline void test_stateMachine(CuTest *testCase, StateMachine *sM, Nanopor
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        1, 1);
     checkAlignedPairs(testCase, alignedPairs, refSeq->length, npRead->nbTemplateEvents);
-
     CuAssertIntEquals(testCase, stList_length(alignedPairs), targetAlignedPairs);
 
     stList_destruct(filteredRemappedAnchors);
@@ -713,6 +735,37 @@ static void test_r9StateMachineWithBanding(CuTest *testCase) {
     nanopore_nanoporeReadDestruct(npRead);
     sequence_destruct(refSeq);
 }
+
+static void test_r94StateMachineWithBanding(CuTest *testCase) {
+    NanoporeRead *npRead = loadTestR94NanopreRead(testCase);
+    StateMachine *sM = loadR94DescaledStateMachine3(testCase, npRead);
+    Sequence *refSeq = getEcoliReferenceSequence(sM->kmerLength); 
+    signalUtils_estimateNanoporeParams(sM, npRead, &npRead->templateParams, 0.0,
+                                       signalUtils_templateOneDAssignmentsFromRead,
+                                       nanopore_adjustTemplateEventsForDrift);
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = 0.01;
+    // get anchors using lastz
+    stList *filteredRemappedAnchors = get1dRemappedAnchors(refSeq, npRead, p);
+    // make the event sequence object
+    Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
+                                                  sequence_sliceEventSequence, event);
+
+    // do alignment with scaled stateMachine
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       1, 1);
+    checkAlignedPairs(testCase, alignedPairs, refSeq->length, npRead->nbTemplateEvents);
+    CuAssertIntEquals(testCase, stList_length(alignedPairs), 12784);
+
+    stList_destruct(filteredRemappedAnchors);
+    sequence_destruct(eventSequence);
+    stList_destruct(alignedPairs);
+    pairwiseAlignmentBandingParameters_destruct(p);
+    
+}
+
 
 static void test_r9_5merModel(CuTest *testCase) {
     NanoporeRead *npRead = loadTestR9NanoporeRead();
@@ -1232,6 +1285,7 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3_5merDiagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_stateMachine3_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_r9StateMachineWithBanding);
+    SUITE_ADD_TEST(suite, test_r94StateMachineWithBanding);
     SUITE_ADD_TEST(suite, test_r9_5merModel);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_sm3Hdp_setModelToHdpExpectedValues);
