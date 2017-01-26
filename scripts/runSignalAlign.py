@@ -24,6 +24,7 @@ def parse_args():
                         help="directory to put the alignments")
     # optional arguments
     parser.add_argument("--2d", action='store_true', dest="twoD", default=False)
+    parser.add_argument("--bwt", action='store', dest="bwt", default=None)
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -160,9 +161,13 @@ def main(args):
                                             sub_char=args.ambig_char)
 
     # index the reference for bwa
-    print("signalAlign - indexing reference", file=sys.stderr)
-    bwa_ref_index = get_bwa_index(args.ref, temp_dir_path)
-    print("signalAlign - indexing reference, done", file=sys.stderr)
+    if args.bwt is not None:
+        print("signalAlign - using provided BWT %s" % args.bwt)
+        bwa_ref_index = args.bwt
+    else:
+        print("signalAlign - indexing reference", file=sys.stderr)
+        bwa_ref_index = get_bwa_index(args.ref, temp_dir_path)
+        print("signalAlign - indexing reference, done", file=sys.stderr)
 
     # parse the target regions, if provided
     if args.target_regions is not None:
@@ -207,9 +212,9 @@ def main(args):
             "degenerate": degenerate_enum(args.degenerate),
             "twoD_chemistry": args.twoD,
         }
-        #alignment = SignalAlignment(**alignment_args)
-        #alignment.run()
-        work_queue.put(alignment_args)
+        alignment = SignalAlignment(**alignment_args)
+        alignment.run()
+        #work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))

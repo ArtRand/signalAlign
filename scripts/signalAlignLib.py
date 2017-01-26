@@ -607,6 +607,7 @@ class NanoporeRead(object):
 
     def initialize(self):
         highest_1d_basecall = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
+        print(highest_1d_basecall, self.is_open)
         oneD_root_address = "/Analyses/Basecall_1D_00{}".format(highest_1d_basecall)
         self.version = self.fastFive[oneD_root_address].attrs["dragonet version"]
         assert(self.version == "1.23.0"), "Unsupported version {}".format(self.version)
