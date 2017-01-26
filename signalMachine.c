@@ -614,10 +614,9 @@ int main(int argc, char *argv[]) {
 
     stList *anchorPairs = signalUtils_guideAlignmentToRebasedAnchorPairs(pA, p);  // pA gets modified here, no turning back
 
-    if ((templateExpectationsFile != NULL) && (complementExpectationsFile != NULL)) {
+    if ((templateExpectationsFile != NULL) || (complementExpectationsFile != NULL)) {
         st_uglyf("Starting expectations routine\n");
         // Expectation Routine //
-        // TODO XXX TODO XXX needs 1D R9.4 refacotoring
         StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, nHdpT);
 
         // temporary way to 'turn off' estimates if I want to
@@ -632,7 +631,8 @@ int main(int argc, char *argv[]) {
         // get expectations for template
         fprintf(stderr, "signalAlign - getting expectations for template\n");
 
-        getSignalExpectations(sMt, templateExpectations, tEventSequence, npRead->templateEventMap,
+        getSignalExpectations(sMt, templateExpectations, tEventSequence,
+                              (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),
                               pA->start2,
                               R->getTemplateTargetSequence(R),
                               p, anchorPairs, degenerate);
@@ -648,43 +648,49 @@ int main(int argc, char *argv[]) {
         hmmContinuous_writeToFile(templateExpectationsFile, templateExpectations, sMtype);
 
         // get expectations for the complement
-        fprintf(stderr, "signalAlign - getting expectations for complement\n");
+        StateMachine *sMc;
+        Hmm *complementExpectations = NULL;
+        if (twoD) {
+            fprintf(stderr, "signalAlign - getting expectations for complement\n");
 
-        StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, nHdpC);
+            sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, nHdpC);
 
-        if (ESTIMATE_PARAMS) {
-            signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
-                                               signalUtils_complementOneDAssignmentsFromRead,
-                                               nanopore_adjustComplementEventsForDrift);
+            if (ESTIMATE_PARAMS) {
+                signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
+                                                   signalUtils_complementOneDAssignmentsFromRead,
+                                                   nanopore_adjustComplementEventsForDrift);
+            }
+
+            complementExpectations = hmmContinuous_getExpectationsHmm(sMc, p->threshold, 0.001, 0.001);
+            
+            getSignalExpectations(sMc, complementExpectations, cEventSequence, npRead->complementEventMap,
+                                  pA->start2,
+                                  R->getComplementTargetSequence(R),
+                                  p, anchorPairs, degenerate);
+
+            if (sMtype == threeStateHdp) {
+                fprintf(stderr, "signalAlign - got %"PRId64"complement HDP assignments\n",
+                        hmmContinuous_howManyAssignments(complementExpectations));
+            }
+            // write to file
+            fprintf(stderr, "signalAlign - writing expectations to file: %s\n", complementExpectationsFile);
+            hmmContinuous_writeToFile(complementExpectationsFile, complementExpectations, sMtype);
         }
 
-        Hmm *complementExpectations = hmmContinuous_getExpectationsHmm(sMc, p->threshold, 0.001, 0.001);
-        
-        getSignalExpectations(sMc, complementExpectations, cEventSequence, npRead->complementEventMap,
-                              pA->start2,
-                              R->getComplementTargetSequence(R),
-                              p, anchorPairs, degenerate);
-
-        if (sMtype == threeStateHdp) {
-            fprintf(stderr, "signalAlign - got %"PRId64"complement HDP assignments\n",
-                    hmmContinuous_howManyAssignments(complementExpectations));
-        }
-
-        // write to file
-        fprintf(stderr, "signalAlign - writing expectations to file: %s\n", complementExpectationsFile);
-        hmmContinuous_writeToFile(complementExpectationsFile, complementExpectations, sMtype);
 
         stateMachine_destruct(sMt);
-        stateMachine_destruct(sMc);
         signalUtils_ReferenceSequenceDestruct(R);
         hmmContinuous_destruct(templateExpectations, sMtype);
-        hmmContinuous_destruct(complementExpectations, sMtype);
         nanopore_nanoporeReadDestruct(npRead);
         sequence_destruct(tEventSequence);
-        sequence_destruct(cEventSequence);
         pairwiseAlignmentBandingParameters_destruct(p);
         destructPairwiseAlignment(pA);
         stList_destruct(anchorPairs);
+        if (twoD) {
+            stateMachine_destruct(sMc);
+            sequence_destruct(cEventSequence);
+            hmmContinuous_destruct(complementExpectations, sMtype);
+        }
         return 0;
     } else {
         // Alignment Procedure //
@@ -709,7 +715,6 @@ int main(int argc, char *argv[]) {
                                                               pA->start2, R->getTemplateTargetSequence(R),
                                                               p, anchorPairs,
                                                               degenerate);
-        st_uglyf("--> got %lld template aligned pairs\n", stList_length(templateAlignedPairs));
         double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
         // sort
@@ -717,7 +722,6 @@ int main(int argc, char *argv[]) {
 
         // write to file
         if (posteriorProbsFile != NULL) {
-            st_uglyf("--> about to write down alignment\n");
             outputAlignment(outFmt, posteriorProbsFile, readLabel, sMt, npRead->templateParams, npRead->templateEvents,
                             R->getTemplateTargetSequence(R), forward, pA->contig1, tCoordinateShift, rCoordinateShift_t,
                             templateAlignedPairs, template);

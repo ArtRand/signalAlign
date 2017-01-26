@@ -26,6 +26,8 @@ def parse_args():
                         required=False, type=str,
                         help="directory to put the trained model, and use for working directory.")
     # optional arguments
+    parser.add_argument("--2d", action='store_true', dest="twoD", default=False)
+    parser.add_argument("--bwt", action='store', dest="bwt", default=None)
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", required=False,
                         help="StateMachine options: threeState, threeStateHdp")
@@ -94,7 +96,22 @@ def get_2d_length(fast5):
         return read_length
 
 
-def cull_training_files(directories, fofns, training_amount, reference_sequences):
+def get_1d_length(fast5):
+    read = h5.File(fast5, "r")
+    read_length = 0
+    template_fastq_address = "/Analyses/Basecall_1D_000/BaseCalled_template/Fastq"
+    if not (template_fastq_address in read):
+        print("Read %s has not been basecalled" % fast5)
+        read.close()
+        return 0
+    else:
+        read_length = len(read[template_fastq_address][()].split()[2])
+        print("read %s has %s bases" % (fast5, read_length))
+        read.close()
+        return read_length
+
+
+def cull_training_files(directories, fofns, training_amount, reference_maps, twoD):
     def get_file_list():
         source_list_tups = []
         if fofns is not None:
@@ -115,22 +132,23 @@ def cull_training_files(directories, fofns, training_amount, reference_sequences
 
     sources_and_files = get_file_list()
 
-    assert len(sources_and_files) == len(reference_sequences), "Need to have equal number of references as training " \
-                                                               "file directories."
+    assert len(sources_and_files) == len(reference_maps), "Need to have equal number of references as training " \
+                                                          "file directories."
     # loop over the directories and collect reads for training
     for j, tup in enumerate(sources_and_files):
         assert len(tup) == 2
-        source = tup[0]
-        fast5s = tup[1]
+        source = tup[0]  # the directory or the fofn
+        fast5s = tup[1]  # the list of files (paths)
         shuffle(fast5s)
         total_amount = 0
         n = 0
+        get_seq_len_fcn = get_2d_length if twoD else get_1d_length
         # loop over files and add them to training list, break when we have enough bases to complete a batch
         # make a list of tuples [(fast5_path, (plus_ref_seq, minus_ref_seq))]
         for i in xrange(len(fast5s)):
-            add_to_training_files((fast5s[i], reference_sequences[j]))
+            add_to_training_files((fast5s[i], reference_maps[j]))
             n += 1
-            total_amount += get_2d_length(fast5s[i])
+            total_amount += get_seq_len_fcn(fast5s[i])
             if total_amount >= training_amount:
                 break
         print("Culled {nb_files} training files, for {bases} from {dir}.".format(nb_files=n, bases=total_amount,
@@ -261,6 +279,7 @@ def main(args):
     # if we are performing supervised training with multiple kinds of substitutions, then we
     # need to make a reference sequence for each one
     if args.substitution_file is not None:
+        raise NotImplementedError
         assert args.ambig_char is not None, "Need to provide nucleotide to substitute"
         reference_sequences = []
         for sub_char in args.ambig_char:
@@ -274,17 +293,18 @@ def main(args):
                                              sub_char=sub_char)
             reference_sequences.append((plus_strand_sequence, minus_strand_sequence))
     else:
-        plus_strand_sequence = working_folder.add_file_path("forward_reference.txt")
-        minus_strand_sequence = working_folder.add_file_path("backward_reference.txt")
-        make_temp_sequence(fasta=args.ref,
-                           sequence_outfile=plus_strand_sequence,
-                           rc_sequence_outfile=minus_strand_sequence)
-        reference_sequences = [(plus_strand_sequence, minus_strand_sequence)]
+        reference_map = process_reference_fasta(fasta=args.ref,
+                                                work_folder=working_folder)
+        reference_maps = [reference_map]
 
     # index the reference for bwa
-    print("signalAlign - indexing reference", file=sys.stderr)
-    bwa_ref_index = get_bwa_index(args.ref, working_directory_path)
-    print("signalAlign - indexing reference, done", file=sys.stderr)
+    if args.bwt is not None:
+        print("signalAlign - Using provided BWT")
+        bwa_ref_index = args.bwt
+    else:
+        print("signalAlign - indexing reference", file=sys.stderr)
+        bwa_ref_index = get_bwa_index(args.ref, working_directory_path)
+        print("signalAlign - indexing reference, done", file=sys.stderr)
 
     # the default lookup tables are the starting conditions for the model if we're starting from scratch
     # todo next make get default model function based on version inferred from reads
@@ -335,9 +355,8 @@ def main(args):
     i = 0
     while i < args.iter:
         # first cull a set of files to get expectations on
-        #training_files = cull_training_files(args.files_dir, args.amount, reference_sequences)
         training_files = cull_training_files(directories=args.files_dir, fofns=args.fofn, training_amount=args.amount,
-                                             reference_sequences=reference_sequences)
+                                             reference_maps=reference_maps, twoD=args.twoD)
         # setup
         workers = args.nb_jobs
         work_queue = Manager().Queue()
@@ -348,8 +367,7 @@ def main(args):
         # file_ref_tuple should be (fast5, (plus_ref_seq, minus_ref_seq))
         for file_ref_tuple in training_files:
             alignment_args = {
-                "forward_reference": file_ref_tuple[1][0],   # this is the plus strand sequence
-                "backward_reference": file_ref_tuple[1][1],  # this is the minus strand sequence
+                "reference_map": file_ref_tuple[1],
                 "path_to_EC_refs": None,
                 "destination": working_directory_path,
                 "stateMachineType": args.stateMachineType,
@@ -358,18 +376,17 @@ def main(args):
                 "in_complementHmm": complement_hmm,
                 "in_templateHdp": template_hdp,
                 "in_complementHdp": complement_hdp,
-                "banded": True, #args.banded,
-                #"output_format": "full",
                 "in_fast5": file_ref_tuple[0],  # fast5
                 "threshold": args.threshold,
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
                 "target_regions": None,
                 "degenerate": None,
+                "twoD_chemistry": args.twoD,
             }
-            #alignment = SignalAlignment(**alignment_args)
-            #alignment.run(get_expectations=True)
-            work_queue.put(alignment_args)
+            alignment = SignalAlignment(**alignment_args)
+            alignment.run(get_expectations=True)
+            #work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))
@@ -442,4 +459,3 @@ def main(args):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
-

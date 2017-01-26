@@ -1203,7 +1203,6 @@ class SignalAlignment(object):
         temp_samfile = temp_folder.add_file_path("temp_sam_file_{read}.sam".format(read=read_label))
 
         # make the npRead and fasta
-        ## XXX check for chemistry, given as input
         if not self.twoD_chemistry:
             ok, version, pop_1 = prepareOneD(fast5=self.in_fast5, npRead_path=temp_npRead, oneD_read_path=read_fasta)
         else:
@@ -1212,7 +1211,7 @@ class SignalAlignment(object):
                                                                        twod_read_path=read_fasta)
 
         if not ok:
-            print("file {file} does not have 2D or is corrupt".format(file=read_label), file=sys.stderr)
+            print("file {file} does not have is corrupt".format(file=read_label), file=sys.stderr)
             temp_folder.remove_folder()
             return False
 
