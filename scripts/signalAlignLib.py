@@ -161,8 +161,8 @@ def process_reference_fasta(fasta, work_folder, motif_key=None, sub_char=None):
         # the motif label allows us to make multiple copies of the reference with unique file names
         motif_lab = "" if motif_key is None else "%s." % motif_key
         # these are the paths to the flat files that have the references
-        fw_path = work_folder.add_file_path("%s%s.forward.txt" % (motif_lab, header))
-        bw_path = work_folder.add_file_path("%s%s.backward.txt" % (motif_lab, header))
+        fw_path = work_folder.add_file_path("%s%s.%s.forward.txt" % (motif_lab, header, sub_char))
+        bw_path = work_folder.add_file_path("%s%s.%s.backward.txt" % (motif_lab, header, sub_char))
         # signalAlign likes uppercase
         if motif_key is not None:
             motif = getMotif(motif_key, sequence)

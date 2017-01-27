@@ -72,8 +72,9 @@ def parse_args():
     #parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
     #                    help="Specify degenerate nucleotide options: "
     #                         "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
-    parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
-                        dest='substitution_file', help="Ambiguity positions")
+    #parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
+    #                    dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument("--motif", action="store", dest="motif_key", default=None)
     parser.add_argument('--ambig_char', '-X', action='append', required=False, default=None, type=str, dest='ambig_char',
                         help="Character to substitute at positions, default is 'X'.")
     #parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
@@ -278,20 +279,10 @@ def main(args):
 
     # if we are performing supervised training with multiple kinds of substitutions, then we
     # need to make a reference sequence for each one
-    if args.substitution_file is not None:
-        raise NotImplementedError
-        assert args.ambig_char is not None, "Need to provide nucleotide to substitute"
-        reference_sequences = []
+    if args.ambig_char is not None:
+        reference_maps = []
         for sub_char in args.ambig_char:
-            plus_strand_sequence = working_folder.add_file_path("forward_reference_{}.txt".format(sub_char))
-            minus_strand_sequence = working_folder.add_file_path("backward_reference_{}.txt".format(sub_char))
-            add_ambiguity_chars_to_reference(input_fasta=args.ref,
-                                             substitution_file=args.substitution_file,
-                                             sequence_outfile=plus_strand_sequence,
-                                             rc_sequence_outfile=minus_strand_sequence,
-                                             degenerate_type=None,
-                                             sub_char=sub_char)
-            reference_sequences.append((plus_strand_sequence, minus_strand_sequence))
+            reference_maps.append(process_reference_fasta(args.ref, args.motif_key, working_folder, sub_char))
     else:
         reference_map = process_reference_fasta(fasta=args.ref,
                                                 work_folder=working_folder)
