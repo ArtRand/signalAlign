@@ -39,6 +39,8 @@ class AbstractSequenceMotif(object):
             return "C"
         elif base == "T":
             return "A"
+        elif base == "N":
+            return "N"
         else:
             raise RuntimeError
 
