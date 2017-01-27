@@ -50,8 +50,9 @@ def parse_args():
                         required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
                         required=False, default=None, help="tab separated table with regions to align to")
-    parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
-                        dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument("--motif", action="store", dest="motif_key", default=None)
+    #parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
+    #                    dest='substitution_file', help="Ambiguity positions")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
@@ -155,9 +156,8 @@ def main(args):
     temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
 
     reference_map = process_reference_fasta(fasta=args.ref,
+                                            motif_key=args.motif_key,
                                             work_folder=temp_folder,
-                                            substitution_file=args.substitution_file,
-                                            degenerate_type=args.degenerate,
                                             sub_char=args.ambig_char)
 
     # index the reference for bwa

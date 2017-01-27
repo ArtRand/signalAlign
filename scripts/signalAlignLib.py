@@ -10,6 +10,7 @@ import re
 import numpy as np
 from itertools import islice, izip
 from random import shuffle
+from motif import getMotif
 from serviceCourse.sequenceTools import reverse_complement
 from serviceCourse.parsers import read_fasta
 from serviceCourse.file_handlers import FolderHandler
@@ -150,62 +151,31 @@ def parse_substitution_file2(substitution_file):
     return positions
 
 
-def process_reference_fasta(fasta, work_folder,
-                            substitution_file=None, degenerate_type=None, sub_char=None):
+def process_reference_fasta(fasta, work_folder, motif_key=None, sub_char=None):
     """loops over all of the contigs in the reference file, writes the forward and backward sequences
     as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
     names as keys and the paths to the processed sequence as keys
     """
-    def add_ambiguity_positions(positions):
-        # type: (dict<string, dict<string, list>>, string)
-        def check_substitution(position, seq):
-            sub_out = seq[position]
-            if sub_out == sub_char:
-                return True  # no change
-            if sub_char == "I" and sub_out != "A":
-                return False
-            if (sub_char == "E" or sub_char == "O") and sub_out != "C":
-                return False
-            if sub_char == "X":
-                if degenerate_type is None:
-                    return False
-                if sub_out == "C" and degenerate_type not in ["cytosine2", "cytosine3"]:
-                    return False
-                if sub_out == "A" and degenerate_type not in ["adenosine"]:
-                    return False
-            return True
-
-        def make_substitutions(positions, sequence_as_list):
-            for pos in positions:
-                ok = check_substitution(position=pos, seq=sequence_as_list)
-                assert ok, "[process_reference_fasta.make_substitutions]Cannot sub {orig} for {sub} at"\
-                           "{position}".format(orig=sequence_as_list[pos], sub=sub_char, position=pos)
-                sequence_as_list[pos] = sub_char
-            return ''.join(sequence_as_list)
-
-        # make into a mutable list
-        seq_li      = list(fw_sequence)
-        comp_seq_li = list(complement_sequence)
-
-        fw_subed_sequence = make_substitutions(positions[header]["forward"], seq_li)
-        bw_subed_sequence = make_substitutions(positions[header]["backward"], comp_seq_li)
-
-        return fw_subed_sequence, bw_subed_sequence
-
     ref_sequence_map = {}
-    for header, comment, fw_sequence in read_fasta(fasta):
-        fw_path = work_folder.add_file_path("{seq_name}.forward.txt".format(seq_name=header))
-        bw_path = work_folder.add_file_path("{seq_name}.backward.txt".format(seq_name=header))
-        complement_sequence = reverse_complement(fw_sequence, reverse=False, complement=True)
-
-        if substitution_file is not None:
-            positions = parse_substitution_file2(substitution_file)
-            fw_sequence, complement_sequence = add_ambiguity_positions(positions)
+    for header, comment, sequence in read_fasta(fasta):
+        # the motif label allows us to make multiple copies of the reference with unique file names
+        motif_lab = "" if motif_key is None else "%s." % motif_key
+        # these are the paths to the flat files that have the references
+        fw_path = work_folder.add_file_path("%s%s.forward.txt" % (motif_lab, header))
+        bw_path = work_folder.add_file_path("%s%s.backward.txt" % (motif_lab, header))
+        # signalAlign likes uppercase
+        if motif_key is not None:
+            motif = getMotif(motif_key, sequence)
+            fw_sequence = motif.forwardSubstitutedSequence(sub_char)
+            bw_sequence = motif.complementSubstitutedSequence(sub_char)
+        else:
+            fw_sequence = sequence.upper()
+            bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True)
 
         with open(fw_path, 'w') as fH:
             print(fw_sequence, end='\n', file=fH)
         with open(bw_path, 'w') as fH:
-            print(complement_sequence, end='\n', file=fH)
+            print(bw_sequence, end='\n', file=fH)
 
         ref_sequence_map[header] = {"forward": fw_path, "backward": bw_path}
 
