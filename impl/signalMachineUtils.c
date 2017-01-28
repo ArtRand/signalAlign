@@ -62,12 +62,10 @@ static inline void referenceSequence_reset(ReferenceSequence *self) {
 }
 
 char *referenceSequence_getTemplateTarget(ReferenceSequence *self) {
-    //return self->forward ? self->trimmedForwardSequence : self->trimmedBackwardSequence;
     return self->A->strand1 ? self->trimmedForwardSequence : self->trimmedBackwardSequence;
 }
 
 char *referenceSequence_getComplementTarget(ReferenceSequence *self) {
-    //return self->forward ? self->trimmedBackwardSequence : self->trimmedForwardSequence;
     return self->A->strand1 ? self->trimmedBackwardSequence : self->trimmedForwardSequence;
 }
 
