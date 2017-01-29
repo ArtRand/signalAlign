@@ -46,6 +46,7 @@ int main(int argc, char *argv[]) {
 
     int64_t nbSamples, burnIn, thinning, samplingGridLength, kmerLength, j;
     bool verbose = FALSE;
+    bool twoD = TRUE;
 
     double baseGamma = NULL_HYPERPARAMETER;
     double middleGamma = NULL_HYPERPARAMETER;
@@ -67,6 +68,7 @@ int main(int argc, char *argv[]) {
         static struct option long_options[] = {
                 {"help",                        no_argument,        0,  'h'},
                 {"verbose",                     no_argument,        0,  'o'},
+                {"oneD",                        no_argument,        0,  'q'},
                 {"kmerLength",                  required_argument,  0,  'a'},
                 {"HdpType",                     required_argument,  0,  'p'},
                 {"templateLookupTable",         required_argument,  0,  'T'},
@@ -94,7 +96,7 @@ int main(int argc, char *argv[]) {
                 {0, 0, 0, 0} };
 
         int option_index = 0;
-        key = getopt_long(argc, argv, "h:a:o:p:T:C:l:E:W:v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
+        key = getopt_long(argc, argv, "h:a:o:q:p:T:C:l:E:W:v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
                           long_options, &option_index);
         if (key == -1) {
             //usage();
@@ -142,6 +144,9 @@ int main(int argc, char *argv[]) {
                 j = sscanf(optarg, "%" PRIi64 "", &thinning);
                 assert (j == 1);
                 assert (thinning >= 0);
+                break;
+            case 'q':
+                twoD = FALSE;
                 break;
             case 'o':
                 verbose = TRUE;
@@ -220,9 +225,10 @@ int main(int argc, char *argv[]) {
         st_errAbort("[buildHdpUtil] ERROR: Need lookup tables");
     }
     printStartMessage(hdpType, alignmentsFile, templateHdpOutfile, complementHdpOutfile);
-
+    
+    if (alignmentsFile == NULL) st_errAbort("[buildHdpUtil]Need to provide build alignment (assignments)");
     // option for building from alignment
-    if (alignmentsFile != NULL) {
+    if (twoD) {
         if (!((hdpType >= 0) && (hdpType <= 13))) {
             st_errAbort("Invalid HDP type");
         }
@@ -236,6 +242,24 @@ int main(int argc, char *argv[]) {
                                                   middleGammaAlpha, middleGammaBeta,
                                                   leafGammaAlpha, leafGammaBeta,
                                                   samplingGridStart, samplingGridEnd, samplingGridLength);
+            
+    } else {
+        if (hdpType != singleLevelPrior2 || hdpType != multisetPrior2) {
+            st_errAbort("Invalid HDP type for 1D %s", hdpType);
+        }
+        NanoporeHdpType type = (NanoporeHdpType )hdpType;
+        nanoporeHdp_buildOneDHdpFromAlignment(type, kmerLength,
+                                              templateLookupTable,
+                                              alignmentsFile,
+                                              templateHdpOutfile,
+                                              nbSamples, burnIn, thinning, verbose,
+                                              baseGamma, middleGamma, leafGamma,
+                                              baseGammaAlpha, baseGammaBeta,
+                                              middleGammaAlpha, middleGammaBeta,
+                                              leafGammaAlpha, leafGammaBeta,
+                                              samplingGridStart, samplingGridEnd, samplingGridLength);
+                                          
     }
+
     return 0;
 }

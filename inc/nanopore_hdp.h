@@ -165,6 +165,18 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kme
                                                double samplingGridStart, double samplingGridEnd,
                                                int64_t samplingGridLength);
 
+void nanoporeHdp_buildOneDHdpFromAlignment(NanoporeHdpType type, int64_t kmerLength,
+                                           const char *templateModelFile,
+                                           const char *alignments,
+                                           const char *templateHDP,
+                                           int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose,
+                                           double baseGamma, double middleGamma, double leafGamma,
+                                           double baseGammaAlpha, double baseGammaBeta,
+                                           double middleGammaAlpha, double middleGammaBeta,
+                                           double leafGammaAlpha, double leafGammaBeta,
+                                           double samplingGridStart, double samplingGridEnd,
+                                           int64_t samplingGridLength);
+
 // n^k
 int64_t power(int64_t n, int64_t k);
 //  ((n k))

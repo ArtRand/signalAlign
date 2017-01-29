@@ -1352,3 +1352,35 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kme
 }
 }
 
+void nanoporeHdp_buildOneDHdpFromAlignment(NanoporeHdpType type, int64_t kmerLength,
+                                           const char *templateModelFile,
+                                           const char *alignments,
+                                           const char *templateHDP,
+                                           int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose,
+                                           double baseGamma, double middleGamma, double leafGamma,
+                                           double baseGammaAlpha, double baseGammaBeta,
+                                           double middleGammaAlpha, double middleGammaBeta,
+                                           double leafGammaAlpha, double leafGammaBeta,
+                                           double samplingGridStart, double samplingGridEnd,
+                                           int64_t samplingGridLength) {
+    fprintf(stderr, "Updating Template HDP from alignments...\n");
+    NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile, kmerLength,
+                                                    baseGamma, middleGamma, leafGamma,
+                                                    baseGammaAlpha, baseGammaBeta,
+                                                    middleGammaAlpha, middleGammaBeta,
+                                                    leafGammaAlpha, leafGammaBeta,
+                                                    samplingGridStart, samplingGridEnd, samplingGridLength);
+    update_nhdp_from_alignment_with_filter(nHdpT, alignments, FALSE, "t");
+
+    fprintf(stderr, "Running Gibbs for template doing %"PRId64"samples, %"PRId64"burn in, %"PRId64"thinning.\n",
+            nbSamples, burnIn, thinning);
+
+    execute_nhdp_gibbs_sampling(nHdpT, nbSamples, burnIn, thinning, verbose);
+    finalize_nhdp_distributions(nHdpT);
+
+    fprintf(stderr, "Serializing template to %s...\n", templateHDP);
+    serialize_nhdp(nHdpT, templateHDP);
+    destroy_nanopore_hdp(nHdpT);
+
+}
+
