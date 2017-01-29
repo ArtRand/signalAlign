@@ -249,7 +249,7 @@ int main(int argc, char *argv[]) {
         if (hdpType != singleLevelPrior2 || hdpType != multisetPrior2) {
             st_errAbort("Invalid HDP type for 1D %s", hdpType);
         }
-        NanoporeHdpType type = (NanoporeHdpType )hdpType;
+        NanoporeHdpType type = (NanoporeHdpType) hdpType;
         nanoporeHdp_buildOneDHdpFromAlignment(type, kmerLength,
                                               templateLookupTable,
                                               alignmentsFile,
