@@ -217,11 +217,11 @@ int main(int argc, char *argv[]) {
     
     (void) j;
     
-    if ((templateHdpOutfile == NULL) || (complementHdpOutfile == NULL)) {
+    if ((templateHdpOutfile == NULL) || (complementHdpOutfile == NULL && twoD)) {
         st_errAbort("[buildHdpUtil] ERROR: Need to specify where to put the HDP files");
     }
 
-    if ((templateLookupTable == NULL) || (complementLookupTable == NULL)) {
+    if ((templateLookupTable == NULL) || (complementLookupTable == NULL && twoD)) {
         st_errAbort("[buildHdpUtil] ERROR: Need lookup tables");
     }
     printStartMessage(hdpType, alignmentsFile, templateHdpOutfile, complementHdpOutfile);
