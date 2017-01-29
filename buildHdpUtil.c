@@ -10,14 +10,16 @@ void usage() {
     exit(1);
 }
 
-void printStartMessage(int64_t hdpType, char *alignmentsFile, char *templateHdpOutfile, char *complementHdpOutfile) {
+void printStartMessage(int64_t hdpType, char *alignmentsFile, char *templateHdpOutfile, char *complementHdpOutfile, bool twoD) {
     fprintf(stderr, "Building Nanopore HDP\n");
     fprintf(stderr, "Making HDP type %"PRId64"\n", hdpType);
     if (alignmentsFile != NULL) {
         fprintf(stderr, "Using alignment from %s\n", alignmentsFile);
     }
     fprintf(stderr, "Putting template here: %s\n", templateHdpOutfile);
-    fprintf(stderr, "Putting complement here: %s\n", complementHdpOutfile);
+    if (twoD) {
+        fprintf(stderr, "Putting complement here: %s\n", complementHdpOutfile);
+    }
 }
 
 void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile, const char *nHdpOutFile,
@@ -224,7 +226,7 @@ int main(int argc, char *argv[]) {
     if ((templateLookupTable == NULL) || (complementLookupTable == NULL && twoD)) {
         st_errAbort("[buildHdpUtil] ERROR: Need lookup tables");
     }
-    printStartMessage(hdpType, alignmentsFile, templateHdpOutfile, complementHdpOutfile);
+    printStartMessage(hdpType, alignmentsFile, templateHdpOutfile, complementHdpOutfile, twoD);
     
     if (alignmentsFile == NULL) st_errAbort("[buildHdpUtil]Need to provide build alignment (assignments)");
     // option for building from alignment
