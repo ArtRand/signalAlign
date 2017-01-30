@@ -1281,9 +1281,10 @@ class SignalAlignment(object):
         backward_ref_flag = "-b {b_ref} ".format(b_ref=backward_reference)
 
         # input HDPs
-        if (self.in_templateHdp is not None) and (self.in_complementHdp is not None):
-            hdp_flags = "-v {tHdp_loc} -w {cHdp_loc} ".format(tHdp_loc=self.in_templateHdp,
-                                                              cHdp_loc=self.in_complementHdp)
+        if (self.in_templateHdp is not None) or (self.in_complementHdp is not None):
+            hdp_flags = "-v {tHdp_loc} ".format(tHdp_loc=self.in_templateHdp)
+            if self.twoD_chemistry and self.in_complementHdp is not None:
+                hdp_flags += "-w {cHdp_loc} ".format(cHdp_loc=self.in_complementHdp)
         else:
             hdp_flags = ""
 
