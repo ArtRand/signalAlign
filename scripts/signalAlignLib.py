@@ -1192,7 +1192,10 @@ class SignalAlignment(object):
         elif self.stateMachineType == "threeStateHdp":
             model_label = ".sm3Hdp"
             stateMachineType_flag = "--sm3Hdp "
-            assert (self.in_templateHdp is not None) and (self.in_complementHdp is not None), "Need to provide HDPs"
+            if self.twoD_chemistry:
+                assert self.in_templateHdp is not None, "Need to provide Template HDP"
+            else:
+                assert (self.in_templateHdp is not None) and (self.in_complementHdp is not None), "Need to provide HDPs"
         else:  # make invalid stateMachine control?
             model_label = ".sm"
             stateMachineType_flag = ""
