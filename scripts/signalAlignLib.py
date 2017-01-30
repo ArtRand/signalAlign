@@ -527,6 +527,7 @@ class NanoporeRead(object):
         # load the fast5
         self.filename = fast_five_file
         self.is_open = self.open()
+        self.read_label = ""
         self.alignment_table_sequence = ""     # the sequence made by assembling the alignment table
         self.template_events = []              # template event sequence
         self.complement_events = []            # complement event sequence
@@ -576,6 +577,7 @@ class NanoporeRead(object):
                 return highest - 1
 
     def initialize(self):
+        # TODO add try/except or something here to check for files that haven't been base-called
         highest_1d_basecall = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
         print(highest_1d_basecall, self.is_open)
         oneD_root_address = "/Analyses/Basecall_1D_00{}".format(highest_1d_basecall)
@@ -585,6 +587,7 @@ class NanoporeRead(object):
         self.template_model_address = oneD_root_address + "/BaseCalled_template/Model"
         self.template_model_id = self.get_model_id(oneD_root_address + "/Summary/basecall_1d_template")
         self.template_read = self.fastFive[oneD_root_address + "/BaseCalled_template/Fastq"][()].split()[2]
+        self.read_label = self.fastFive[oneD_root_address + "/BaseCalled_template/Fastq"][()].split()[0][1:]
         self.kmer_length = len(self.fastFive[self.template_event_table_address][0][4])
         return
 
@@ -1193,9 +1196,9 @@ class SignalAlignment(object):
             model_label = ".sm3Hdp"
             stateMachineType_flag = "--sm3Hdp "
             if self.twoD_chemistry:
-                assert self.in_templateHdp is not None, "Need to provide Template HDP"
-            else:
                 assert (self.in_templateHdp is not None) and (self.in_complementHdp is not None), "Need to provide HDPs"
+            else:
+                assert self.in_templateHdp is not None, "Need to provide Template HDP"
         else:  # make invalid stateMachine control?
             model_label = ".sm"
             stateMachineType_flag = ""
