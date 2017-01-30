@@ -193,7 +193,7 @@ def main(args):
     for fast5 in fast5s:
         alignment_args = {
             "reference_map": reference_map,
-            "path_to_EC_refs": (temp_dir_path if args.error_correct else None),
+            "path_to_EC_refs": None,  # TODO refactor this out!
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,
