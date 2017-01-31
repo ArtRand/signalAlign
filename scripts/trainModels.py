@@ -375,9 +375,9 @@ def main(args):
                 "degenerate": None,
                 "twoD_chemistry": args.twoD,
             }
-            alignment = SignalAlignment(**alignment_args)
-            alignment.run(get_expectations=True)
-            #work_queue.put(alignment_args)
+            #alignment = SignalAlignment(**alignment_args)
+            #alignment.run(get_expectations=True)
+            work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))

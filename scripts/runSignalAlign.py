@@ -210,9 +210,9 @@ def main(args):
             "degenerate": degenerate_enum(args.degenerate),
             "twoD_chemistry": args.twoD,
         }
-        alignment = SignalAlignment(**alignment_args)
-        alignment.run()
-        #work_queue.put(alignment_args)
+        #alignment = SignalAlignment(**alignment_args)
+        #alignment.run()
+        work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))
