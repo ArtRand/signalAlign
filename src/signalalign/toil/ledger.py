@@ -5,19 +5,56 @@ import gzip
 import tarfile
 import cPickle
 
+from itertools import chain
+
+from bd2k.util.humanize import human2bytes
 from toil_lib import require
 from toil_lib.files import tarball_files
 
 from margin.toil.localFileManager import LocalFile, urlDownload, deliverOutput
-
 from signalalign.nanoporeRead import NanoporeRead
 
 
 def makeReadstoreJobFunction(job, config, samples):
-    ledger_fids = [job.addChildJobFn(makeNanoporeReadLedgerJobFunction, s,
-                                     config["batchsize"],
-                                     config["readstore_dir"]).rv()
-                   for s in samples]
+    tar_fids = [job.addChildJobFn(prepareFast5Tarfile,
+                                  human2bytes(config["split_tars_bigger_than_this"]),
+                                  config["put_this_many_reads_in_a_tar"],
+                                  sample).rv()
+                for sample in samples]
+    job.addFollowOnJobFn(makeLedgerJobFunction, config, tar_fids)
+
+
+def prepareFast5Tarfile(job, split_tars_bigger_than_this, batchsize, rs_sample):
+    job.fileStore.logToMaster("[prepareFast5Tarfile]Working on sample %s" % rs_sample.sample_label)
+    workdir = job.fileStore.getLocalTempDir()
+    archive = LocalFile(workdir=workdir, filename="%s.tar" % uuid.uuid4().hex)
+    urlDownload(job, rs_sample.URL, archive)
+
+    _handle = tarfile.open(archive.fullpathGetter(), "r")
+    members = _handle.getmembers()[1:]  # the first member is often just the directory with the fast5s
+    paths   = [os.path.join(workdir, m.name) for m in members]
+    _handle.extractall(path=workdir)
+
+    if rs_sample.size >= split_tars_bigger_than_this:
+        _iter     = [paths[i:i + batchsize] for i in xrange(0, len(paths), batchsize)]
+        tar_fids  = [archiveBatchAndUploadToFileStore(job, b, workdir) for b in _iter]
+        _handle.close()
+        job.fileStore.logToMaster("[prepareFast5Tarfile]Split %s into %s smaller tars"
+                                  % (rs_sample.sample_label, len(tar_fids)))
+        return tar_fids
+    else:
+        tar_fid = archiveBatchAndUploadToFileStore(job, paths, workdir)
+        _handle.close()
+        return [tar_fid]
+
+
+def makeLedgerJobFunction(job, config, tar_fids):
+    tar_fid_iter = chain(*tar_fids)
+    ledger_fids  = [job.addChildJobFn(makeNanoporeReadLedgerJobFunction,
+                                      fid,
+                                      config["NanoporeRead_batchsize"],
+                                      config["readstore_dir"]).rv()
+                    for fid in tar_fid_iter]
     job.addFollowOnJobFn(deliverLedgerJobFunction, config, ledger_fids)
     return
 
@@ -35,29 +72,23 @@ def deliverLedgerJobFunction(job, config, ledger_fids):
     deliverOutput(job, fn, config["readstore_ledger_dir"])
 
 
-def makeNanoporeReadLedgerJobFunction(job, sample, batchsize, readstore_dir):
-    def check_and_write(filepath):
-        require(os.path.exists(filepath), "[makeNanoporeReadLedgerJobFunction]Missing %s" % filepath)
-        return job.fileStore.writeGlobalFile(filepath)
+def archiveBatchAndUploadToFileStore(parent_job, batch, workdir):
+    tarname = "%s.tmp" % uuid.uuid4().hex
+    tarpath = os.path.join(workdir, tarname)
+    tarball_files(tar_name=tarname, file_paths=batch, output_dir=workdir)
+    require(os.path.exists(tarpath), "[makeNanoporeReadLedgerJobFunction]Didn't make smaller tar")
+    return parent_job.fileStore.writeGlobalFile(tarpath)
 
-    def tar_and_make_send_batch(batch):
-        tarname = "%s.tmp" % uuid.uuid4().hex
-        tarpath = os.path.join(workdir, tarname)
-        tarball_files(tar_name=tarname, file_paths=batch, output_dir=workdir)
-        require(os.path.exists(tarpath), "[makeNanoporeReadLedgerJobFunction]Didn't make smaller tar")
-        return job.fileStore.writeGlobalFile(tarpath)
-    job.fileStore.logToMaster("[makeNanoporeReadLedgerJobFunction]Working on sample %s" % sample.sample_label)
-    # download the sample locally
+
+def makeNanoporeReadLedgerJobFunction(job, tar_fid, batchsize, readstore_dir):
     workdir        = job.fileStore.getLocalTempDir()
-    minion_archive = LocalFile(workdir=workdir, filename="%s.tmp" % uuid.uuid4().hex)
-    urlDownload(job, sample.URL, minion_archive)
-    require(os.path.exists(minion_archive.fullpathGetter()),
-            "[makeNanoporeReadLedgerJobFunction]Didn't download tar from {url} to {path}"
-            "".format(url=sample.URL, path=minion_archive.fullpathGetter()))
-
+    minion_archive = job.fileStore.readGlobalFile(tar_fid)
+    #minion_archive = LocalFile(workdir=workdir, filename="%s.tmp" % uuid.uuid4().hex)
+    #urlDownload(job, sample.URL, minion_archive)
     # make batches and send child jobs to make NanoporeReads out of them
-    tar_handle   = tarfile.TarFile(minion_archive.fullpathGetter(), "r")
-    members      = tar_handle.getmembers()[1:]
+    #tar_handle   = tarfile.TarFile(minion_archive.fullpathGetter(), "r")
+    tar_handle   = tarfile.open(minion_archive, "r:gz")
+    members      = tar_handle.getmembers()
     member_paths = [os.path.join(workdir, m.name) for m in members]
     tar_handle.extractall(path=workdir)
     require(batchsize <= len(member_paths),
@@ -66,10 +97,11 @@ def makeNanoporeReadLedgerJobFunction(job, sample, batchsize, readstore_dir):
 
     member_iter   = [member_paths[i:i + batchsize]
                      for i in xrange(0, len(member_paths), batchsize)]
-    tar_fids      = map(tar_and_make_send_batch, member_iter)
+    #tar_fids      = map(tar_and_make_send_batch, member_iter)
+    tar_fids      = [archiveBatchAndUploadToFileStore(job, b, workdir) for b in member_iter]
     ledger_shards = [job.addChildJobFn(makeNanoporeReadsJobFunction, fid, readstore_dir, cores=0.5).rv()
                      for fid in tar_fids]
-
+    tar_handle.close()
     return job.addFollowOnJobFn(consolidateLedgerShardsJobFunction, ledger_shards).rv()
 
 
@@ -96,15 +128,15 @@ def makeNanoporeReadsJobFunction(job, tar_fid, readstore_dir):
         l = "%s\t%s" % (line[0], line[1])  # read_label, npread URL
         fH.write(l)
 
-    workdir = job.fileStore.getLocalTempDir()
-    tar = job.fileStore.readGlobalFile(tar_fid)
-    # TODO make this a function, opens the tar, extracts, and returns members
+    workdir    = job.fileStore.getLocalTempDir()
+    tar        = job.fileStore.readGlobalFile(tar_fid)
     tar_handle = tarfile.open(tar, "r:gz")
-    members = tar_handle.getmembers()
-    members = [os.path.join(workdir, m.name) for m in members]
+    members    = tar_handle.getmembers()
+    members    = [os.path.join(workdir, m.name) for m in members]
     tar_handle.extractall(path=workdir)
     [require(os.path.exists(m), "[makeNanoporeReadsJobFunction]Missing member %s" % m) for m in members]
     ledger_lines = map(makeNanoporeRead, members)
+    tar_handle.close()
 
     ledger_shard = job.fileStore.getLocalTempFile()
     _handle      = open(ledger_shard, "w")
