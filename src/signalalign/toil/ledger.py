@@ -36,8 +36,8 @@ def prepareFast5Tarfile(job, split_tars_bigger_than_this, batchsize, rs_sample):
     _handle.extractall(path=workdir)
 
     if rs_sample.size >= split_tars_bigger_than_this:
-        _iter     = [paths[i:i + batchsize] for i in xrange(0, len(paths), batchsize)]
-        tar_fids  = [archiveBatchAndUploadToFileStore(job, b, workdir) for b in _iter]
+        _iter    = [paths[i:i + batchsize] for i in xrange(0, len(paths), batchsize)]
+        tar_fids = [archiveBatchAndUploadToFileStore(job, b, workdir) for b in _iter]
         _handle.close()
         job.fileStore.logToMaster("[prepareFast5Tarfile]Split %s into %s smaller tars"
                                   % (rs_sample.sample_label, len(tar_fids)))
@@ -76,20 +76,16 @@ def archiveBatchAndUploadToFileStore(parent_job, batch, workdir):
     tarname = "%s.tmp" % uuid.uuid4().hex
     tarpath = os.path.join(workdir, tarname)
     tarball_files(tar_name=tarname, file_paths=batch, output_dir=workdir)
-    require(os.path.exists(tarpath), "[makeNanoporeReadLedgerJobFunction]Didn't make smaller tar")
+    require(os.path.exists(tarpath), "[archiveBatchAndUploadToFileStore]Didn't make smaller tar")
     return parent_job.fileStore.writeGlobalFile(tarpath)
 
 
 def makeNanoporeReadLedgerJobFunction(job, tar_fid, batchsize, readstore_dir):
     workdir        = job.fileStore.getLocalTempDir()
     minion_archive = job.fileStore.readGlobalFile(tar_fid)
-    #minion_archive = LocalFile(workdir=workdir, filename="%s.tmp" % uuid.uuid4().hex)
-    #urlDownload(job, sample.URL, minion_archive)
-    # make batches and send child jobs to make NanoporeReads out of them
-    #tar_handle   = tarfile.TarFile(minion_archive.fullpathGetter(), "r")
-    tar_handle   = tarfile.open(minion_archive, "r:gz")
-    members      = tar_handle.getmembers()
-    member_paths = [os.path.join(workdir, m.name) for m in members]
+    tar_handle     = tarfile.open(minion_archive, "r:gz")
+    members        = tar_handle.getmembers()
+    member_paths   = [os.path.join(workdir, m.name) for m in members]
     tar_handle.extractall(path=workdir)
     require(batchsize <= len(member_paths),
             "[makeNanoporeReadLedgerJobFunction]Cannot split %s members into batches of %s"
@@ -97,7 +93,6 @@ def makeNanoporeReadLedgerJobFunction(job, tar_fid, batchsize, readstore_dir):
 
     member_iter   = [member_paths[i:i + batchsize]
                      for i in xrange(0, len(member_paths), batchsize)]
-    #tar_fids      = map(tar_and_make_send_batch, member_iter)
     tar_fids      = [archiveBatchAndUploadToFileStore(job, b, workdir) for b in member_iter]
     ledger_shards = [job.addChildJobFn(makeNanoporeReadsJobFunction, fid, readstore_dir, cores=0.5).rv()
                      for fid in tar_fids]
@@ -108,15 +103,21 @@ def makeNanoporeReadLedgerJobFunction(job, tar_fid, batchsize, readstore_dir):
 def makeNanoporeReadsJobFunction(job, tar_fid, readstore_dir):
     def makeNanoporeRead(f5_path):
         # here we load the NanoporeRead and write it to a file
-        np = NanoporeRead(fast_five_file=f5_path, twoD=False)
+        np = NanoporeRead(fast_five_file=f5_path, twoD=False)  # make this a config arg
+        ok = np.Initialize()
+        if not ok:
+            return None
         _l = np.read_label
-        tf = job.fileStore.getLocalTempFile()
-        fH = open(tf, "w")
-        np.write_npRead(fH)
+        tF = job.fileStore.getLocalTempFile()
+        fH = open(tF, "w")
+        ok = np.Write(job, fH, initialize=False)
+        if not ok:
+            fH.close()
+            return None
         fH.close()
         # then we gzip it and deliver it to the readstore and return the ledger line
         fn = LocalFile(workdir=workdir, filename="%s.np.gz" % _l)
-        fH = open(tf, "rb")
+        fH = open(tF, "rb")
         gz = gzip.open(fn.fullpathGetter(), "wb")
         shutil.copyfileobj(fH, gz)
         fH.close()
@@ -140,7 +141,7 @@ def makeNanoporeReadsJobFunction(job, tar_fid, readstore_dir):
 
     ledger_shard = job.fileStore.getLocalTempFile()
     _handle      = open(ledger_shard, "w")
-    [write_ledger_line(l, _handle) for l in ledger_lines]
+    [write_ledger_line(l, _handle) for l in ledger_lines if l is not None]
     _handle.close()
 
     return job.fileStore.writeGlobalFile(ledger_shard)
