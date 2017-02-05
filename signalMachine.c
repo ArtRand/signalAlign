@@ -406,7 +406,7 @@ int main(int argc, char *argv[]) {
     char *npReadFile = NULL;
     char *forwardReference = NULL;
     char *backwardReference = NULL;
-    char *errorCorrectPath = NULL;
+    char *exonerateCigarFile= NULL;
     char *posteriorProbsFile = NULL;
     char *templateExpectationsFile = NULL;
     char *complementExpectationsFile = NULL;
@@ -427,7 +427,7 @@ int main(int argc, char *argv[]) {
                 {"npRead",                  required_argument,  0,  'q'},
                 {"forward_reference",       required_argument,  0,  'f'},
                 {"backward_reference",      required_argument,  0,  'b'},
-                {"error_correct_path",      required_argument,  0,  'p'},
+                {"exonerate_cigar_file",    required_argument,  0,  'p'},
                 {"posteriors",              required_argument,  0,  'u'},
                 {"templateHdp",             required_argument,  0,  'v'},
                 {"complementHdp",           required_argument,  0,  'w'},
@@ -440,7 +440,7 @@ int main(int argc, char *argv[]) {
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:o:p:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:",
+        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -484,7 +484,7 @@ int main(int argc, char *argv[]) {
                 backwardReference= stString_copy(optarg);
                 break;
             case 'p':
-                errorCorrectPath = stString_copy(optarg);
+                exonerateCigarFile = stString_copy(optarg);
                 break;
             case 'u':
                 posteriorProbsFile = stString_copy(optarg);
@@ -531,9 +531,21 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (exonerateCigarFile == NULL) {
+        st_errAbort("[signalMachine]ERROR: Need to provide input guide alignments, exiting\n");
+        return 1;
+    }
+
     // Anchors //
     // get pairwise alignment from stdin, in exonerate CIGAR format
-    FILE *fileHandleIn = stdin;
+    //FILE *fileHandleIn = stdin;
+    if (!stFile_exists(exonerateCigarFile)) {
+        st_errAbort("[signalMachine]ERROR: Didn't find input alignment file, looked %s\n", exonerateCigarFile);
+    } else {
+        st_uglyf("[signalMachine]NOTICE: Using guide alignments from %s\n", exonerateCigarFile);
+    }
+    
+    FILE *fileHandleIn = fopen(exonerateCigarFile, "r");
     // parse input CIGAR to get anchors
     struct PairwiseAlignment *pA;
     pA = cigarRead(fileHandleIn);
@@ -572,16 +584,12 @@ int main(int argc, char *argv[]) {
     }
 
     ReferenceSequence *R;
-    if (errorCorrectPath == NULL) { // not doing error correction
-        if ((forwardReference == NULL) || (backwardReference == NULL)) {
-            st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
-                        forwardReference, backwardReference);
-        }
-        R = signalUtils_ReferenceSequenceConstructFull(forwardReference, backwardReference, pA);
-    } else {
-        R = signalUtils_ReferenceSequenceConstructEmpty(pA);
+    if ((forwardReference == NULL) || (backwardReference == NULL)) {
+        st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
+                    forwardReference, backwardReference);
     }
-
+    R = signalUtils_ReferenceSequenceConstructFull(forwardReference, backwardReference, pA);
+    
     // Nanopore Read //
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);

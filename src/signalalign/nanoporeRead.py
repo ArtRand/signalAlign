@@ -10,7 +10,8 @@ from itertools import islice
 
 TEMPLATE_BASECALL_KEY_0 = "/Analyses/Basecall_1D_000"
 TWOD_BASECALL_KEY_0     = "/Analyses/Basecall_2D_000"
-
+VERSION_KEY             = "dragonet version"
+SUPPORTED_1D_VERSIONS   = ("1.23.0", "1.22.4")
 
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False):
@@ -60,38 +61,67 @@ class NanoporeRead(object):
                 highest += 1
                 continue
             else:
-               return highest - 1
+               return address.format(highest - 1)  # the last base-called version we saw
 
-    def Initialize(self):
+    def Initialize(self, parent_job):
+        if not self.is_open:
+            ok = self.open()
+            if not ok:
+                parent_job.fileStore.logToMaster("[NanoporeRead:Initialize]ERROR opening %s" % self.filename)
+                self.close()
+                return False
         if self.twoD:
-            ok = self._initialize_twoD()
+            raise NotImplementedError
+            ok = self._initialize_twoD(parent_job)
         else:
-            ok = self._initialize()
+            ok = self._initialize(parent_job)
         return ok
 
-    def _initialize(self):
+    def _initialize(self, parent_job):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """
         if TEMPLATE_BASECALL_KEY_0 not in self.fastFive:  # not base-called
+            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s not basecalled" % self.filename)
             self.close()
             return False
 
-        highest_1d_basecall = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
-        oneD_root_address = "/Analyses/Basecall_1D_00{}".format(highest_1d_basecall)
+        oneD_root_address = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
+
+        if VERSION_KEY not in self.fastFive[oneD_root_address].attrs.keys():
+            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s missing version" % self.filename)
+            self.close()
+            return False
+
         self.version = self.fastFive[oneD_root_address].attrs["dragonet version"]
 
-        supported_oneD_versions = ("1.23.0", "1.22.4")
-        if self.version not in supported_oneD_versions:
+        if self.version not in SUPPORTED_1D_VERSIONS:
+            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s unsupported version %s "
+                                             % (self.filename, self.version))
             self.close()
             return False
 
-        self.template_event_table_address = oneD_root_address + '/BaseCalled_template/Events'
-        self.template_model_address = oneD_root_address + "/BaseCalled_template/Model"
-        self.template_model_id = self.get_model_id(oneD_root_address + "/Summary/basecall_1d_template")
-        self.template_read = self.fastFive[oneD_root_address + "/BaseCalled_template/Fastq"][()].split()[2]
-        self.read_label = self.fastFive[oneD_root_address + "/BaseCalled_template/Fastq"][()].split()[0][1:]
-        self.kmer_length = len(self.fastFive[self.template_event_table_address][0][4])
+        self.template_event_table_address = "%s/BaseCalled_template/Events" % oneD_root_address
+        self.template_model_address       = "%s/BaseCalled_template/Model" % oneD_root_address
+        self.template_model_id            = None
+
+        fastq_sequence_address = "%s/BaseCalled_template/Fastq" % oneD_root_address
+        if fastq_sequence_address not in self.fastFive:
+            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s missing fastq" % self.filename)
+            self.close()
+            return False
+
+        self.template_read        = self.fastFive[fastq_sequence_address][()].split()[2]
+        self.read_label           = self.fastFive[fastq_sequence_address][()].split()[0][1:]
+        self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
+        self.template_read_length = len(self.template_read)
+        if self.template_read_length <= 0 or not self.read_label or self.kmer_length <= 0:
+            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s illegal read parameters "
+                                             "template_read_length: %s, read_label: %s, kmer_length: %s"
+                                             % (self.template_read_length, self.read_label, self.kmer_length))
+            self.close()
+            return False
+
         return True
 
     def _initialize_twoD(self, get_sequence=False):

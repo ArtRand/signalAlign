@@ -19,7 +19,7 @@ def makeReadstoreJobFunction(job, config, samples):
     tar_fids = [job.addChildJobFn(prepareFast5Tarfile,
                                   human2bytes(config["split_tars_bigger_than_this"]),
                                   config["put_this_many_reads_in_a_tar"],
-                                  sample).rv()
+                                  sample, disk=(3 * sample.size)).rv()
                 for sample in samples]
     job.addFollowOnJobFn(makeLedgerJobFunction, config, tar_fids)
 
@@ -104,7 +104,7 @@ def makeNanoporeReadsJobFunction(job, tar_fid, readstore_dir):
     def makeNanoporeRead(f5_path):
         # here we load the NanoporeRead and write it to a file
         np = NanoporeRead(fast_five_file=f5_path, twoD=False)  # make this a config arg
-        ok = np.Initialize()
+        ok = np.Initialize(job)
         if not ok:
             return None
         _l = np.read_label

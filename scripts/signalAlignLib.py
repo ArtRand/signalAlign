@@ -1173,6 +1173,7 @@ class SignalAlignment(object):
         temp_npRead  = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
         read_fasta   = temp_folder.add_file_path("temp_seq_{read}.fa".format(read=read_label))
         temp_samfile = temp_folder.add_file_path("temp_sam_file_{read}.sam".format(read=read_label))
+        cigar_file   = temp_folder.add_file_path("temp_cigar_{read}.txt".format(read=read_label))
 
         # make the npRead and fasta
         if not self.twoD_chemistry:
@@ -1207,7 +1208,9 @@ class SignalAlignment(object):
                                                                      query=read_fasta,
                                                                      temp_sam_path=temp_samfile,
                                                                      target_regions=self.target_regions)
-
+        cig_handle = open(cigar_file, "w")
+        cig_handle.write(cigar_string + "\n")
+        cig_handle.close()
         if mapped_refernce not in self.reference_map.keys():
             if mapped_refernce is False:
                 print("[SignalAlignment::run]Read {read} didn't map"
@@ -1337,11 +1340,11 @@ class SignalAlignment(object):
             complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
 
             command = \
-                "echo {cigar} | {vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
-                "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} " \
+                "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
+                "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
                 "-t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag,
-                        f_ref=forward_ref_flag, b_ref=backward_ref_flag,
+                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file,
                         npRead=temp_npRead, readLabel=read_label, td=twoD_flag,
                         templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
@@ -1349,11 +1352,11 @@ class SignalAlignment(object):
                         trim=trim_flag, degen=degenerate_flag, sparse=out_fmt)
         else:
             command = \
-                "echo {cigar} | {vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
-                "{t_model}{c_model}{thresh}{expansion}{trim} " \
+                "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
+                "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
                 "-u {posteriors} {hdp}-L {readLabel}"\
                 .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
-                        f_ref=forward_ref_flag, b_ref=backward_ref_flag,
+                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file,
                         readLabel=read_label, npRead=temp_npRead, td=twoD_flag,
                         t_model=template_model_flag, c_model=complement_model_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
