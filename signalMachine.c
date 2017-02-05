@@ -15,8 +15,27 @@ typedef enum {
 } OutputFormat;
 
 void usage() {
-    fprintf(stderr, "signalMachine binary, meant to be used through the signalAlign program.\n");
-    fprintf(stderr, "See doc for runSignalAlign for help\n");
+    fprintf(stderr, "\n\tsignalMachine - Align ONT ionic current to a reference sequence\n\n");
+    fprintf(stderr, "--help: Display this super useful message and exit\n");
+    fprintf(stderr, "--sm3Hdp, -d: Flag, enable HMM-HDP model\n");
+    fprintf(stderr, "--twoD, -e: Flag, use 2D workflow (enables complement alignment)\n");
+    fprintf(stderr, "-s: Output format, 0=full, 1=variantCaller, 2=assignments\n");
+    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T\n");
+    fprintf(stderr, "-T: Template HMM model\n");
+    fprintf(stderr, "-C: Complement HMM model\n");
+    fprintf(stderr, "-L: Read (output) label\n");
+    fprintf(stderr, "-q: NanoporeRead (in npRead format)\n");
+    fprintf(stderr, "-f: Forward reference to align to as a flat file\n");
+    fprintf(stderr, "-b: Backward reference to align to as a flat fiel\n");
+    fprintf(stderr, "-p: Guide alignment file, containing CIGARs in EXONERATE format\n");
+    fprintf(stderr, "-u: Posteriors (output) file path, place to put the output\n");
+    fprintf(stderr, "-v: TemplateHDP file\n");
+    fprintf(stderr, "-w: Complement HDP file\n");
+    fprintf(stderr, "-t: Template expectations (HMM transitions) output location\n");
+    fprintf(stderr, "-c: Complement expectations (HMM transitions) output location\n");
+    fprintf(stderr, "-x: Diagonal expansion, how much to expand the dynamic programming envelope\n");
+    fprintf(stderr, "-D: Posterior probability threshold, keep aligned pairs with posterior prob >= this\n");
+    fprintf(stderr, "-m: Constranint trim, how much to trim the guide alignment anchors by\n\n");
 }
 
 void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {

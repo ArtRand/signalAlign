@@ -19,7 +19,7 @@ def makeReadstoreJobFunction(job, config, samples):
     tar_fids = [job.addChildJobFn(prepareFast5Tarfile,
                                   human2bytes(config["split_tars_bigger_than_this"]),
                                   config["put_this_many_reads_in_a_tar"],
-                                  sample, disk=(3 * sample.size)).rv()
+                                  sample, disk=(2 * sample.size)).rv()
                 for sample in samples]
     job.addFollowOnJobFn(makeLedgerJobFunction, config, tar_fids)
 
