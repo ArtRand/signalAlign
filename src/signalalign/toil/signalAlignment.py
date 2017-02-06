@@ -1,6 +1,7 @@
 import os
 import string
 import subprocess
+import fileinput
 
 import pandas as pd
 import numpy as np
@@ -36,18 +37,6 @@ def _reverseComplement(dna, reverse=True, complement=True):
         return dna
 
 
-def _marginalizeOverColumns(posteriors_df, workdir):
-    f  = LocalFile(workdir=workdir)
-    _h = open(f.fullpathGetter(), "w")
-    for pos, pos_df in posteriors_df.groupby(["ref_pos"]):
-        for base, base_df in pos_df.groupby("base"):
-            marginal_prob = base_df["posterior"].sum()
-            l = "%s\t%s\t%s\n" % (pos, base, marginal_prob)
-            _h.write(l)
-    _h.close()
-    return f
-
-
 def signalAlignJobFunction(job, config, alignment_shards):
     alignment_shards = chain(*alignment_shards)
     # each shard is a region of the genome/chromosome/contig and can be methylation called
@@ -66,7 +55,19 @@ def signalAlignJobFunction(job, config, alignment_shards):
         count += 1
     job.fileStore.logToMaster("[signalAlignJobFunction]Issued methylation calling for %s alignment shards"
                               % count)
-    # TODO followOn 'consolidate job function'
+    job.addFollowOnJobFn(consolidateMethylationCallsJobFunction, config, all_methylation_probs)
+    return
+
+
+def consolidateMethylationCallsJobFunction(job, config, methylation_prob_fids):
+    outfile = LocalFile(workdir=job.fileStore.getLocalTempDir(),
+                        filename="%s_%s.tsv" % (config["sample_label"], config["degenerate"]))
+    _handle = open(outfile.fullpathGetter(), "w")
+    files   = fileinput.input([job.fileStore.readGlobalFile(fid) for fid in methylation_prob_fids])
+    map(lambda l: _handle.write(l), files)
+    files.close()
+    _handle.close()
+    deliverOutput(job, outfile, config["output_dir"])
     return
 
 
@@ -137,6 +138,17 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
                                     "base"      : np.str,
                                     "posterior" : np.float64})
 
+    def _sumExpectationsOverColumns():
+        f  = LocalFile(workdir=workdir)
+        _h = open(f.fullpathGetter(), "w")
+        for pos, pos_df in aligned_pairs.groupby(["ref_pos"]):
+            for base, base_df in pos_df.groupby("base"):
+                marginal_prob = base_df["posterior"].sum()
+                l = "%s\t%s\t%s\t%s\n" % (cPecan_config["contig_name"], pos, base, marginal_prob)
+                _h.write(l)
+        _h.close()
+        return f
+
     job.fileStore.logToMaster("[calculateMethylationProbabilityJobFunction]Running on batch %s" % batch_number)
     workdir = job.fileStore.getLocalTempDir()
     fw_seqfile, bw_seqfile, ok = processReferenceSequence(cPecan_config["contig_seq"],
@@ -152,11 +164,23 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
         models = LocalFileManager(job=job, fileIds_to_get=[hmmfid, hdpfid], workdir=workdir)
     except AssertionError:
         raise RuntimeError("[calculateMethylationProbabilityJobFunction]ERROR getting models locally")
+
     # download the npRead files
     ledger    = config["ledger"]
     read_urls = [ledger[label.strip()] for label in cPecan_config["query_labels"]]
-    # TODO could make this error check, and continue even when some of the reads aren't downloaded
-    npReads    = [unzipLocalFile(f) for f in [urlDownloadToLocalFile(job, workdir, url) for url in read_urls]]
+    npReads   = [unzipLocalFile(f)
+                 for f in [urlDownloadToLocalFile(job, workdir, url) for url in read_urls]
+                 if f is not None]
+    failed    = len(read_urls) - len(npReads)
+
+    if failed > 0 and config["stop_at_failed_reads"]:
+        raise RuntimeError("[calculateMethylationProbabilityJobFunction]Got %s failed npRead"
+                           "downloads and stop_at_failed_reads is True" % failed)
+    else:
+        if config["debug"]:
+            job.fileStore.logToMaster("[calculateMethylationProbabilityJobFunction]"
+                                      "Failed to download and upzip %s NanoporeReads" % failed)
+
     posteriors = LocalFile(workdir=workdir)
 
     # do the signal alignment, and get the posterior probabilities
@@ -164,22 +188,54 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
                                                                   cPecan_config["exonerate_cigars"],
                                                                   npReads))
 
-    # the reads may not produce any posteriors, if, for example, they don't align to a region where 
-    # there are any ambiguity characters the posteriors file will be empty and we just return 
+    # the reads may not produce any posteriors, if, for example, they don't align to a region where
+    # there are any ambiguity characters the posteriors file will be empty and we just return
     # None, which is the convention
     if os.stat(posteriors.fullpathGetter()).st_size == 0:
         return None
 
-    aligned_pairs  = parse_probabilities()
-    marginal_probs = _marginalizeOverColumns(aligned_pairs, workdir)
-    #deliverOutput(job, marginal_probs, config["output_dir"])
-    return job.fileStore.writeGlobalFile(marginal_probs.fullpathGetter())
+    # reminder: the convention is that 'expectations' are un-normalized posterior probabilities
+    # so this file is a table of expectatiosn, I also use the convention that the trailing
+    # underscore means `file` or `file-path`
+    aligned_pairs = parse_probabilities()
+    expectations_ = _sumExpectationsOverColumns()
+    return job.fileStore.writeGlobalFile(expectations_.fullpathGetter())
 
 
-def callMethylationJobFunction(job, config, alignment_shard, methylation_probs):
+def callMethylationJobFunction(job, config, alignment_shard, prob_fids):
+    def parse_expectations(_file):
+        return pd.read_table(_file, usecols=(0, 1, 2, 3),
+                             names=["contig", "ref_pos", "base", "prob"],
+                             dtype={"contig" : np.str,
+                                    "refpos" : np.int,
+                                    "base"   : np.str,
+                                    "prob"   : np.float64})
+
+    def write_down_methylation(contig, position, posterior_probs):
+        base_call = max(posterior_probs, key=posterior_probs.get)
+        _handle.write("%s\t%s\t%s\t" % (contig, position, base_call))
+        for base, prob in posterior_probs.items():
+            _handle.write("%s,%s\t" % (base, prob))
+        _handle.write("\n")
+
     job.fileStore.logToMaster("[callMethylationJobFunction]Calling methylation")
-    
-    def parse_marginal_probs(_file):
-        return pd.read_table(_file, usecols=(0, 1, 2), names=["ref_pos", "base", "prob"],
-                             dtype={"refpos": np.int, "base": np.str, "prob": np.float64})
-    
+    prob_fids = [x[0] for x in prob_fids if x[0] is not None]
+    expectations = pd.concat([parse_expectations(f)
+                             for f in [job.fileStore.readGlobalFile(f) for f in prob_fids]])
+
+    # to decide on the methylation status to call, we first sum up the expectations for all 
+    # bases at a given reference position. Then we divide the total expectations for each 
+    # base by the total to give the final (normalized) posterior probability for the base
+    # at that position given the reference (and the model... etc)
+    calls_file = job.fileStore.getLocalTempFile()
+    _handle    = open(calls_file, "w")
+    for contig, contig_df in expectations.groupby(["contig"]):
+        for ref_pos, pos_df in contig_df.groupby(["ref_pos"]):
+            posterior_probabilities = {}
+            total_prob = pos_df["prob"].sum()
+            for base, base_df in pos_df.groupby(["base"]):
+                posterior_probability = base_df["prob"].sum() / total_prob
+                posterior_probabilities[base] = posterior_probability
+            write_down_methylation(contig, ref_pos, posterior_probabilities)
+        _handle.close()
+    return job.fileStore.writeGlobalFile(calls_file)

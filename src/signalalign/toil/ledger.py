@@ -16,19 +16,23 @@ from signalalign.nanoporeRead import NanoporeRead
 
 
 def makeReadstoreJobFunction(job, config, samples):
+    cores    = config["download_cores"]
     tar_fids = [job.addChildJobFn(prepareFast5Tarfile,
                                   human2bytes(config["split_tars_bigger_than_this"]),
-                                  config["put_this_many_reads_in_a_tar"],
-                                  sample, disk=(2 * sample.size)).rv()
+                                  config["put_this_many_reads_in_a_tar"],  # batchsize
+                                  config["max_download_slots"],
+                                  config["download_part_size"],
+                                  sample, cores=cores,
+                                  disk=(3 * sample.size)).rv()
                 for sample in samples]
     job.addFollowOnJobFn(makeLedgerJobFunction, config, tar_fids)
 
 
-def prepareFast5Tarfile(job, split_tars_bigger_than_this, batchsize, rs_sample):
+def prepareFast5Tarfile(job, split_tars_bigger_than_this, batchsize, download_slots, part_size, rs_sample):
     job.fileStore.logToMaster("[prepareFast5Tarfile]Working on sample %s" % rs_sample.sample_label)
     workdir = job.fileStore.getLocalTempDir()
     archive = LocalFile(workdir=workdir, filename="%s.tar" % uuid.uuid4().hex)
-    urlDownload(job, rs_sample.URL, archive)
+    urlDownload(job, rs_sample.URL, archive, download_slots=str(download_slots), part_size=str(part_size))
 
     _handle = tarfile.open(archive.fullpathGetter(), "r")
     members = _handle.getmembers()[1:]  # the first member is often just the directory with the fast5s
