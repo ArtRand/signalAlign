@@ -3,7 +3,6 @@
 #include "signalMachineUtils.h"
 #include "pairwiseAligner.h"
 
-#define STEP 6  // space between degenerate nucleotides in for error correction
 #define ESTIMATE_PARAMS 1
 #define ASSIGNMENT_THRESHOLD 0.1
 

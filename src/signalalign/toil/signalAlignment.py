@@ -1,5 +1,10 @@
 import os
 import string
+import subprocess
+
+import pandas as pd
+import numpy as np
+
 from itertools import chain
 
 from toil_lib import require
@@ -29,6 +34,18 @@ def _reverseComplement(dna, reverse=True, complement=True):
         return comp_dna
     if not complement and not reverse:
         return dna
+
+
+def _marginalizeOverColumns(posteriors_df, workdir):
+    f  = LocalFile(workdir=workdir)
+    _h = open(f.fullpathGetter(), "w")
+    for pos, pos_df in posteriors_df.groupby(["ref_pos"]):
+        for base, base_df in pos_df.groupby("base"):
+            marginal_prob = base_df["posterior"].sum()
+            l = "%s\t%s\t%s\n" % (pos, base, marginal_prob)
+            _h.write(l)
+    _h.close()
+    return f
 
 
 def signalAlignJobFunction(job, config, alignment_shards):
@@ -84,8 +101,8 @@ def processReferenceSequence(ref_seq, workdir, motif_key=None, sub_char="X"):
 
 
 def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignore_hmm, batch_number,
-                                               signalMachine_image="506217c84696"):
-    def runSignalMachine(read_label, cigar, nanopore_read):
+                                               signalMachine_image="quay.io/artrand/signalmachine"):
+    def run_SignalMachine(read_label, cigar, nanopore_read):
         guide_aln = LocalFile(workdir=workdir)
         _handle   = open(guide_aln.fullpathGetter(), "w")
         _handle.write(cigar)
@@ -104,10 +121,21 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
             "-u", "%s%s" % (DOCKER_DIR, posteriors.filenameGetter()),
             "-v", "%s%s" % (DOCKER_DIR, models.localFileName(hdpfid)),
         ]
-        docker_call(job=job,
-                    tool=signalMachine_image,
-                    parameters=signalMachine_args,
-                    work_dir=(workdir + "/"))
+        try:
+            docker_call(job=job,
+                        tool=signalMachine_image,
+                        parameters=signalMachine_args,
+                        work_dir=(workdir + "/"))
+        except subprocess.CalledProcessError:
+            pass
+
+    def parse_probabilities():
+        return pd.read_table(posteriors.fullpathGetter(),
+                             usecols=(1, 2, 3),
+                             names=["ref_pos", "base", "posterior"],
+                             dtype={"ref_pos"   : np.str,
+                                    "base"      : np.str,
+                                    "posterior" : np.float64})
 
     job.fileStore.logToMaster("[calculateMethylationProbabilityJobFunction]Running on batch %s" % batch_number)
     workdir = job.fileStore.getLocalTempDir()
@@ -130,14 +158,28 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
     # TODO could make this error check, and continue even when some of the reads aren't downloaded
     npReads    = [unzipLocalFile(f) for f in [urlDownloadToLocalFile(job, workdir, url) for url in read_urls]]
     posteriors = LocalFile(workdir=workdir)
-    #map(lambda l, c, n: runSignalMachine(l, c, n), zip(cPecan_config["query_labels"],
-    #                                                   cPecan_config["exonerate_cigars"],
-    #                                                   npReads))
-    for label, cigar, npread in zip(cPecan_config["query_labels"], cPecan_config["exonerate_cigars"], npReads):
-        runSignalMachine(label.strip(), cigar, npread)
 
-    deliverOutput(job, posteriors, config["output_dir"])
+    # do the signal alignment, and get the posterior probabilities
+    map(lambda (l, c, n): run_SignalMachine(l.strip(), c, n), zip(cPecan_config["query_labels"],
+                                                                  cPecan_config["exonerate_cigars"],
+                                                                  npReads))
+
+    # the reads may not produce any posteriors, if, for example, they don't align to a region where 
+    # there are any ambiguity characters the posteriors file will be empty and we just return 
+    # None, which is the convention
+    if os.stat(posteriors.fullpathGetter()).st_size == 0:
+        return None
+
+    aligned_pairs  = parse_probabilities()
+    marginal_probs = _marginalizeOverColumns(aligned_pairs, workdir)
+    #deliverOutput(job, marginal_probs, config["output_dir"])
+    return job.fileStore.writeGlobalFile(marginal_probs.fullpathGetter())
 
 
 def callMethylationJobFunction(job, config, alignment_shard, methylation_probs):
     job.fileStore.logToMaster("[callMethylationJobFunction]Calling methylation")
+    
+    def parse_marginal_probs(_file):
+        return pd.read_table(_file, usecols=(0, 1, 2), names=["ref_pos", "base", "prob"],
+                             dtype={"refpos": np.int, "base": np.str, "prob": np.float64})
+    
