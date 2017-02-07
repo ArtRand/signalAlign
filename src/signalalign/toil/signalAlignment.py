@@ -8,6 +8,7 @@ import numpy as np
 
 from itertools import chain
 
+from bd2k.util.humanize import human2bytes
 from toil_lib import require
 from toil_lib.programs import docker_call
 
@@ -44,13 +45,15 @@ def signalAlignJobFunction(job, config, alignment_shards):
     all_methylation_probs = []  # contains the methylation probabilites for all of the shards together
     count = 0
     for aln_shard in alignment_shards:
-        # TODO disk requirement
-        # TODO memory requirement
-        # TODO cores requirement
+        disk       = (2 * config["reference_FileStoreID"].size)
+        memory     = (6 * aln_shard.FileStoreID.size)
+        batch_disk = human2bytes("250M") + config["reference_FileStoreID"].size
         methylation_probs = job.addChildJobFn(shardSamJobFunction,
                                               config, aln_shard, None,
                                               calculateMethylationProbabilityJobFunction,
-                                              callMethylationJobFunction).rv()
+                                              callMethylationJobFunction,
+                                              batch_disk=batch_disk,
+                                              disk=disk, memory=memory).rv()
         all_methylation_probs.append(methylation_probs)
         count += 1
     job.fileStore.logToMaster("[signalAlignJobFunction]Issued methylation calling for %s alignment shards"
@@ -103,7 +106,13 @@ def processReferenceSequence(ref_seq, workdir, motif_key=None, sub_char="X"):
 
 def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignore_hmm, batch_number,
                                                signalMachine_image="quay.io/artrand/signalmachine"):
-    def run_SignalMachine(read_label, cigar, nanopore_read):
+    def _get_url(read_label):
+        try:
+            return ledger[read_label]
+        except KeyError:
+            return None
+
+    def _SignalMachine(read_label, cigar, nanopore_read):
         guide_aln = LocalFile(workdir=workdir)
         _handle   = open(guide_aln.fullpathGetter(), "w")
         _handle.write(cigar)
@@ -130,13 +139,14 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
         except subprocess.CalledProcessError:
             pass
 
-    def parse_probabilities():
+    def _parse_probabilities():
         return pd.read_table(posteriors.fullpathGetter(),
-                             usecols=(1, 2, 3),
-                             names=["ref_pos", "base", "posterior"],
-                             dtype={"ref_pos"   : np.str,
-                                    "base"      : np.str,
-                                    "posterior" : np.float64})
+                             usecols=(1, 2, 3, 6),
+                             names=["ref_pos", "base", "posterior", "read_label"],
+                             dtype={"ref_pos"    : np.int,
+                                    "base"       : np.str,
+                                    "posterior"  : np.float64,
+                                    "read_label" : np.str})
 
     def _sumExpectationsOverColumns():
         f  = LocalFile(workdir=workdir)
@@ -144,7 +154,8 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
         for pos, pos_df in aligned_pairs.groupby(["ref_pos"]):
             for base, base_df in pos_df.groupby("base"):
                 marginal_prob = base_df["posterior"].sum()
-                l = "%s\t%s\t%s\t%s\n" % (cPecan_config["contig_name"], pos, base, marginal_prob)
+                coverage      = len(base_df["read_label"].unique())
+                l = "%s\t%s\t%s\t%s\t%s\n" % (cPecan_config["contig_name"], pos, base, marginal_prob, coverage)
                 _h.write(l)
         _h.close()
         return f
@@ -167,7 +178,12 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
 
     # download the npRead files
     ledger    = config["ledger"]
-    read_urls = [ledger[label.strip()] for label in cPecan_config["query_labels"]]
+    url_iter  = (_get_url(l.strip()) for l in cPecan_config["query_labels"])
+    read_urls = [u for u in url_iter if u is not None]
+
+    if config["debug"]:
+        job.fileStore.logToMaster("[calculateMethylationProbabilityJobFunction]Got %s URLs" % len(read_urls))
+
     npReads   = [unzipLocalFile(f)
                  for f in [urlDownloadToLocalFile(job, workdir, url) for url in read_urls]
                  if f is not None]
@@ -184,9 +200,9 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
     posteriors = LocalFile(workdir=workdir)
 
     # do the signal alignment, and get the posterior probabilities
-    map(lambda (l, c, n): run_SignalMachine(l.strip(), c, n), zip(cPecan_config["query_labels"],
-                                                                  cPecan_config["exonerate_cigars"],
-                                                                  npReads))
+    map(lambda (l, c, n): _SignalMachine(l.strip(), c, n), zip(cPecan_config["query_labels"],
+                                                               cPecan_config["exonerate_cigars"],
+                                                               npReads))
 
     # the reads may not produce any posteriors, if, for example, they don't align to a region where
     # there are any ambiguity characters the posteriors file will be empty and we just return
@@ -197,25 +213,26 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
     # reminder: the convention is that 'expectations' are un-normalized posterior probabilities
     # so this file is a table of expectatiosn, I also use the convention that the trailing
     # underscore means `file` or `file-path`
-    aligned_pairs = parse_probabilities()
+    aligned_pairs = _parse_probabilities()
     expectations_ = _sumExpectationsOverColumns()
     return job.fileStore.writeGlobalFile(expectations_.fullpathGetter())
 
 
 def callMethylationJobFunction(job, config, alignment_shard, prob_fids):
     def parse_expectations(_file):
-        return pd.read_table(_file, usecols=(0, 1, 2, 3),
-                             names=["contig", "ref_pos", "base", "prob"],
-                             dtype={"contig" : np.str,
-                                    "refpos" : np.int,
-                                    "base"   : np.str,
-                                    "prob"   : np.float64})
+        return pd.read_table(_file, usecols=(0, 1, 2, 3, 4),
+                             names=["contig", "ref_pos", "base", "prob", "coverage"],
+                             dtype={"contig"   : np.str,
+                                    "refpos"   : np.int,
+                                    "base"     : np.str,
+                                    "prob"     : np.float64,
+                                    "coverage" : np.int})
 
     def write_down_methylation(contig, position, posterior_probs):
         base_call = max(posterior_probs, key=posterior_probs.get)
         _handle.write("%s\t%s\t%s\t" % (contig, position, base_call))
-        for base, prob in posterior_probs.items():
-            _handle.write("%s,%s\t" % (base, prob))
+        for base, (prob, coverage) in posterior_probs.items():
+            _handle.write("%s,%s,%s\t" % (base, prob, coverage))
         _handle.write("\n")
 
     job.fileStore.logToMaster("[callMethylationJobFunction]Calling methylation")
@@ -235,7 +252,8 @@ def callMethylationJobFunction(job, config, alignment_shard, prob_fids):
             total_prob = pos_df["prob"].sum()
             for base, base_df in pos_df.groupby(["base"]):
                 posterior_probability = base_df["prob"].sum() / total_prob
-                posterior_probabilities[base] = posterior_probability
+                coverage = base_df["coverage"].max()
+                posterior_probabilities[base] = (posterior_probability, coverage)
             write_down_methylation(contig, ref_pos, posterior_probabilities)
         _handle.close()
     return job.fileStore.writeGlobalFile(calls_file)
