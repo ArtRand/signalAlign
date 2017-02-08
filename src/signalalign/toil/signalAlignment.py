@@ -18,9 +18,11 @@ from margin.toil.localFileManager import \
     urlDownloadToLocalFile,\
     unzipLocalFile,\
     deliverOutput
-from margin.toil.realign import shardSamJobFunction, DOCKER_DIR
 
-from signalalign.motif import getMotif, degenerateEnum
+from margin.toil.shardAlignment import shardSamJobFunction
+from margin.toil.realign import DOCKER_DIR
+
+from signalalign.motif import getMotif, getVariantCallFunctions
 
 
 def _reverseComplement(dna, reverse=True, complement=True):
@@ -58,8 +60,21 @@ def signalAlignJobFunction(job, config, alignment_shards):
         count += 1
     job.fileStore.logToMaster("[signalAlignJobFunction]Issued methylation calling for %s alignment shards"
                               % count)
-    job.addFollowOnJobFn(consolidateMethylationCallsJobFunction, config, all_methylation_probs)
+    job.addFollowOnJobFn(consolidateVariantCallsJobFunction, config, all_methylation_probs)
     return
+
+
+def consolidateVariantCallsJobFunction(job, config, posterior_prob_fids):
+    variants  = getVariantCallFunctions(config["degenerate"])
+    parser    = variants.parseVariantCalls
+    file_iter = (job.fileStore.readGlobalFile(fid) for fid in posterior_prob_fids)
+    table     = pd.concat([parser(f) for f in file_iter]).sort_values(["contig"]).sort_values(["contig", "ref_pos"])
+    outfile   = LocalFile(workdir=job.fileStore.getLocalTempDir(),
+                          filename="%s_%s.tsv" % (config["sample_label"], config["degenerate"]))
+    _handle   = open(outfile.fullpathGetter(), "w")
+    variants.writeVariantCalls(table, _handle)
+    _handle.close()
+    deliverOutput(job, outfile, config["output_dir"])
 
 
 def consolidateMethylationCallsJobFunction(job, config, methylation_prob_fids):
@@ -121,7 +136,7 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
         signalMachine_args = [
             "--sm3Hdp",
             "-s", "1",
-            "-o", "%s" % degenerateEnum(config["degenerate"]),
+            "-o", "%s" % degenerate_enum,
             "-L", "%s" % read_label,
             "-T", "%s%s" % (DOCKER_DIR, models.localFileName(hmmfid)),
             "-q", "%s%s" % (DOCKER_DIR, nanopore_read.filenameGetter()),
@@ -197,7 +212,8 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
             job.fileStore.logToMaster("[calculateMethylationProbabilityJobFunction]"
                                       "Failed to download and upzip %s NanoporeReads" % failed)
 
-    posteriors = LocalFile(workdir=workdir)
+    posteriors      = LocalFile(workdir=workdir)  # file to collect the posterior probs
+    degenerate_enum = getVariantCallFunctions(config["degenerate"]).enum()
 
     # do the signal alignment, and get the posterior probabilities
     map(lambda (l, c, n): _SignalMachine(l.strip(), c, n), zip(cPecan_config["query_labels"],
@@ -222,30 +238,39 @@ def callMethylationJobFunction(job, config, alignment_shard, prob_fids):
     def parse_expectations(_file):
         return pd.read_table(_file, usecols=(0, 1, 2, 3, 4),
                              names=["contig", "ref_pos", "base", "prob", "coverage"],
-                             dtype={"contig"   : np.str,
-                                    "refpos"   : np.int,
-                                    "base"     : np.str,
-                                    "prob"     : np.float64,
-                                    "coverage" : np.int})
+                             dtype={"contig"    : np.str,
+                                    "ref_pos"   : np.int,
+                                    "base"      : np.str,
+                                    "prob"      : np.float64,
+                                    "coverage"  : np.int})
 
     def write_down_methylation(contig, position, posterior_probs):
-        base_call = max(posterior_probs, key=posterior_probs.get)
+        base_call    = max(posterior_probs, key=posterior_probs.get)  # the base with highest marginal prob
         _handle.write("%s\t%s\t%s\t" % (contig, position, base_call))
-        for base, (prob, coverage) in posterior_probs.items():
-            _handle.write("%s,%s,%s\t" % (base, prob, coverage))
+        for base in base_options:
+            try:
+                prob, coverage = posterior_probs[base]
+                _handle.write("%s,%s,%s\t" % (base, prob, coverage))
+            except KeyError:
+                _handle.write("%s,%s,%s\t" % (base, 0.0, 0))
         _handle.write("\n")
 
     job.fileStore.logToMaster("[callMethylationJobFunction]Calling methylation")
     prob_fids = [x[0] for x in prob_fids if x[0] is not None]
+
+    # inner list comp: downloads the proability file outer list comp: parses the files, then 
+    # they are concatenated
     expectations = pd.concat([parse_expectations(f)
-                             for f in [job.fileStore.readGlobalFile(f) for f in prob_fids]])
+                              for f in [job.fileStore.readGlobalFile(f)
+                                        for f in prob_fids]])
 
     # to decide on the methylation status to call, we first sum up the expectations for all 
     # bases at a given reference position. Then we divide the total expectations for each 
     # base by the total to give the final (normalized) posterior probability for the base
     # at that position given the reference (and the model... etc)
-    calls_file = job.fileStore.getLocalTempFile()
-    _handle    = open(calls_file, "w")
+    base_options = getVariantCallFunctions(config["degenerate"]).baseOptions()
+    calls_file   = job.fileStore.getLocalTempFile()
+    _handle      = open(calls_file, "w")
     for contig, contig_df in expectations.groupby(["contig"]):
         for ref_pos, pos_df in contig_df.groupby(["ref_pos"]):
             posterior_probabilities = {}
