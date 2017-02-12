@@ -36,6 +36,7 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 #define CANONICAL_NUCLEOTIDES "ACGT"
 #define ALL_BASES "ACEGOT"
 
+// TODO depreciate these things
 #define KMER_LENGTH 6
 #define NUM_OF_KMERS 46656
 

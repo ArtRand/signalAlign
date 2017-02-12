@@ -22,6 +22,7 @@ from margin.toil.localFileManager import \
 from margin.toil.shardAlignment import shardSamJobFunction
 from margin.toil.realign import DOCKER_DIR
 
+from signalalign import exonerateCigarWithStrandOrientation
 from signalalign.motif import getMotif, getVariantCallFunctions
 
 
@@ -54,6 +55,7 @@ def signalAlignJobFunction(job, config, alignment_shards):
                                               config, aln_shard, None,
                                               calculateMethylationProbabilityJobFunction,
                                               callMethylationJobFunction,
+                                              exonerateCigarStringFn=exonerateCigarWithStrandOrientation,
                                               batch_disk=batch_disk,
                                               disk=disk, memory=memory).rv()
         all_methylation_probs.append(methylation_probs)
@@ -68,7 +70,7 @@ def consolidateVariantCallsJobFunction(job, config, posterior_prob_fids):
     variants  = getVariantCallFunctions(config["degenerate"])
     parser    = variants.parseVariantCalls
     file_iter = (job.fileStore.readGlobalFile(fid) for fid in posterior_prob_fids)
-    table     = pd.concat([parser(f) for f in file_iter]).sort_values(["contig"]).sort_values(["contig", "ref_pos"])
+    table     = pd.concat([parser(f) for f in file_iter]).sort_values(["contig", "ref_pos"])
     outfile   = LocalFile(workdir=job.fileStore.getLocalTempDir(),
                           filename="%s_%s.tsv" % (config["sample_label"], config["degenerate"]))
     _handle   = open(outfile.fullpathGetter(), "w")
@@ -131,6 +133,7 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
         guide_aln = LocalFile(workdir=workdir)
         _handle   = open(guide_aln.fullpathGetter(), "w")
         _handle.write(cigar)
+        #job.fileStore.logToMaster("[SignalMachine]CIGAR %s" % cigar)
         _handle.close()
         require(os.path.exists(guide_aln.fullpathGetter()), "NO guide aln file")
         signalMachine_args = [
@@ -223,6 +226,9 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
     # the reads may not produce any posteriors, if, for example, they don't align to a region where
     # there are any ambiguity characters the posteriors file will be empty and we just return
     # None, which is the convention
+    if not os.path.exists(posteriors.fullpathGetter()):
+        return None
+
     if os.stat(posteriors.fullpathGetter()).st_size == 0:
         return None
 
@@ -245,7 +251,7 @@ def callMethylationJobFunction(job, config, alignment_shard, prob_fids):
                                     "coverage"  : np.int})
 
     def write_down_methylation(contig, position, posterior_probs):
-        base_call    = max(posterior_probs, key=posterior_probs.get)  # the base with highest marginal prob
+        base_call = max(posterior_probs, key=posterior_probs.get)  # the base with highest marginal prob
         _handle.write("%s\t%s\t%s\t" % (contig, position, base_call))
         for base in base_options:
             try:
@@ -273,12 +279,15 @@ def callMethylationJobFunction(job, config, alignment_shard, prob_fids):
     _handle      = open(calls_file, "w")
     for contig, contig_df in expectations.groupby(["contig"]):
         for ref_pos, pos_df in contig_df.groupby(["ref_pos"]):
-            posterior_probabilities = {}
-            total_prob = pos_df["prob"].sum()
-            for base, base_df in pos_df.groupby(["base"]):
-                posterior_probability = base_df["prob"].sum() / total_prob
-                coverage = base_df["coverage"].max()
-                posterior_probabilities[base] = (posterior_probability, coverage)
-            write_down_methylation(contig, ref_pos, posterior_probabilities)
-        _handle.close()
+            if ref_pos >= alignment_shard.start and ref_pos < alignment_shard.end:
+                posterior_probabilities = {}
+                total_prob = pos_df["prob"].sum()
+                for base, base_df in pos_df.groupby(["base"]):
+                    posterior_probability = base_df["prob"].sum() / total_prob
+                    coverage = base_df["coverage"].max()
+                    posterior_probabilities[base] = (posterior_probability, coverage)
+                write_down_methylation(contig, ref_pos, posterior_probabilities)
+            else:
+                pass
+    _handle.close()
     return job.fileStore.writeGlobalFile(calls_file)
