@@ -126,7 +126,11 @@ def makeNanoporeReadsJobFunction(job, tar_fid, readstore_dir):
         shutil.copyfileobj(fH, gz)
         fH.close()
         gz.close()
-        deliverOutput(job, fn, readstore_dir)
+        try:
+            deliverOutput(job, fn, readstore_dir)
+        except RuntimeError:
+            job.fileStore.logToMaster("[makeNanoporeReadsJobFunction]Read %s failed to upload" % _l)
+            return None
         return (_l, "%s%s\n" % (readstore_dir, fn.filenameGetter()))
 
     def write_ledger_line(line, fH):
