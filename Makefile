@@ -11,7 +11,8 @@ signalAlignLib = ${basicLibs}
 all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
       ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
-      ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
+      ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign \
+	  externals
       #nanoporeParams
       #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
       #${signalAlignBin}/empire ${signalAlignBin}/jamison \
@@ -34,6 +35,9 @@ sL :
 
 bD :
 	mkdir -v -p ${rootPath}bin
+
+externals :
+	cd externalTools && make all
 
 test :
 	#cd ${signalAlignBin} && ./signalAlignLibTests

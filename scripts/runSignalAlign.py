@@ -2,12 +2,18 @@
 """Run signal-to-reference alignments
 """
 from __future__ import print_function
+
 import sys
-from signalAlignLib import *
-from multiprocessing import Process, Queue, current_process, Manager
-from serviceCourse.file_handlers import FolderHandler
+import os
+
 from argparse import ArgumentParser
 from random import shuffle
+from multiprocessing import Process, Queue, current_process, Manager
+
+from signalalign.utils.fileHandlers import FolderHandler
+from signalalign.utils import process_reference_fasta
+from signalalign.utils.bwaWrapper import getBwaIndex
+from signalalign.motif import getDegenerateEnum
 
 
 def parse_args():
@@ -164,7 +170,7 @@ def main(args):
         bwa_ref_index = args.bwt
     else:
         print("signalAlign - indexing reference", file=sys.stderr)
-        bwa_ref_index = get_bwa_index(args.ref, temp_dir_path)
+        bwa_ref_index = getBwaIndex(args.ref, temp_dir_path)
         print("signalAlign - indexing reference, done", file=sys.stderr)
 
     # parse the target regions, if provided
@@ -207,12 +213,14 @@ def main(args):
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim,
             "target_regions": target_regions,
-            "degenerate": degenerate_enum(args.degenerate),
+            "degenerate": getDegenerateEnum(args.degenerate),
             "twoD_chemistry": args.twoD,
         }
-        #alignment = SignalAlignment(**alignment_args)
-        #alignment.run()
-        work_queue.put(alignment_args)
+        if args.DEBUG:
+            alignment = SignalAlignment(**alignment_args)
+            alignment.run()
+        else:
+            work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))
