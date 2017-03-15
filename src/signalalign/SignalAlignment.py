@@ -4,6 +4,7 @@ import sys
 import os
 
 from sonLib.bioio import fastaWrite
+from signalalign import defaultModelFromVersion
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import generateGuideAlignment
 from signalalign.utils.fileHandlers import FolderHandler
@@ -43,6 +44,7 @@ class SignalAlignment(object):
         self.twoD_chemistry     = twoD_chemistry      # flag for 2D sequencing runs
         self.temp_folder        = FolderHandler()     # object for holding temporary files (non-toil)
         self.read_name          = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
+        self.output_formats     = {"full": 0, "variantCaller": 1, "assignments": 2}
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
@@ -108,53 +110,38 @@ class SignalAlignment(object):
             model_label = ".sm"
             stateMachineType_flag = ""
 
-        cigar_string, strand, mapped_refernce = generateGuideAlignment(bwa_index=self.bwa_index,
-                                                                       query=read_fasta_,
-                                                                       temp_sam_path=temp_samfile_,
-                                                                       target_regions=self.target_regions)
-        cig_handle = open(cigar_file, "w")
-        cig_handle.write(cigar_string + "\n")
-        cig_handle.close()
-        if mapped_refernce not in self.reference_map.keys():
-            if mapped_refernce is False:
-                print("[SignalAlignment::run]Read {read} didn't map"
-                      "".format(read=read_label), file=sys.stderr)
-            else:
-                self.failStop("[SignalAlignment::run]Reference {ref} not found in contigs"
-                              "{keys}".format(ref=mapped_refernce, keys=self.reference_map.keys()),
-                              npRead)
+        guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_, temp_sam_path=temp_samfile_,
+                                                 target_regions=self.target_regions)
+        ok = guide_alignment.validate(self.reference_map.keys())
+        if not ok:
+            self.failStop("[SignalAlignment.run]ERROR getting guide alignment", npRead)
             return False
 
-        # this gives the format: /directory/for/files/file.model.orientation.tsv
-        posteriors_file_path = ''
+        cig_handle = open(cigar_file_, "w")
+        cig_handle.write(guide_alignment.cigar + "\n")
+        cig_handle.close()
 
+        # next section makes the output file name with the format: /directory/for/files/file.model.orientation.tsv
+        posteriors_file_path = ''
         # forward strand
-        if strand == "+":
+        if guide_alignment.strand == "+":
             if self.output_format == "full":
-                posteriors_file_path = self.destination + read_name + model_label + ".forward.tsv"
+                posteriors_file_path = self.destination + read_label + model_label + ".forward.tsv"
             elif self.output_format == "variantCaller":
-                posteriors_file_path = self.destination + read_name + model_label + ".tsv"
+                posteriors_file_path = self.destination + read_label + model_label + ".tsv"
             else:
-                posteriors_file_path = self.destination + read_name + model_label + ".assignments"
+                posteriors_file_path = self.destination + read_label + model_label + ".assignments"
 
         # backward strand
-        if strand == "-":
+        if guide_alignment.strand == "-":
             if self.output_format == "full":
-                posteriors_file_path = self.destination + read_name + model_label + ".backward.tsv"
+                posteriors_file_path = self.destination + read_label + model_label + ".backward.tsv"
             elif self.output_format == "variantCaller":
-                posteriors_file_path = self.destination + read_name + model_label + ".tsv"
+                posteriors_file_path = self.destination + read_label + model_label + ".tsv"
             else:
-                posteriors_file_path = self.destination + read_name + model_label + ".assignments"
-
-        # didn't map
-        elif (strand != "+") and (strand != "-"):
-            print("[SignalAlignment::run]- {read} gave unrecognizable strand flag: {flag}".format(read=read_label, flag=strand),
-                  file=sys.stderr)
-            temp_folder.remove_folder()
-            return False
+                posteriors_file_path = self.destination + read_label + model_label + ".assignments"
 
         # Alignment/Expectations routine
-
         # containers and defaults
         path_to_signalAlign = "./signalMachine"
 
@@ -162,15 +149,17 @@ class SignalAlignment(object):
 
         # input (match) models
         if self.in_templateHmm is None:
-            self.in_templateHmm = default_template_model_from_version(version=version)
+            self.in_templateHmm = defaultModelFromVersion(strand="template", version=version)
         if self.twoD_chemistry:
             if self.in_complementHmm is None:
-                self.in_complementHmm = default_complement_model_from_version(version=version,
-                                                                              pop1_complement=pop1_complement)
+                self.in_complementHmm = defaultModelFromVersion(strand="complement", version=version,
+                                                                pop1_complement=pop1_complement)
 
         assert self.in_templateHmm is not None
         if self.twoD_chemistry:
-            assert self.in_complementHmm is not None
+            if self.in_complementHmm is None:
+                self.failStop("[SignalAlignment.run]ERROR Need to have complement HMM for 2D analysis", npRead)
+                return False
 
         template_model_flag = "-T {} ".format(self.in_templateHmm)
         if self.twoD_chemistry:
@@ -178,17 +167,17 @@ class SignalAlignment(object):
         else:
             complement_model_flag = ""
 
-        print("signalAlign - NOTICE: template model {t} complement model {c}"
+        print("[SignalALignment.run]NOTICE: template model {t} complement model {c}"
               "".format(t=self.in_templateHmm, c=self.in_complementHmm), file=sys.stderr)
 
         # reference sequences
-        assert self.reference_map[mapped_refernce]["forward"] is not None
-        assert self.reference_map[mapped_refernce]["backward"] is not None
-        forward_reference = self.reference_map[mapped_refernce]["forward"]
-        backward_reference = self.reference_map[mapped_refernce]["backward"]
+        assert self.reference_map[guide_alignment.reference_name]["forward"] is not None
+        assert self.reference_map[guide_alignment.reference_name]["backward"] is not None
+        forward_reference  = self.reference_map[guide_alignment.reference_name]["forward"]
+        backward_reference = self.reference_map[guide_alignment.reference_name]["backward"]
         assert os.path.isfile(forward_reference)
         assert os.path.isfile(backward_reference)
-        forward_ref_flag = "-f {f_ref} ".format(f_ref=forward_reference)
+        forward_ref_flag  = "-f {f_ref} ".format(f_ref=forward_reference)
         backward_ref_flag = "-b {b_ref} ".format(b_ref=backward_reference)
 
         # input HDPs
@@ -221,11 +210,10 @@ class SignalAlignment(object):
         #trim_flag = "-m 9999"
 
         # output format
-        fmts = {"full": 0, "variantCaller": 1, "assignments": 2}
-        if self.output_format not in fmts.keys():
-            temp_folder.remove_folder()
+        if self.output_format not in self.output_formats.keys():
+            self.failStop("[SignalAlignment.run]ERROR illegal outpur format selected %s" % self.output_format)
             return False
-        out_fmt = "-s {fmt} ".format(fmt=fmts[self.output_format])
+        out_fmt = "-s {fmt} ".format(fmt=self.output_formats[self.output_format])
 
         # degenerate nucleotide information
         if self.degenerate is not None:
@@ -239,28 +227,29 @@ class SignalAlignment(object):
             twoD_flag = ""
         # commands
         if get_expectations:
-            template_expectations_file_path = self.destination + read_name + ".template.expectations"
-            complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
+            template_expectations_file_path   = self.destination + read_label + ".template.expectations"
+            complement_expectations_file_path = self.destination + read_label + ".complement.expectations"
 
             command = \
                 "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
                 "-t {templateExpectations} -c {complementExpectations}"\
-                .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag,
-                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file,
-                        npRead=temp_npRead, readLabel=read_label, td=twoD_flag,
+                .format(vA=path_to_signalAlign, model=stateMachineType_flag,
+                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
+                        npRead=npRead_, readLabel=read_label, td=twoD_flag,
                         templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag, degen=degenerate_flag, sparse=out_fmt)
         else:
+            print("read_label", read_label)
             command = \
                 "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
                 "-u {posteriors} {hdp}-L {readLabel}"\
-                .format(cigar=cigar_string, vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
-                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file,
-                        readLabel=read_label, npRead=temp_npRead, td=twoD_flag,
+                .format(vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
+                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
+                        readLabel=read_label, npRead=npRead_, td=twoD_flag,
                         t_model=template_model_flag, c_model=complement_model_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag)
@@ -268,7 +257,7 @@ class SignalAlignment(object):
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
-        temp_folder.remove_folder()
+        self.temp_folder.remove_folder()
         return True
 
     def prepare_oned(self, nanopore_read, oned_read_path):

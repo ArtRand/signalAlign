@@ -3,8 +3,6 @@ from __future__ import print_function
 import sys
 import h5py
 
-import numpy as np
-
 from itertools import islice
 
 
@@ -12,6 +10,7 @@ TEMPLATE_BASECALL_KEY_0 = "/Analyses/Basecall_1D_000"
 TWOD_BASECALL_KEY_0     = "/Analyses/Basecall_2D_000"
 VERSION_KEY             = "dragonet version"
 SUPPORTED_1D_VERSIONS   = ("1.23.0", "1.22.4")
+
 
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False):
@@ -28,7 +27,7 @@ class NanoporeRead(object):
         self.complement_strand_event_map = []  # map of events to kmers in the 1D complement read
         self.template_event_map = []           # map of template events to kmers in 2D read
         self.complement_event_map = []         # map of complement events to kmers in 2D read
-        self.stay_prob = 0                     # TODO, do I need this
+        self.stay_prob = 0                     # TODO, do I need this?
         self.template_model_name = ""          # legacy, for reads base-called by a specific model (template)
         self.complement_model_name = ""        # legacy, for reads base-called by a specific model (complement)
         self.template_scale = 1                # initial values for scaling parameters
@@ -71,7 +70,6 @@ class NanoporeRead(object):
                 self.close()
                 return False
         if self.twoD:
-            raise NotImplementedError
             ok = self._initialize_twoD(parent_job)
         else:
             ok = self._initialize(parent_job)
@@ -124,7 +122,7 @@ class NanoporeRead(object):
 
         return True
 
-    def _initialize_twoD(self, get_sequence=False):
+    def _initialize_twoD(self, parent_job=None):
         self.has2D = False
         self.has2D_alignment_table = False
 
@@ -132,9 +130,9 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        highest_2d_basecall = self.get_latest_basecall_edition("/Analyses/Basecall_2D_00{}")
-        twoD_address = "/Analyses/Basecall_2D_00{}".format(highest_2d_basecall)
-        assert(twoD_address in self.fastFive), "[NanoporeRead::initialize_twoD] Didn't find two D address"
+        twoD_address = self.get_latest_basecall_edition("/Analyses/Basecall_2D_00{}")
+        assert(twoD_address in self.fastFive), "[NanoporeRead::initialize_twoD] Didn't find twoD address, "\
+                                               "looked here %s " % twoD_address
 
         self.version = self.fastFive[twoD_address].attrs["dragonet version"]
 
@@ -146,10 +144,9 @@ class NanoporeRead(object):
             return False
 
         if self.version == "1.15.0":
-            oneD_address = "/Analyses/Basecall_2D_00{}".format(highest_2d_basecall)
+            oneD_address = self.get_latest_basecall_edition("/Analyses/Basecall_2D_00{}")
         else:
-            highest_1d_basecall = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
-            oneD_address = "/Analyses/Basecall_1D_00{}".format(highest_1d_basecall)
+            oneD_address = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
 
         twoD_alignment_table_address = twoD_address + "/BaseCalled_2D/Alignment"
         if twoD_alignment_table_address in self.fastFive:
@@ -158,12 +155,11 @@ class NanoporeRead(object):
                 self.has2D_alignment_table = True
             self.kmer_length = len(self.twoD_alignment_table[0][2])
 
-        if get_sequence is True:
-            twoD_read_sequence_address = twoD_address + "/BaseCalled_2D/Fastq"
-            if twoD_read_sequence_address in self.fastFive:
-                self.has2D = True
-                self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
-                self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
+        twoD_read_sequence_address = twoD_address + "/BaseCalled_2D/Fastq"
+        if twoD_read_sequence_address in self.fastFive:
+            self.has2D = True
+            self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
+            self.read_label = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
 
         # initialize version-specific paths
         if self.version == "1.15.0":

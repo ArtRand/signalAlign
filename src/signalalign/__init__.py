@@ -1,3 +1,4 @@
+import os
 import re
 
 ALLOWED_FLAGS = (0, 16)
@@ -70,3 +71,44 @@ def exonerateCigarWithStrandOrientation(aligned_segment, samfile):
                                                               cigar_string)
 
     return exonerate_cigar, True
+
+
+def defaultModelFromVersion(version, strand, pop1_complement=False):
+    def default_template_model_from_version(version):
+        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0"]
+        assert version in supported_versions, "got version {}".format(version)
+        version_index = supported_versions.index(version)
+        if version_index <= 2:
+            r7_3_default_template_model = "../models/testModelR73_acegot_template.model"
+            assert os.path.exists(r7_3_default_template_model), "Didn't find default template R7.3 model"
+            return r7_3_default_template_model
+        elif version_index == 5:
+            r94_default_template_model = "../models/testModelR9p4_acegt_template.model"
+            assert os.path.exists(r94_default_template_model), "Didn't find default R9.4 model"
+            return r94_default_template_model
+        else:
+            r9_default_template_model = "../models/testModelR9_template.model"
+            assert os.path.exists(r9_default_template_model), "Didn't find default template R9 model"
+            return r9_default_template_model
+
+    def default_complement_model_from_version(version, pop1_complement=False):
+        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4"]
+        assert version in supported_versions, "got version {}".format(version)
+        version_index = supported_versions.index(version)
+
+        if version_index <= 2:
+            r7_3_default_complement_model = "../models/testModelR73_acegot_complement.model" if not pop1_complement \
+                else "../models/testModelR9_complement_pop2.model"
+            assert os.path.exists(r7_3_default_complement_model), "Didn't find default complement R7.3 model"
+            return r7_3_default_complement_model
+        else:
+            r9_default_complement_model = "../models/testModelR9_complement.model"
+            assert os.path.exists(r9_default_complement_model), "Didn't find default complement R9 model"
+            return r9_default_complement_model
+
+    if strand == "template":
+        return default_template_model_from_version(version)
+    elif strand == "complement":
+        return default_complement_model_from_version(version, pop1_complement)
+    else:
+        return None
