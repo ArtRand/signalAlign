@@ -3,14 +3,15 @@
 from setuptools import setup, find_packages
 
 setup(name="signalAlign",
-      version="0.1.1",
-      description="Python objects and Toil-based functions for signal-level analysis of ONT data",
+      version="0.1.3",
+      description="A library for signal-level analysis of ONT data",
       author="Art Rand",
       author_email="arand@soe.ucsc.edu",
       url="https://github.com/ArtRand/signalAlign",
       package_dir={"": "src"},
       packages=find_packages("src"),
       install_requires=["numpy==1.9.2",
+                        "marginAlign==1.1.9",
                         "h5py==2.6.0",
                         "pysam==0.8.2.1",
                         "pandas==0.18.1",

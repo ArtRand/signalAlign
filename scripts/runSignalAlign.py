@@ -10,8 +10,9 @@ from argparse import ArgumentParser
 from random import shuffle
 from multiprocessing import Process, Queue, current_process, Manager
 
-from signalalign.utils.fileHandlers import FolderHandler
+from signalalign.SignalAlignment import SignalAlignment
 from signalalign.utils import process_reference_fasta
+from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import getBwaIndex
 from signalalign.motif import getDegenerateEnum
 

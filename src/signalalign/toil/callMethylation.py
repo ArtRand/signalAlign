@@ -215,7 +215,8 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
             job.fileStore.logToMaster("[calculateMethylationProbabilityJobFunction]"
                                       "Failed to download and upzip %s NanoporeReads" % failed)
 
-    posteriors      = LocalFile(workdir=workdir)  # file to collect the posterior probs
+    # file to collect the posterior probs
+    posteriors      = LocalFile(workdir=workdir, filename="%s_%s.tsv" % (config["sample_label"], batch_number))
     degenerate_enum = getVariantCallFunctions(config["degenerate"]).enum()
 
     # do the signal alignment, and get the posterior probabilities
@@ -237,6 +238,10 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
     # underscore means `file` or `file-path`
     aligned_pairs = _parse_probabilities()
     expectations_ = _sumExpectationsOverColumns()
+    if config["probs_output_dir"] is not None:
+        job.fileStore.logToMaster("writing probs")
+        deliverOutput(job, posteriors, config["probs_output_dir"])
+
     return job.fileStore.writeGlobalFile(expectations_.fullpathGetter())
 
 
@@ -256,6 +261,7 @@ def callMethylationJobFunction(job, config, alignment_shard, prob_fids):
         for base in base_options:
             try:
                 prob, coverage = posterior_probs[base]
+                # TODO maybe put readScore here?
                 _handle.write("%s,%s,%s\t" % (base, prob, coverage))
             except KeyError:
                 _handle.write("%s,%s,%s\t" % (base, 0.0, 0))

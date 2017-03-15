@@ -61,13 +61,13 @@ class NanoporeRead(object):
                 highest += 1
                 continue
             else:
-               return address.format(highest - 1)  # the last base-called version we saw
+                return address.format(highest - 1)  # the last base-called version we saw
 
     def Initialize(self, parent_job):
         if not self.is_open:
             ok = self.open()
             if not ok:
-                parent_job.fileStore.logToMaster("[NanoporeRead:Initialize]ERROR opening %s" % self.filename)
+                self.logError(parent_job, "[NanoporeRead:Initialize]ERROR opening %s" % self.filename)
                 self.close()
                 return False
         if self.twoD:
@@ -81,6 +81,7 @@ class NanoporeRead(object):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """
+        ## XXX TODO LEFT OFF HERE
         if TEMPLATE_BASECALL_KEY_0 not in self.fastFive:  # not base-called
             parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s not basecalled" % self.filename)
             self.close()
@@ -431,7 +432,7 @@ class NanoporeRead(object):
 
     def Write(self, parent_job, out_file, initialize=True):
         if initialize:
-            ok = self.Initialize()
+            ok = self.Initialize(parent_job)
             if not ok:
                 self.close()
                 return False
@@ -548,3 +549,9 @@ class NanoporeRead(object):
     def close(self):
         self.fastFive.close()
 
+    @staticmethod
+    def logError(parent_job, message):
+        if parent_job is None:
+            print(message, file=sys.stderr)
+        else:
+            parent_job.fileStore.logToMaster(message)

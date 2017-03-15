@@ -152,7 +152,7 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
 void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachine *sM, char *target, bool forward,
                            int64_t eventSequenceOffset, int64_t referenceSequenceOffset, stList *alignedPairs,
-                           Strand strand) {
+                           Strand strand, double posteriorScore) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
     char *forwardLabel = forward ? "forward" : "backward";
@@ -207,8 +207,8 @@ void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachi
             char base = pathKmer[queryPosition];
             // position in the reference we're reporting on
             int64_t reportPosition = x_adj + unadjustedQueryPosition;
-            fprintf(fH, "%"PRId64"\t%"PRId64"\t%c\t%f\t%s\t%s\t%s\n", y, reportPosition, base, p,
-                    strandLabel, forwardLabel, readLabel);
+            fprintf(fH, "%"PRId64"\t%"PRId64"\t%c\t%f\t%s\t%s\t%s\t%f\n", y, reportPosition, base, p,
+                    strandLabel, forwardLabel, readLabel, posteriorScore);
         }
         free(k_i);
         free(refKmer);
@@ -255,10 +255,21 @@ void writeAssignments(char *posteriorProbsFile, StateMachine *sM, double *events
     fclose(fH);
 }
 
-void outputAlignment(OutputFormat fmt,
-                     char *posteriorProbsFile, char *readLabel, StateMachine *sM, NanoporeReadAdjustmentParameters npp,
-                     double *events, char *target, bool forward, char *contig, int64_t eventSequenceOffset,
-                     int64_t referenceSequenceOffset, stList *alignedPairs, Strand strand) {
+void outputAlignment(
+        OutputFormat fmt,
+        char *posteriorProbsFile,
+        char *readLabel,
+        StateMachine *sM,
+        NanoporeReadAdjustmentParameters npp,
+        double *events,
+        char *target,
+        bool forward,
+        char *contig,
+        int64_t eventSequenceOffset,
+        int64_t referenceSequenceOffset,
+        stList *alignedPairs, 
+        double posteriorScore,
+        Strand strand) {
     switch (fmt) {
         case full:
             writePosteriorProbsFull(posteriorProbsFile, readLabel, sM, npp, events, target, forward, contig,
@@ -266,7 +277,7 @@ void outputAlignment(OutputFormat fmt,
             break;
         case variantCaller:
             writePosteriorProbsVC(posteriorProbsFile, readLabel, sM, target, forward, eventSequenceOffset,
-                                  referenceSequenceOffset, alignedPairs, strand);
+                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore);
             break;
         case assignments:
             writeAssignments(posteriorProbsFile, sM, events, eventSequenceOffset, npp, alignedPairs, strand);
@@ -750,7 +761,7 @@ int main(int argc, char *argv[]) {
         if (posteriorProbsFile != NULL) {
             outputAlignment(outFmt, posteriorProbsFile, readLabel, sMt, npRead->templateParams, npRead->templateEvents,
                             R->getTemplateTargetSequence(R), forward, pA->contig1, tCoordinateShift, rCoordinateShift_t,
-                            templateAlignedPairs, template);
+                            templateAlignedPairs, templatePosteriorScore,template);
         }
 
         stList *complementAlignedPairs;
@@ -785,7 +796,8 @@ int main(int argc, char *argv[]) {
             if (posteriorProbsFile != NULL) {
                 outputAlignment(outFmt, posteriorProbsFile, readLabel, sMc, npRead->complementParams,
                                 npRead->complementEvents, R->getComplementTargetSequence(R), forward, pA->contig1,
-                                cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complement);
+                                cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complementPosteriorScore,
+                                complement);
             }
 
         }

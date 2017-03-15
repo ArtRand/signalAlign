@@ -41,6 +41,8 @@ class SignalAlignment(object):
         self.output_format      = output_format       # smaller output files
         self.degenerate         = degenerate          # set of nucleotides for degenerate characters
         self.twoD_chemistry     = twoD_chemistry      # flag for 2D sequencing runs
+        self.temp_folder        = FolderHandler()     # object for holding temporary files (non-toil)
+        self.read_name          = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
@@ -71,34 +73,24 @@ class SignalAlignment(object):
             print("[SignalAlignment.run]ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5))
             return False
 
-        # containers and defaults
-        read_label = self.in_fast5.split("/")[-1]       # used in the posteriors file as identifier
-        read_name  = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
-
-        # object for handling temporary files
-        temp_folder   = FolderHandler()
-        temp_folder.open_folder(self.destination + "tempFiles_{readLabel}".format(readLabel=read_label))
-
-        # temporary filepaths, there aren't files at the end of these paths yet, but we're going to make them
-        temp_npRead_  = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
-        read_fasta_   = temp_folder.add_file_path("temp_seq_{read}.fa".format(read=read_label))
-        temp_samfile_ = temp_folder.add_file_path("temp_sam_file_{read}.sam".format(read=read_label))
-        cigar_file_   = temp_folder.add_file_path("temp_cigar_{read}.txt".format(read=read_label))
-
-        # make the npRead and fasta
-        if not self.twoD_chemistry:
-            ok, version, pop_1 = self.prepare_oned(npRead_path=temp_npRead_,
-                                                   oneD_read_path=read_fasta_)
-        else:
-            ok, version, pop1_complement = self.get_npRead_2dseq_and_models(fast5=self.in_fast5,
-                                                                            npRead_path=temp_npRead_,
-                                                                            twod_read_path=read_fasta_)
-
+        self.openTempFolder("tempFiles_%s" % self.read_name)
+        npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
+        npRead  = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry)
+        ok      = npRead.Write(parent_job=None, out_file=npRead_, initialize=True)
         if not ok:
-            print("[SignalAlignment.run]File: {file} did not pass checks"
-                  "".format(file=read_label), file=sys.stderr)
-            temp_folder.remove_folder()
+            self.failStop("[SignalAlignment.run]File: %s did not pass initial checks" % self.read_name, npRead)
             return False
+
+        read_label    = npRead.read_label  # use this to identify the read throughout
+        # paths to temporary files
+        read_fasta_   = self.addTempFilePath("temp_seq_%s.fa" % read_label)
+        temp_samfile_ = self.addTempFilePath("temp_sam_file_%s.sam" % read_label)
+        cigar_file_   = self.addTempFilePath("temp_cigar_%s.txt" % read_label)
+        if self.twoD_chemistry:
+            ok, version, pop1_complement = self.prepare_twod(nanopore_read=npRead, twod_read_path=read_fasta_)
+        else:
+            ok, version, _ = self.prepare_oned(npRead_path=npRead_, oneD_read_path=read_fasta_)
+            pop1_complement = None
 
         # add an indicator for the model being used
         if self.stateMachineType == "threeState":
@@ -115,6 +107,7 @@ class SignalAlignment(object):
             model_label = ".sm"
             stateMachineType_flag = ""
 
+        ## XXX TODO left off here
         # get orientation and cigar from BWA this serves as the guide alignment
         cigar_string, strand, mapped_refernce = exonerated_bwa_pysam(bwa_index=self.bwa_index,
                                                                      query=read_fasta,
@@ -128,10 +121,9 @@ class SignalAlignment(object):
                 print("[SignalAlignment::run]Read {read} didn't map"
                       "".format(read=read_label), file=sys.stderr)
             else:
-                print("[SignalAlignment::run]Reference {ref} not found in contigs"
-                      "{keys}".format(ref=mapped_refernce, keys=self.reference_map.keys()),
-                      file=sys.stderr)
-            temp_folder.remove_folder()
+                self.failStop("[SignalAlignment::run]Reference {ref} not found in contigs"
+                              "{keys}".format(ref=mapped_refernce, keys=self.reference_map.keys()),
+                              npRead)
             return False
 
         # this gives the format: /directory/for/files/file.model.orientation.tsv
@@ -280,53 +272,45 @@ class SignalAlignment(object):
         temp_folder.remove_folder()
         return True
 
-    def prepare_oned(self, npRead_path, oneD_read_path):
-        out_file  = open(npRead_path, "w")
-        read_file = open(oneD_read_path, "w")
-        npRead    = NanoporeRead(self.in_fast5, False)
-        ok        = npRead.write_npRead(out_file=out_file)
-        if not ok:
-            npRead.close()
+    def prepare_oned(self, nanopore_read, oned_read_path):
+        try:
+            read_file = open(oned_read_path, "w")
+            fastaWrite(fileHandleOrFile=read_file,
+                       name=nanopore_read.read_label,
+                       seq=nanopore_read.template_read)
+            version = nanopore_read.version
             read_file.close()
-            out_file.close()
-            return False, None, False
-        fastaWrite(fileHandleOrFile=read_file, name=self.in_fast5, seq=npRead.template_read)
-        version = npRead.version
-
-        read_file.close()
-        out_file.close()
-        npRead.close()
-        return True, version, False
-
-    def get_npRead_2dseq_and_models(self, npRead_path, twod_read_path):
-        """process a MinION .fast5 file into a npRead file for use with signalAlign also extracts
-        the 2D read into fasta format
-        """
-        # setup
-        out_file   = open(npRead_path, 'w')
-        temp_fasta = open(twod_read_path, "w")
-
-        # load MinION read
-        npRead = NanoporeRead(self.in_fast5, True)
-
-        # only working with 2D reads right now
-        if npRead.has2D_alignment_table is False:
-            npRead.close()
+            nanopore_read.close()
+            return True, version, False
+        except Exception:
             return False, None, False
 
-        proceed = npRead.write_npRead(out_file=out_file)
-
-        if proceed:
-            # make the 2d read
-            fastaWrite(fileHandleOrFile=temp_fasta, name=self.in_fast5, seq=npRead.alignment_table_sequence)
-            if npRead.complement_model_id == "complement_median68pA_pop1.model":
-                pop1_complement = True
-            else:
-                pop1_complement = False
-            version = npRead.version
-            npRead.close()
-            return True, version, pop1_complement
+    def prepare_twod(self, nanopore_read, twod_read_path):
+        # check for table to make 'assembled' 2D alignment table fasta with
+        if nanopore_read.has2D_alignment_table is False:
+            nanopore_read.close()
+            return False, None, False
+        fasta_handle = open(twod_read_path, "w")
+        fastaWrite(fileHandleOrFile=fasta_handle,
+                   name=nanopore_read.read_label,
+                   seq=nanopore_read.alignment_table_sequence)
+        if nanopore_read.complement_model_id == "complement_median68pA_pop1.model":
+            pop1_complement = True
         else:
-            npRead.close()
-            print("problem making npRead for {fast5}".format(fast5=self.in_fast5), file=sys.stderr)
-            return False, None, False
+            pop1_complement = False
+        version = nanopore_read.version
+        fasta_handle.close()
+        nanopore_read.close()
+        return True, version, pop1_complement
+
+    def openTempFolder(self, temp_dir):
+        self.temp_folder.open_folder("%s%s" % (self.destination, temp_dir))
+
+    def addTempFilePath(self, path_to_add):
+        return self.temp_folder.add_file_path(path_to_add)
+
+    def failStop(self, message, nanopore_read=None):
+        self.temp_folder.remove_folder()
+        if nanopore_read is not None:
+            nanopore_read.close()
+        print(message, file=sys.stderr)
