@@ -131,15 +131,18 @@ class NanoporeRead(object):
             return False
 
         twoD_address = self.get_latest_basecall_edition("/Analyses/Basecall_2D_00{}")
-        assert(twoD_address in self.fastFive), "[NanoporeRead::initialize_twoD] Didn't find twoD address, "\
-                                               "looked here %s " % twoD_address
+        if twoD_address not in self.fastFive:
+            self.logError("[NanoporeRead::initialize_twoD] Didn't find twoD address, looked here %s " % twoD_address, 
+                          parent_job)
+            self.close()
+            return False
 
         self.version = self.fastFive[twoD_address].attrs["dragonet version"]
 
         supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0"]
         if self.version not in supported_versions:
-            print("[NanoporeRead::initialize_twoD]Unsupported Version {} (1.15.0, 1.19.0, 1.20.0, "
-                  "1.22.2, 1.22.4, 1.23.0 supported)".format(self.version), file=sys.stdout)
+            self.logError("[NanoporeRead::initialize_twoD]Unsupported Version {} (1.15.0, 1.19.0, 1.20.0, "
+                          "1.22.2, 1.22.4, 1.23.0 supported)".format(self.version), parent_job)
             self.close()
             return False
 
@@ -198,7 +201,7 @@ class NanoporeRead(object):
             self.complement_read = self.fastFive[oneD_address + "/BaseCalled_complement/Fastq"][()].split()[2]
             return True
         else:
-            print("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)", file=sys.stdout)
+            self.logError("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)", parent_job)
             return False
 
     def assemble_2d_sequence_from_table(self):
