@@ -16,7 +16,8 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${
       #nanoporeParams
       #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
       #${signalAlignBin}/empire ${signalAlignBin}/jamison \
-	cd externalTools && make all
+
+core : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
 
 clean_light:
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi

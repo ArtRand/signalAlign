@@ -67,7 +67,7 @@ class NanoporeRead(object):
         if not self.is_open:
             ok = self.open()
             if not ok:
-                self.logError(parent_job, "[NanoporeRead:Initialize]ERROR opening %s" % self.filename)
+                self.logError("[NanoporeRead:Initialize]ERROR opening %s" % self.filename, parent_job)
                 self.close()
                 return False
         if self.twoD:
@@ -81,24 +81,23 @@ class NanoporeRead(object):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """
-        ## XXX TODO LEFT OFF HERE
         if TEMPLATE_BASECALL_KEY_0 not in self.fastFive:  # not base-called
-            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s not basecalled" % self.filename)
+            self.logError("[NanoporeRead:_initialize]ERROR %s not basecalled" % self.filename, parent_job)
             self.close()
             return False
 
         oneD_root_address = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
 
         if VERSION_KEY not in self.fastFive[oneD_root_address].attrs.keys():
-            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s missing version" % self.filename)
+            self.logError("[NanoporeRead:_initialize]ERROR %s missing version" % self.filename, parent_job)
             self.close()
             return False
 
         self.version = self.fastFive[oneD_root_address].attrs["dragonet version"]
 
         if self.version not in SUPPORTED_1D_VERSIONS:
-            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s unsupported version %s "
-                                             % (self.filename, self.version))
+            self.logError("[NanoporeRead:_initialize]ERROR %s unsupported version %s " % (self.filename, self.version),
+                          parent_job)
             self.close()
             return False
 
@@ -108,7 +107,7 @@ class NanoporeRead(object):
 
         fastq_sequence_address = "%s/BaseCalled_template/Fastq" % oneD_root_address
         if fastq_sequence_address not in self.fastFive:
-            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s missing fastq" % self.filename)
+            self.logError("[NanoporeRead:_initialize]ERROR %s missing fastq" % self.filename, parent_job)
             self.close()
             return False
 
@@ -117,9 +116,9 @@ class NanoporeRead(object):
         self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
         self.template_read_length = len(self.template_read)
         if self.template_read_length <= 0 or not self.read_label or self.kmer_length <= 0:
-            parent_job.fileStore.logToMaster("[NanoporeRead:_initialize]ERROR %s illegal read parameters "
-                                             "template_read_length: %s, read_label: %s, kmer_length: %s"
-                                             % (self.template_read_length, self.read_label, self.kmer_length))
+            self.logError("[NanoporeRead:_initialize]ERROR %s illegal read parameters "
+                          "template_read_length: %s, read_label: %s, kmer_length: %s"
+                          % (self.template_read_length, self.read_label, self.kmer_length), parent_job)
             self.close()
             return False
 
@@ -550,7 +549,7 @@ class NanoporeRead(object):
         self.fastFive.close()
 
     @staticmethod
-    def logError(parent_job, message):
+    def logError(message, parent_job=None):
         if parent_job is None:
             print(message, file=sys.stderr)
         else:

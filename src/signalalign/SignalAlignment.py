@@ -3,9 +3,9 @@ from __future__ import print_function
 import sys
 import os
 
-
 from sonLib.bioio import fastaWrite
 from signalalign.nanoporeRead import NanoporeRead
+from signalalign.utils.bwaWrapper import generateGuideAlignment
 from signalalign.utils.fileHandlers import FolderHandler
 
 
@@ -76,20 +76,21 @@ class SignalAlignment(object):
         self.openTempFolder("tempFiles_%s" % self.read_name)
         npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
         npRead  = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry)
-        ok      = npRead.Write(parent_job=None, out_file=npRead_, initialize=True)
+        fH      = open(npRead_, "w")
+        ok      = npRead.Write(parent_job=None, out_file=fH, initialize=True)
+        fH.close()
         if not ok:
             self.failStop("[SignalAlignment.run]File: %s did not pass initial checks" % self.read_name, npRead)
             return False
 
         read_label    = npRead.read_label  # use this to identify the read throughout
-        # paths to temporary files
         read_fasta_   = self.addTempFilePath("temp_seq_%s.fa" % read_label)
         temp_samfile_ = self.addTempFilePath("temp_sam_file_%s.sam" % read_label)
         cigar_file_   = self.addTempFilePath("temp_cigar_%s.txt" % read_label)
         if self.twoD_chemistry:
             ok, version, pop1_complement = self.prepare_twod(nanopore_read=npRead, twod_read_path=read_fasta_)
         else:
-            ok, version, _ = self.prepare_oned(npRead_path=npRead_, oneD_read_path=read_fasta_)
+            ok, version, _ = self.prepare_oned(nanopore_read=npRead, oned_read_path=read_fasta_)
             pop1_complement = None
 
         # add an indicator for the model being used
@@ -107,12 +108,10 @@ class SignalAlignment(object):
             model_label = ".sm"
             stateMachineType_flag = ""
 
-        ## XXX TODO left off here
-        # get orientation and cigar from BWA this serves as the guide alignment
-        cigar_string, strand, mapped_refernce = exonerated_bwa_pysam(bwa_index=self.bwa_index,
-                                                                     query=read_fasta,
-                                                                     temp_sam_path=temp_samfile,
-                                                                     target_regions=self.target_regions)
+        cigar_string, strand, mapped_refernce = generateGuideAlignment(bwa_index=self.bwa_index,
+                                                                       query=read_fasta_,
+                                                                       temp_sam_path=temp_samfile_,
+                                                                       target_regions=self.target_regions)
         cig_handle = open(cigar_file, "w")
         cig_handle.write(cigar_string + "\n")
         cig_handle.close()

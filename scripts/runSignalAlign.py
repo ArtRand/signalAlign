@@ -167,7 +167,7 @@ def main(args):
 
     # index the reference for bwa
     if args.bwt is not None:
-        print("signalAlign - using provided BWT %s" % args.bwt)
+        print("[RunSignalAlign]NOTICE - using provided BWT %s" % args.bwt)
         bwa_ref_index = args.bwt
     else:
         print("signalAlign - indexing reference", file=sys.stderr)

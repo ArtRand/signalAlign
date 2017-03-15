@@ -133,7 +133,6 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
         guide_aln = LocalFile(workdir=workdir)
         _handle   = open(guide_aln.fullpathGetter(), "w")
         _handle.write(cigar)
-        #job.fileStore.logToMaster("[SignalMachine]CIGAR %s" % cigar)
         _handle.close()
         require(os.path.exists(guide_aln.fullpathGetter()), "NO guide aln file")
         signalMachine_args = [
@@ -216,7 +215,7 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
                                       "Failed to download and upzip %s NanoporeReads" % failed)
 
     # file to collect the posterior probs
-    posteriors      = LocalFile(workdir=workdir, filename="%s_%s.tsv" % (config["sample_label"], batch_number))
+    posteriors      = LocalFile(workdir=workdir, filename="%s_%s.dat" % (config["sample_label"], batch_number))
     degenerate_enum = getVariantCallFunctions(config["degenerate"]).enum()
 
     # do the signal alignment, and get the posterior probabilities
@@ -239,7 +238,6 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
     aligned_pairs = _parse_probabilities()
     expectations_ = _sumExpectationsOverColumns()
     if config["probs_output_dir"] is not None:
-        job.fileStore.logToMaster("writing probs")
         deliverOutput(job, posteriors, config["probs_output_dir"])
 
     return job.fileStore.writeGlobalFile(expectations_.fullpathGetter())
