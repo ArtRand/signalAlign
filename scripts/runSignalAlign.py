@@ -59,7 +59,7 @@ def parse_args():
                         required=False, default=None, help="tab separated table with regions to align to")
     parser.add_argument("--motif", action="store", dest="motif_key", default=None)
     parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
-                        dest='substitution_file', help="Ambiguity positions")
+                        dest='ambiguity_positions', help="Ambiguity positions")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
@@ -129,7 +129,8 @@ def main(args):
     reference_map = processReferenceFasta(fasta=args.ref,
                                           motif_key=args.motif_key,
                                           work_folder=temp_folder,
-                                          sub_char=args.ambig_char)
+                                          sub_char=args.ambig_char,
+                                          ambig_positions_file=args.ambiguity_positions)
 
     # index the reference for bwa
     if args.bwt is not None:
