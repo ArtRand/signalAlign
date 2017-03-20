@@ -5,6 +5,7 @@ import os
 import subprocess
 
 import pysam
+import numpy as np
 
 from signalalign import _parseCigar
 
@@ -93,6 +94,30 @@ def generateGuideAlignment(bwa_index, query, temp_sam_path, target_regions=None)
     is a problem with any of the steps or if the read maps to a region not included
     within TargetRegions
     """
+    class TargetRegions(object):
+        def __init__(self, tsv, already_sorted=False):
+            assert(os.stat(tsv).st_size != 0), "Empty regions file"
+
+            self.region_array = np.loadtxt(tsv, usecols=(0, 1), dtype=np.int32)
+
+            if len(self.region_array.shape) == 1:
+                a = np.empty([1, 2], dtype=np.int32)
+                a[0] = self.region_array
+                self.region_array = a
+
+            if not already_sorted:
+                self.region_array = np.sort(self.region_array, axis=1)
+
+        def check_aligned_region(self, left, right):
+            if right < left:
+                left, right = right, left
+            for region in self.region_array:
+                if (region[0] >= left) and (region[1] <= right):
+                    return True
+                else:
+                    continue
+            return False
+
     # align with bwa
     ok = Bwa.align(bwa_index=bwa_index, query=query, output_sam_path=temp_sam_path)
     if not ok:  # Bwa alignment fail
@@ -153,6 +178,7 @@ def generateGuideAlignment(bwa_index, query, temp_sam_path, target_regions=None)
         query_name, query_start, query_end, reference_name, reference_start, reference_end, strand, cigar_string)
 
     if target_regions is not None:
+        target_regions = TargetRegions(target_regions)
         keep = target_regions.check_aligned_region(reference_start, reference_end)
         if keep is False:
             print("[exonerated_bwa_pysam]Read does not map witin the target regions, passing "

@@ -14,7 +14,6 @@ class SignalAlignment(object):
     def __init__(self,
                  in_fast5,
                  reference_map,
-                 path_to_EC_refs,
                  destination,
                  stateMachineType,
                  bwa_index,
@@ -31,19 +30,18 @@ class SignalAlignment(object):
                  output_format="full"):
         self.in_fast5           = in_fast5            # fast5 file to align
         self.reference_map      = reference_map       # map with paths to reference sequences
-        self.path_to_EC_refs    = path_to_EC_refs     # place where the reference sequence with ambiguous characters is
         self.destination        = destination         # place where the alignments go, should already exist
         self.stateMachineType   = stateMachineType    # flag for signalMachine
         self.bwa_index          = bwa_index           # index of reference sequence
         self.threshold          = threshold           # min posterior probability to keep
         self.diagonal_expansion = diagonal_expansion  # alignment algorithm param
         self.constraint_trim    = constraint_trim     # alignment algorithm param
-        self.target_regions     = target_regions      # only signal-align reads that map to these positions
         self.output_format      = output_format       # smaller output files
         self.degenerate         = degenerate          # set of nucleotides for degenerate characters
         self.twoD_chemistry     = twoD_chemistry      # flag for 2D sequencing runs
         self.temp_folder        = FolderHandler()     # object for holding temporary files (non-toil)
         self.read_name          = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
+        self.target_regions     = target_regions
         self.output_formats     = {"full": 0, "variantCaller": 1, "assignments": 2}
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -205,9 +203,6 @@ class SignalAlignment(object):
             trim_flag = "-m {trim} ".format(trim=self.constraint_trim)
         else:
             trim_flag = ""
-
-        # NOTE: to turn off banded alignment, uncomment this flag, it just trimms away all of the anchors
-        #trim_flag = "-m 9999"
 
         # output format
         if self.output_format not in self.output_formats.keys():

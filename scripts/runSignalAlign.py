@@ -10,8 +10,8 @@ from argparse import ArgumentParser
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
-from signalalign.SignalAlignment import SignalAlignment
-from signalalign.utils import processReferenceFasta
+from signalalign.signalAlignment import SignalAlignment
+from signalalign.utils import processReferenceFasta, parseFofn
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import getBwaIndex
 from signalalign.motif import getDegenerateEnum
@@ -30,8 +30,8 @@ def parse_args():
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
     # optional arguments
-    parser.add_argument("--2d", action='store_true', dest="twoD", default=False)
-    parser.add_argument("--bwt", action='store', dest="bwt", default=None)
+    parser.add_argument("--2d", action='store_true', dest="twoD", default=False, help="flag, specify if using 2D reads")
+    parser.add_argument("--bwt", action='store', dest="bwt", default=None, help="path to BWT files. example: ../ref.fasta")
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -58,9 +58,8 @@ def parse_args():
     parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
                         required=False, default=None, help="tab separated table with regions to align to")
     parser.add_argument("--motif", action="store", dest="motif_key", default=None)
-    # TODO reimplement ambiguity positions
-    #parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
-    #                    dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
+                        dest='substitution_file', help="Ambiguity positions")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
@@ -73,40 +72,6 @@ def parse_args():
 
     args = parser.parse_args()
     return args
-
-
-def make_degenerate_reference_iterator(input_sequence, block_size=1, step=6):
-    """
-    input_sequence: string, input nucleotide sequence
-    out_path: string, path to directory to put new sequences with substituted degenerate characters
-    block_size: not implemented
-    step: number of bases between degenerate characters
-    :return (subbed sequence, complement subbed sequence)
-    """
-    complement_sequence = reverse_complement(dna=input_sequence, reverse=False, complement=True)
-
-    for s in xrange(0, step):
-        positions = xrange(s, len(input_sequence), step)
-        t_seq = list(input_sequence)
-        c_seq = list(complement_sequence)
-        for position in positions:
-            t_seq[position] = "X"
-            c_seq[position] = "X"
-        yield ''.join(t_seq), ''.join(c_seq)
-
-
-def write_degenerate_reference_set(input_fasta, out_path):
-    # get the first sequence from the FASTA
-    seq = ""
-    for header, comment, sequence in read_fasta(input_fasta):
-        seq += sequence
-        break
-
-    for i, s in enumerate(make_degenerate_reference_iterator(input_sequence=seq)):
-        with open(out_path + "forward_sub{i}.txt".format(i=i), 'w') as f:
-            f.write("{seq}".format(seq=s[0]))
-        with open(out_path + "backward_sub{i}.txt".format(i=i), 'w') as f:
-            f.write("{seq}".format(seq=s[1]))
 
 
 def aligner(work_queue, done_queue):
@@ -183,7 +148,7 @@ def main(args):
 
     # list of read files
     if args.fofn is not None:
-        fast5s = [x for x in parse_fofn(args.fofn) if x.endswith(".fast5")]
+        fast5s = [x for x in parseFofn(args.fofn) if x.endswith(".fast5")]
     else:
         fast5s = [args.files_dir + x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
 
@@ -195,7 +160,6 @@ def main(args):
     for fast5 in fast5s:
         alignment_args = {
             "reference_map": reference_map,
-            "path_to_EC_refs": None,  # TODO refactor this out!
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,
@@ -208,9 +172,9 @@ def main(args):
             "threshold": args.threshold,
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim,
-            "target_regions": target_regions,
             "degenerate": getDegenerateEnum(args.degenerate),
             "twoD_chemistry": args.twoD,
+            "target_regions": args.target_regions,
         }
         if args.DEBUG:
             alignment = SignalAlignment(**alignment_args)

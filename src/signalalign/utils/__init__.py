@@ -5,6 +5,15 @@ from signalalign.motif import getMotif
 from signalalign.utils.parsers import read_fasta
 
 
+def parseFofn(fofn_file):
+    files = []
+    with open(fofn_file, "r") as fH:
+        for l in fH:
+            files.append(l.strip())
+    assert len(files) > 0, "parse_fofn: error, didn't find any files in file of files {}".format(fofn_file)
+    return files
+
+
 def reverse_complement(dna, reverse=True, complement=True):
     """
     Make the reverse complement of a DNA sequence. You can also just make the

@@ -25,15 +25,16 @@ def parse_args():
     # required arguments
     parser.add_argument('--file_directory', '-d', action='append', default=None,
                         dest='files_dir', required=True, type=str,
-                        help="directories with fast5 files to train on")
+                        help="directories with fast5 files to train on. example: ../reads/")
     parser.add_argument('--ref', '-r', action='store', default=None, dest='ref', required=True, type=str,
-                        help="location of refrerence sequence in FASTA")
+                        help="location of refrerence sequence in FASTA, example: ../ref.fasta")
     parser.add_argument('--output_location', '-o', action='store', dest='out', default=None,
                         required=True, type=str,
-                        help="directory to put the trained model, and use for working directory.")
+                        help="directory to put the trained model, and use for working directory. example: ./scratch/")
     # optional arguments
-    parser.add_argument("--2d", action='store_true', dest="twoD", default=False)
-    parser.add_argument("--bwt", action='store', dest="bwt", default=None)
+    parser.add_argument("--2d", action='store_true', dest="twoD", default=False, help="flag, reads are 2D chemistry.")
+    parser.add_argument("--bwt", action='store', dest="bwt", default=None,
+                        help="path to BWT files. example: ../ref.fasta")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         default="threeState", required=False,
                         help="StateMachine options: threeState, threeStateHdp")
@@ -44,45 +45,24 @@ def parse_args():
     parser.add_argument('--train_amount', '-a', action='store', dest='amount', default=15000,
                         required=False, type=int,
                         help="limit the total length of sequence to use in training (batch size).")
-    parser.add_argument('--emissions', action='store_true', default=False, dest='emissions',
-                        help="Flag to train emissions, False by default")
-    parser.add_argument('--transitions', action='store_true', default=False, dest='transitions',
-                        help='Flag to train transitions, False by default')
-    parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
-                        default=0.5, help="posterior match probability threshold")
-    parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
-                        required=False, default=None, help="number of diagonals to expand around each anchor")
-    parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
-                        required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
-                        required=True, type=str, help="input HMM for template events, if you don't want the default")
+                        required=True, type=str, help="template model to bootstrap from, find a starting model in the "
+                        "models directory")
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
-                        required=True, type=str, help="input HMM for complement events, if you don't want the default")
+                        required=True, type=str, help="complement model to bootstrap from, find a starting model in the "
+                        "models directory")
     parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None,
                         help="path to template HDP model to use")
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
                         help="path to complement HDP model to use")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False, default=4,
                         type=int, help="number of jobs to run concurrently")
-    parser.add_argument('--test', action='store_true', default=False, dest='test')
-
-    # gibbs
-    parser.add_argument('--verbose', action='store_true', default=False, dest='verbose')
-    parser.add_argument('--samples', '-s', action='store', type=int, default=10000, dest='gibbs_samples')
-    parser.add_argument('--thinning', '-th', action='store', type=int, default=100, dest='thinning')
-    parser.add_argument('--min_assignments', action='store', type=int, default=30000, dest='min_assignments',
-                        help="Do not initiate Gibbs sampling unless this many assignments have been accumulated")
-    # only supervised training enabled right now
-    #parser.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
-    #                    help="Specify degenerate nucleotide options: "
-    #                         "variant -> {ACGT}, twoWay -> {CE} threeWay -> {CEO}")
-    #parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
-    #                    dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument('--test', action='store_true', default=False, dest='test', help="Used for CI testing")
+    parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
+                        dest='substitution_file', help="Ambiguity positions")
     parser.add_argument("--motif", action="store", dest="motif_key", default=None)
     parser.add_argument('--ambig_char', '-X', action='append', required=False, default=None, type=str, dest='ambig_char',
                         help="Character to substitute at positions, default is 'X'.")
-    #parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
-    #                    required=False, default=None, help="tab separated table with regions to align to")
     parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)
 
     args = parser.parse_args()
@@ -299,18 +279,10 @@ def main(args):
         bwa_ref_index = getBwaIndex(args.ref, working_directory_path)
         print("signalAlign - indexing reference, done", file=sys.stderr)
 
-    # the default lookup tables are the starting conditions for the model if we're starting from scratch
-    # todo next make get default model function based on version inferred from reads
-    #template_model_path = "../../signalAlign/models/testModelR73_acegot_template.model" if \
-    #    args.in_T_Hmm is None else args.in_T_Hmm
-    #complement_model_path = "../../signalAlign/models/testModelR73_acegot_complement.model" if \
-    #    args.in_C_Hmm is None else args.in_C_Hmm
     template_model_path   = args.in_T_Hmm
     complement_model_path = args.in_C_Hmm
-
     assert os.path.exists(template_model_path) and os.path.exists(complement_model_path), \
         "Missing default lookup tables"
-
     # make the model objects, for the threeState model, we're going to parse the lookup table or the premade
     # model, for the HDP model, we just load the transitions
     template_model = get_model(type=args.stateMachineType, threshold=args.threshold, model_file=template_model_path)
