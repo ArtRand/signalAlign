@@ -46,7 +46,7 @@ def count_kmers(dna, k):
     return kmer_count
 
 
-def process_reference_fasta(fasta, work_folder, motif_key=None, sub_char=None):
+def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None):
     """loops over all of the contigs in the reference file, writes the forward and backward sequences
     as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
     names as keys and the paths to the processed sequence as keys
@@ -62,7 +62,7 @@ def process_reference_fasta(fasta, work_folder, motif_key=None, sub_char=None):
         if motif_key is not None:
             motif, ok = getMotif(motif_key, sequence)
             if not ok:
-                raise RuntimeError("[process_reference_fasta]Illegal motif key %s" % motif_key)
+                raise RuntimeError("[processReferenceFasta]Illegal motif key %s" % motif_key)
             fw_sequence = motif.forwardSubstitutedSequence(sub_char)
             bw_sequence = motif.complementSubstitutedSequence(sub_char)
         else:

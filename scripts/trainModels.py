@@ -2,28 +2,34 @@
 """Train HMMs for alignment of signal data from the MinION
 """
 from __future__ import print_function, division
+
 import sys
-import h5py as h5
-sys.path.append("../")
-from multiprocessing import Process, Queue, current_process, Manager
-from subprocess import check_output
-from signalAlignLib import *
+import os
+import h5py
+
 from argparse import ArgumentParser
 from random import shuffle
 from shutil import copyfile
 
+from multiprocessing import Process, current_process, Manager
+
+from signalalign.SignalAlignment import SignalAlignment
+from signalalign.hiddenMarkovModel import ContinuousPairHmm, HdpSignalHmm
+from signalalign.utils import processReferenceFasta
+from signalalign.utils.fileHandlers import FolderHandler
+from signalalign.utils.bwaWrapper import getBwaIndex
+
 
 def parse_args():
-    parser = ArgumentParser (description=__doc__)
+    parser = ArgumentParser(description=__doc__)
     # required arguments
     parser.add_argument('--file_directory', '-d', action='append', default=None,
                         dest='files_dir', required=True, type=str,
                         help="directories with fast5 files to train on")
-    parser.add_argument('--ref', '-r', action='store', default=None,
-                        dest='ref', required=False, type=str,
+    parser.add_argument('--ref', '-r', action='store', default=None, dest='ref', required=True, type=str,
                         help="location of refrerence sequence in FASTA")
     parser.add_argument('--output_location', '-o', action='store', dest='out', default=None,
-                        required=False, type=str,
+                        required=True, type=str,
                         help="directory to put the trained model, and use for working directory.")
     # optional arguments
     parser.add_argument("--2d", action='store_true', dest="twoD", default=False)
@@ -49,11 +55,9 @@ def parse_args():
     parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
                         required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
-                        required=False, type=str, default=None,
-                        help="input HMM for template events, if you don't want the default")
+                        required=True, type=str, help="input HMM for template events, if you don't want the default")
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
-                        required=False, type=str, default=None,
-                        help="input HMM for complement events, if you don't want the default")
+                        required=True, type=str, help="input HMM for complement events, if you don't want the default")
     parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None,
                         help="path to template HDP model to use")
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
@@ -79,12 +83,14 @@ def parse_args():
                         help="Character to substitute at positions, default is 'X'.")
     #parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
     #                    required=False, default=None, help="tab separated table with regions to align to")
+    parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)
+
     args = parser.parse_args()
     return args
 
 
 def get_2d_length(fast5):
-    read = h5.File(fast5, 'r')
+    read = h5py.File(fast5, 'r')
     read_length = 0
     twoD_read_sequence_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Fastq"
     if not (twoD_read_sequence_address in read):
@@ -98,7 +104,7 @@ def get_2d_length(fast5):
 
 
 def get_1d_length(fast5):
-    read = h5.File(fast5, "r")
+    read = h5py.File(fast5, "r")
     read_length = 0
     template_fastq_address = "/Analyses/Basecall_1D_000/BaseCalled_template/Fastq"
     if not (template_fastq_address in read):
@@ -261,13 +267,10 @@ def main(args):
                emissions=args.emissions, transitions=args.transitions)
 
     if args.files_dir is None and args.fofn is None:
-        print("Need to provide directory with .fast5 files of fofn", file=sys.stderr)
+        print("Need to provide directory with .fast5 files of file of file names", file=sys.stderr)
         sys.exit(1)
 
-    assert (args.ref is not None), "Need to provide a reference file"
-    assert (args.out is not None), "Need to know the working directory for training"
-
-    if not os.path.isfile(args.ref):  # TODO make this is_fasta(args.ref)
+    if not os.path.isfile(args.ref):
         print("Did not find valid reference file", file=sys.stderr)
         sys.exit(1)
 
@@ -282,27 +285,28 @@ def main(args):
     if args.ambig_char is not None:
         reference_maps = []
         for sub_char in args.ambig_char:
-            reference_maps.append(process_reference_fasta(args.ref, args.motif_key, working_folder, sub_char))
+            reference_maps.append(processReferenceFasta(args.ref, args.motif_key, working_folder, sub_char))
     else:
-        reference_map = process_reference_fasta(fasta=args.ref,
-                                                work_folder=working_folder)
+        reference_map = processReferenceFasta(fasta=args.ref, work_folder=working_folder)
         reference_maps = [reference_map]
 
     # index the reference for bwa
     if args.bwt is not None:
-        print("signalAlign - Using provided BWT")
+        print("[trainModels]Using provided BWT")
         bwa_ref_index = args.bwt
     else:
         print("signalAlign - indexing reference", file=sys.stderr)
-        bwa_ref_index = get_bwa_index(args.ref, working_directory_path)
+        bwa_ref_index = getBwaIndex(args.ref, working_directory_path)
         print("signalAlign - indexing reference, done", file=sys.stderr)
 
     # the default lookup tables are the starting conditions for the model if we're starting from scratch
     # todo next make get default model function based on version inferred from reads
-    template_model_path = "../../signalAlign/models/testModelR73_acegot_template.model" if \
-        args.in_T_Hmm is None else args.in_T_Hmm
-    complement_model_path = "../../signalAlign/models/testModelR73_acegot_complement.model" if \
-        args.in_C_Hmm is None else args.in_C_Hmm
+    #template_model_path = "../../signalAlign/models/testModelR73_acegot_template.model" if \
+    #    args.in_T_Hmm is None else args.in_T_Hmm
+    #complement_model_path = "../../signalAlign/models/testModelR73_acegot_complement.model" if \
+    #    args.in_C_Hmm is None else args.in_C_Hmm
+    template_model_path   = args.in_T_Hmm
+    complement_model_path = args.in_C_Hmm
 
     assert os.path.exists(template_model_path) and os.path.exists(complement_model_path), \
         "Missing default lookup tables"
@@ -375,9 +379,11 @@ def main(args):
                 "degenerate": None,
                 "twoD_chemistry": args.twoD,
             }
-            #alignment = SignalAlignment(**alignment_args)
-            #alignment.run(get_expectations=True)
-            work_queue.put(alignment_args)
+            if args.DEBUG:
+                alignment = SignalAlignment(**alignment_args)
+                alignment.run(get_expectations=True)
+            else:
+                work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))

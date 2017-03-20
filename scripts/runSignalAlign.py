@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Run signal-to-reference alignments
+"""Main driver script for running an ionic current-to-sequence alignment on a single machine. Also good for testing.
 """
 from __future__ import print_function
 
@@ -8,10 +8,10 @@ import os
 
 from argparse import ArgumentParser
 from random import shuffle
-from multiprocessing import Process, Queue, current_process, Manager
+from multiprocessing import Process, current_process, Manager
 
 from signalalign.SignalAlignment import SignalAlignment
-from signalalign.utils import process_reference_fasta
+from signalalign.utils import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import getBwaIndex
 from signalalign.motif import getDegenerateEnum
@@ -58,6 +58,7 @@ def parse_args():
     parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
                         required=False, default=None, help="tab separated table with regions to align to")
     parser.add_argument("--motif", action="store", dest="motif_key", default=None)
+    # TODO reimplement ambiguity positions
     #parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
     #                    dest='substitution_file', help="Ambiguity positions")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
@@ -160,10 +161,10 @@ def main(args):
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
 
-    reference_map = process_reference_fasta(fasta=args.ref,
-                                            motif_key=args.motif_key,
-                                            work_folder=temp_folder,
-                                            sub_char=args.ambig_char)
+    reference_map = processReferenceFasta(fasta=args.ref,
+                                          motif_key=args.motif_key,
+                                          work_folder=temp_folder,
+                                          sub_char=args.ambig_char)
 
     # index the reference for bwa
     if args.bwt is not None:
@@ -173,12 +174,6 @@ def main(args):
         print("signalAlign - indexing reference", file=sys.stderr)
         bwa_ref_index = getBwaIndex(args.ref, temp_dir_path)
         print("signalAlign - indexing reference, done", file=sys.stderr)
-
-    # parse the target regions, if provided
-    if args.target_regions is not None:
-        target_regions = TargetRegions(args.target_regions)
-    else:
-        target_regions = None
 
     # setup workers for multiprocessing
     workers = args.nb_jobs
