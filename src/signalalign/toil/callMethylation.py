@@ -226,10 +226,7 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
     # the reads may not produce any posteriors, if, for example, they don't align to a region where
     # there are any ambiguity characters the posteriors file will be empty and we just return
     # None, which is the convention
-    if not os.path.exists(posteriors.fullpathGetter()):
-        return None
-
-    if os.stat(posteriors.fullpathGetter()).st_size == 0:
+    if not os.path.exists(posteriors.fullpathGetter()) or os.stat(posteriors.fullpathGetter()).st_size == 0:
         return None
 
     # reminder: the convention is that 'expectations' are un-normalized posterior probabilities
