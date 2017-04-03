@@ -13,7 +13,7 @@ from shutil import copyfile
 
 from multiprocessing import Process, current_process, Manager
 
-from signalalign.SignalAlignment import SignalAlignment
+from signalalign.signalAlignment import SignalAlignment
 from signalalign.hiddenMarkovModel import ContinuousPairHmm, HdpSignalHmm
 from signalalign.utils import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
@@ -239,12 +239,10 @@ def main(args):
     # Performing {iterations} iterations.
     # Using model: {model}
     # Using HDPs: {thdp} / {chdp}
-    # Training emissions: {emissions}
-    #        transitions: {transitions}
+    # Training transitions.
     \n
     """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref, outLoc=args.out, iter=args.iter,
-               iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP,
-               emissions=args.emissions, transitions=args.transitions)
+               iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP)
 
     if args.files_dir is None and args.fofn is None:
         print("Need to provide directory with .fast5 files of file of file names", file=sys.stderr)

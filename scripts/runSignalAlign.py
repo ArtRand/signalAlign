@@ -12,7 +12,7 @@ from argparse import ArgumentParser
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
-from signalalign.SignalAlignment import SignalAlignment
+from signalalign.signalAlignment import SignalAlignment
 from signalalign.utils import processReferenceFasta, parseFofn
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import getBwaIndex
