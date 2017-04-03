@@ -1,10 +1,12 @@
 #!/usr/bin/env python
-"""Main driver script for running an ionic current-to-sequence alignment on a single machine. Also good for testing.
+"""Main driver script for running an ionic current-to-sequence alignment on a single machine.
 """
 from __future__ import print_function
 
 import sys
 import os
+
+import pysam
 
 from argparse import ArgumentParser
 from random import shuffle

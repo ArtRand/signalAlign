@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False, default=4,
                         type=int, help="number of jobs to run concurrently")
     parser.add_argument('--test', action='store_true', default=False, dest='test', help="Used for CI testing")
-    parser.add_argument('-ambiguity_positions', '-p', action='store', required=False, default=None,
+    parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
                         dest='substitution_file', help="Ambiguity positions")
     parser.add_argument("--motif", action="store", dest="motif_key", default=None)
     parser.add_argument('--ambig_char', '-X', action='append', required=False, default=None, type=str, dest='ambig_char',

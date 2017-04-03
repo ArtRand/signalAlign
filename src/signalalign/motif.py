@@ -8,8 +8,9 @@ from pandas import read_table
 class AbstractSequenceMotif(object):
     def __init__(self, motif, dna_sequence, offset):
         self.dna_sequence         = dna_sequence.upper()
-        self.forward_positions    = [m.start() for m in re.finditer(motif, dna_sequence)]
+        self.forward_positions    = [m.start() for m in re.finditer(motif, self.dna_sequence)]
         self.complement_positions = [m + offset for m in self.forward_positions]
+        #correct_positiosn         = [m.start() for m in re.finditer(motif, self.dna_sequence)]
 
     def forwardPositions(self):
         return self.forward_positions
@@ -32,6 +33,9 @@ class AbstractSequenceMotif(object):
             assert(l_seq[pos] == orig_nuc), "Illegal substitution of %s with %s" % (l_seq[pos], ambig_nuc)
             l_seq[pos] = ambig_nuc
         return "".join(l_seq)
+
+    def substitutionPositionCount(self):
+        return len(self.forward_positions)
 
     @staticmethod
     def _complementBase(base):

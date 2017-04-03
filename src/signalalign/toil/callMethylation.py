@@ -1,4 +1,5 @@
 import os
+import uuid
 import string
 import subprocess
 import fileinput
@@ -91,11 +92,14 @@ def consolidateMethylationCallsJobFunction(job, config, methylation_prob_fids):
     return
 
 
-def processReferenceSequence(ref_seq, workdir, motif_key=None, sub_char="X"):
+def processReferenceSequence(ref_seq, workdir, motif_key=None, sub_char="X", parent_job=None):
     # make the forward and backward sequences, substituting the necessary motifs
     if motif_key is not None:
         motif, ok = getMotif(motif_key, ref_seq)
         require(ok, "[processReferenceSequence]Illegal motif_key given %s" % motif_key)
+        if parent_job is not None:
+            parent_job.fileStore.logToMaster("[processReferenceSequence]Made %s substitutions" %
+                                             motif.substitutionPositionCount())
         try:
             fw_refseq = motif.forwardSubstitutedSequence(sub_char)
             bw_refseq = motif.complementSubstitutedSequence(sub_char)
@@ -215,7 +219,7 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
                                       "Failed to download and upzip %s NanoporeReads" % failed)
 
     # file to collect the posterior probs
-    posteriors      = LocalFile(workdir=workdir, filename="%s_%s.dat" % (config["sample_label"], batch_number))
+    posteriors      = LocalFile(workdir=workdir, filename="%s_%s.dat" % (config["sample_label"], uuid.uuid4()))
     degenerate_enum = getVariantCallFunctions(config["degenerate"]).enum()
 
     # do the signal alignment, and get the posterior probabilities
@@ -256,7 +260,6 @@ def callMethylationJobFunction(job, config, alignment_shard, prob_fids):
         for base in base_options:
             try:
                 prob, coverage = posterior_probs[base]
-                # TODO maybe put readScore here?
                 _handle.write("%s,%s,%s\t" % (base, prob, coverage))
             except KeyError:
                 _handle.write("%s,%s,%s\t" % (base, 0.0, 0))
