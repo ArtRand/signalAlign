@@ -13,7 +13,7 @@ from shutil import copyfile
 
 from multiprocessing import Process, current_process, Manager
 
-from signalalign.signalAlignment import SignalAlignment
+from signalalign.SignalAlignment import SignalAlignment
 from signalalign.hiddenMarkovModel import ContinuousPairHmm, HdpSignalHmm
 from signalalign.utils import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
