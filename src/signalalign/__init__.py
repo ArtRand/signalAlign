@@ -4,6 +4,15 @@ import re
 ALLOWED_FLAGS = (0, 16)
 
 
+def parseFofn(fofn_file):
+    files = []
+    with open(fofn_file, "r") as fH:
+        for l in fH:
+            files.append(l.strip())
+    assert len(files) > 0, "parse_fofn: error, didn't find any files in file of files {}".format(fofn_file)
+    return files
+
+
 def _parseCigar(cigar_string, ref_start):
     assert(cigar_string is not None), "ERROR got cigar {}".format(cigar_string)
     assert(ref_start is not None)

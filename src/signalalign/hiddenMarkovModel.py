@@ -273,10 +273,9 @@ class ContinuousPairHmm(SignalHmm):
 
 
 class HdpSignalHmm(SignalHmm):
-    def __init__(self, model_type, threshold):
+    def __init__(self, model_type):
         super(HdpSignalHmm, self).__init__(model_type=model_type)
         self.set_default_transitions()
-        self.threshold = threshold
         self.kmer_assignments = []
         self.event_assignments = []
         self.assignments_record = []

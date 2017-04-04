@@ -52,9 +52,10 @@ def parse_args():
     parser.add_argument('--file_of_files', '-fofn', action='store', dest='fofn', required=False, type=str, default=None,
                         help="text file containing absolute paths to files to use")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
-                        default=None, help="posterior match probability threshold, Default: 0.01")
+                        default=0.01, help="posterior match probability threshold, Default: 0.01")
     parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
-                        required=False, default=None, help="number of diagonals to expand around each anchor")
+                        required=False, default=None,
+                        help="number of diagonals to expand around each anchor default: 50")
     parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
                         required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,

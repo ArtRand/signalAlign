@@ -13,7 +13,8 @@ from shutil import copyfile
 
 from multiprocessing import Process, current_process, Manager
 
-from signalalign.SignalAlignment import SignalAlignment
+from signalalign import parseFofn
+from signalalign.signalAlignment import SignalAlignment
 from signalalign.hiddenMarkovModel import ContinuousPairHmm, HdpSignalHmm
 from signalalign.utils import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
@@ -63,6 +64,11 @@ def parse_args():
     parser.add_argument("--motif", action="store", dest="motif_key", default=None)
     parser.add_argument('--ambig_char', '-X', action='append', required=False, default=None, type=str, dest='ambig_char',
                         help="Character to substitute at positions, default is 'X'.")
+    parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
+                        required=False, default=None,
+                        help="number of diagonals to expand around each anchor default: 50")
+    parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
+                        required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)
 
     args = parser.parse_args()
@@ -103,7 +109,7 @@ def cull_training_files(directories, fofns, training_amount, reference_maps, two
         source_list_tups = []
         if fofns is not None:
             for fofn in fofns:
-                source_list_tups.append((fofn, parse_fofn(fofn)))
+                source_list_tups.append((fofn, parseFofn(fofn)))
             return source_list_tups
         else:
             assert directories is not None
@@ -115,17 +121,11 @@ def cull_training_files(directories, fofns, training_amount, reference_maps, two
     print("trainModels - culling training files.\n", end="", file=sys.stderr)
 
     training_files = []
-    add_to_training_files = training_files.append
-
     sources_and_files = get_file_list()
-
     assert len(sources_and_files) == len(reference_maps), "Need to have equal number of references as training " \
                                                           "file directories."
     # loop over the directories and collect reads for training
-    for j, tup in enumerate(sources_and_files):
-        assert len(tup) == 2
-        source = tup[0]  # the directory or the fofn
-        fast5s = tup[1]  # the list of files (paths)
+    for j, (source, fast5s) in enumerate(sources_and_files):
         shuffle(fast5s)
         total_amount = 0
         n = 0
@@ -133,7 +133,7 @@ def cull_training_files(directories, fofns, training_amount, reference_maps, two
         # loop over files and add them to training list, break when we have enough bases to complete a batch
         # make a list of tuples [(fast5_path, (plus_ref_seq, minus_ref_seq))]
         for i in xrange(len(fast5s)):
-            add_to_training_files((fast5s[i], reference_maps[j]))
+            training_files.append((fast5s[i], reference_maps[j]))
             n += 1
             total_amount += get_seq_len_fcn(fast5s[i])
             if total_amount >= training_amount:
@@ -155,16 +155,16 @@ def get_expectations(work_queue, done_queue):
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
-def get_model(type, threshold, model_file):
-    assert (type in ["threeState", "threeStateHdp"]), "Unsupported StateMachine type"
+def get_model(model_type, model_file):
+    assert (model_type in ["threeState", "threeStateHdp"]), "Unsupported StateMachine type"
     # todo clean this up
-    if type == "threeState":
+    if model_type == "threeState":
         assert model_file is not None, "Need to have starting lookup table for {} HMM".format(type)
-        model = ContinuousPairHmm(model_type=type)
+        model = ContinuousPairHmm(model_type=model_type)
         model.load_model(model_file=model_file)
         return model
-    if type == "threeStateHdp":
-        model = HdpSignalHmm(model_type=type, threshold=threshold)
+    if model_type == "threeStateHdp":
+        model = HdpSignalHmm(model_type=model_type)
         model.load_model(model_file=model_file)
         return model
 
@@ -254,9 +254,9 @@ def main(args):
 
     print(start_message, file=sys.stdout)
 
-    # make directory to put the files we're using files
+    # make directory to put the files we're using
     working_folder = FolderHandler()
-    working_directory_path = working_folder.open_folder(args.out + "tempFiles_expectations")
+    working_directory_path = working_folder.open_folder(args.out + "tempFolder_trainModels")
 
     # if we are performing supervised training with multiple kinds of substitutions, then we
     # need to make a reference sequence for each one
@@ -283,8 +283,8 @@ def main(args):
         "Missing default lookup tables"
     # make the model objects, for the threeState model, we're going to parse the lookup table or the premade
     # model, for the HDP model, we just load the transitions
-    template_model = get_model(type=args.stateMachineType, threshold=args.threshold, model_file=template_model_path)
-    complement_model = get_model(type=args.stateMachineType, threshold=args.threshold, model_file=complement_model_path)
+    template_model   = get_model(args.stateMachineType, template_model_path)
+    complement_model = get_model(args.stateMachineType, complement_model_path) if args.twoD else None
 
     # get the input HDP, if we're using it
     if args.stateMachineType == "threeStateHdp":
@@ -292,20 +292,18 @@ def main(args):
             "Need to provide serialized HDP files for this stateMachineType"
         assert (os.path.isfile(args.templateHDP)) and (os.path.isfile(args.complementHDP)),\
             "Could not find the HDP files"
-        template_hdp = working_folder.add_file_path("{}".format(args.templateHDP.split("/")[-1]))
+        template_hdp   = working_folder.add_file_path("{}".format(args.templateHDP.split("/")[-1]))
         complement_hdp = working_folder.add_file_path("{}".format(args.complementHDP.split("/")[-1]))
         copyfile(args.templateHDP, template_hdp)
         copyfile(args.complementHDP, complement_hdp)
     else:
-        template_hdp = None
+        template_hdp   = None
         complement_hdp = None
 
     # make some paths to files to hold the HMMs
-    template_hmm = working_folder.add_file_path("template_trained.hmm")
-    complement_hmm = working_folder.add_file_path("complement_trained.hmm")
-
-    trained_models = [template_hmm, complement_hmm]
-
+    template_hmm     = working_folder.add_file_path("template_trained.hmm")
+    complement_hmm   = working_folder.add_file_path("complement_trained.hmm")
+    trained_models   = [template_hmm, complement_hmm]
     untrained_models = [template_model_path, complement_model_path]
 
     for default_model, trained_model in zip(untrained_models, trained_models):
@@ -332,8 +330,7 @@ def main(args):
         # file_ref_tuple should be (fast5, (plus_ref_seq, minus_ref_seq))
         for file_ref_tuple in training_files:
             alignment_args = {
-                "reference_map": file_ref_tuple[1],
-                "path_to_EC_refs": None,
+                "reference_map": reference_maps[i],
                 "destination": working_directory_path,
                 "stateMachineType": args.stateMachineType,
                 "bwa_index": bwa_ref_index,
@@ -342,7 +339,7 @@ def main(args):
                 "in_templateHdp": template_hdp,
                 "in_complementHdp": complement_hdp,
                 "in_fast5": file_ref_tuple[0],  # fast5
-                "threshold": args.threshold,
+                "threshold": 0.01,
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
                 "target_regions": None,
@@ -378,16 +375,14 @@ def main(args):
                                       files=template_expectations_files,
                                       model=template_model,
                                       hmm_file=template_hmm,
-                                      update_emissions=args.emissions,
-                                      update_transitions=args.transitions)
+                                      update_transitions=True)
 
-        if len(complement_expectations_files) > 0:
+        if args.twoD and len(complement_expectations_files) > 0:
             add_and_norm_expectations(path=working_directory_path,
                                       files=complement_expectations_files,
                                       model=complement_model,
                                       hmm_file=complement_hmm,
-                                      update_emissions=args.emissions,
-                                      update_transitions=args.transitions)
+                                      update_transitions=True)
 
         # Build HDP from last round of assignments
         if args.stateMachineType == "threeStateHdp" and args.emissions is True:
