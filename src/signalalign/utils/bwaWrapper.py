@@ -62,7 +62,7 @@ class Bwa(object):
     def align(bwa_index, query, output_sam_path, outerr=None):
         for suff in Bwa.suffixes():
             assert os.path.exists(bwa_index + suff),\
-                "[Bwa:.lign] Didn't find index files {}".format(bwa_index + suff)
+                "[Bwa:align] Didn't find index files {}".format(bwa_index + suff)
         assert os.path.exists(query), "[Bwa::align] Didn't find query file {}".format(query)
         cmd = "bwa mem -x ont2d {idx} {query}".format(idx=bwa_index, query=query)
         if outerr is None:
