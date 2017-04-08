@@ -60,9 +60,9 @@ def parse_args():
                         type=int, help="number of jobs to run concurrently")
     parser.add_argument('--test', action='store_true', default=False, dest='test', help="Used for CI testing")
     parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
-                        dest='substitution_file', help="Ambiguity positions")
+                        dest='substitution_file', help="Substitution positions")
     parser.add_argument("--motif", action="store", dest="motif_key", default=None)
-    parser.add_argument('--ambig_char', '-X', action='append', required=False, default=None, type=str, dest='ambig_char',
+    parser.add_argument('--ambig_char', '-X', action='append', required=False, default=None, type=str, dest='labels',
                         help="Character to substitute at positions, default is 'X'.")
     parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
                         required=False, default=None,
@@ -143,7 +143,7 @@ def cull_training_files(directories, fofns, training_amount, reference_maps, two
               end="\n", file=sys.stderr)
 
     shuffle(training_files)
-    return training_files
+    return training_files  # [(path_to_fast5, reference_map)...]
 
 
 def get_expectations(work_queue, done_queue):
@@ -249,21 +249,26 @@ def main(args):
         sys.exit(1)
 
     if not os.path.isfile(args.ref):
-        print("Did not find valid reference file", file=sys.stderr)
+        print("Did not find valid reference file, looked here: {}".format(args.ref), file=sys.stderr)
         sys.exit(1)
 
     print(start_message, file=sys.stdout)
 
     # make directory to put the files we're using
     working_folder = FolderHandler()
-    working_directory_path = working_folder.open_folder(args.out + "tempFolder_trainModels")
+    working_directory_path = working_folder.open_folder(args.out + "temp_trainModels")
 
     # if we are performing supervised training with multiple kinds of substitutions, then we
     # need to make a reference sequence for each one
-    if args.ambig_char is not None:
-        reference_maps = []
-        for sub_char in args.ambig_char:
-            reference_maps.append(processReferenceFasta(args.ref, args.motif_key, working_folder, sub_char))
+    if args.labels is not None:
+        if args.motif_key is None and args.substitution_file is None:
+            print("To do labeled training, you need to provide a Motif key or a substitution file", file=sys.stderr)
+            exit(1)
+        reference_maps = [processReferenceFasta(fasta=args.ref,
+                                                work_folder=working_folder,
+                                                motif_key=args.motif_key,
+                                                sub_char=x,
+                                                positions_file=args.substitution_file) for x in args.labels]
     else:
         reference_map = processReferenceFasta(fasta=args.ref, work_folder=working_folder)
         reference_maps = [reference_map]
@@ -328,9 +333,9 @@ def main(args):
 
         # get expectations for all the files in the queue
         # file_ref_tuple should be (fast5, (plus_ref_seq, minus_ref_seq))
-        for file_ref_tuple in training_files:
+        for fast5, ref_map in training_files:
             alignment_args = {
-                "reference_map": reference_maps[i],
+                "reference_map": ref_map,
                 "destination": working_directory_path,
                 "stateMachineType": args.stateMachineType,
                 "bwa_index": bwa_ref_index,
@@ -338,7 +343,7 @@ def main(args):
                 "in_complementHmm": complement_hmm,
                 "in_templateHdp": template_hdp,
                 "in_complementHdp": complement_hdp,
-                "in_fast5": file_ref_tuple[0],  # fast5
+                "in_fast5": fast5,
                 "threshold": 0.01,
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,

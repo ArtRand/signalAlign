@@ -99,23 +99,23 @@ class CustomAmbiguityPositions(object):
         return self.ambig_df.ix[(self.ambig_df["contig"] == contig) & (self.ambig_df["strand"] == strand)]
 
 
-def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, ambig_positions_file=None):
+def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, positions_file=None):
     """loops over all of the contigs in the reference file, writes the forward and backward sequences
     as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
     names as keys and the paths to the processed sequence as keys
     """
-    if ambig_positions_file is not None and motif_key is not None:
+    if positions_file is not None and motif_key is not None:
         raise RuntimeError("[processReferenceFasta]Cannot specify motif key and ambiguity position file")
-    if ambig_positions_file is not None and sub_char is not None:
+    if positions_file is not None and sub_char is not None:
         raise RuntimeError("[processReferenceFasta]Cannot specify a substitution character and a ambiguity position file")
 
-    if ambig_positions_file is not None:
-        if not os.path.exists(ambig_positions_file):
+    if positions_file is not None:
+        if not os.path.exists(positions_file):
             raise RuntimeError("[processReferenceFasta]Did not find ambiguity position file here: %s" %
-                               ambig_positions_file)
-        ambig_pos = CustomAmbiguityPositions(ambig_positions_file)
+                               positions_file)
+        positions = CustomAmbiguityPositions(positions_file)
     else:
-        ambig_pos = None
+        positions = None
 
     ref_sequence_map = {}
     for header, comment, sequence in read_fasta(fasta):
@@ -131,9 +131,9 @@ def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, amb
                 raise RuntimeError("[processReferenceFasta]Illegal motif key %s" % motif_key)
             fw_sequence = motif.forwardSubstitutedSequence(sub_char)
             bw_sequence = motif.complementSubstitutedSequence(sub_char)
-        elif ambig_pos is not None:
-            fw_sequence = ambig_pos.getForwardSequence(contig=header, raw_sequence=sequence.upper())
-            bw_sequence = ambig_pos.getBackwardSequence(contig=header, raw_sequence=sequence.upper())
+        elif positions is not None:
+            fw_sequence = positions.getForwardSequence(contig=header, raw_sequence=sequence.upper())
+            bw_sequence = positions.getBackwardSequence(contig=header, raw_sequence=sequence.upper())
         else:
             fw_sequence = sequence.upper()
             bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True)
