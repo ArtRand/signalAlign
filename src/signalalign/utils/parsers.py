@@ -65,9 +65,8 @@ empty entries.
 import sys
 import re
 from math import log10
-#from __future__ import print_function
 from itertools import groupby
-import argparse
+
 
 def read_fasta(fasta_file, ignore_case=True):
     """
