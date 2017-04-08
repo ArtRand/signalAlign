@@ -185,10 +185,10 @@ def main():
     #testSuite.addTest(signalAlignLibTests("test_pysam"))
     testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    #testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
     #testSuite.addTest(signalAlign_alignment_test('test_ecoli_reads'))
-    #testSuite.addTest(signalAlign_EM_test('test_EM'))
+    testSuite.addTest(signalAlign_EM_test('test_EM'))
 
     testRunner = unittest.TextTestRunner(verbosity=2)
     testRunner.run(testSuite)

@@ -133,7 +133,7 @@ def main(args):
                                           motif_key=args.motif_key,
                                           work_folder=temp_folder,
                                           sub_char=args.ambig_char,
-                                          ambig_positions_file=args.ambiguity_positions)
+                                          positions_file=args.ambiguity_positions)
 
     # index the reference for bwa
     if args.bwt is not None:
