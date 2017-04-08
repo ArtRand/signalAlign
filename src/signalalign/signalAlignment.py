@@ -1,7 +1,7 @@
 from __future__ import print_function
 
-import sys
 import os
+import sys
 
 from sonLib.bioio import fastaWrite
 from signalalign import defaultModelFromVersion
