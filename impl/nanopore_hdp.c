@@ -10,7 +10,12 @@
 #define ALIGNMENT_KMER_COL 9
 #define ALIGNMENT_STRAND_COL 4
 #define ALIGNMENT_SIGNAL_COL 13
+#define ASSIGNMENT_KMER_COL 0
+#define ASSIGNMENT_STRAND_COL 1
+#define ASSIGNMENT_SIGNAL_COL 2
+// number of expected column in the two kinds of input tables
 #define NUM_ALIGNMENT_COLS 15
+#define NUM_ASSIGNMENT_COLS 4
 
 #define MODEL_ROW_HEADER_LENGTH 0
 #define MODEL_MEAN_ENTRY 0
@@ -228,21 +233,33 @@ void update_nhdp_from_alignment_with_filter(NanoporeHDP* nhdp, const char* align
         line_length = stList_length(tokens);
         
         if (!warned) {
-            if (line_length != NUM_ALIGNMENT_COLS) {
+            if ((line_length != NUM_ALIGNMENT_COLS) || (line_length != NUM_ASSIGNMENT_COLS)) {
                 fprintf(stderr, "Input format has changed from design period, HDP may receive incorrect data.\n");
                 warned = true;
+                continue;
             }
         }
         
-        strand = (char*) stList_get(tokens, ALIGNMENT_STRAND_COL);
+        bool using_alignment;
+        if (line_length == NUM_ALIGNMENT_COLS) {
+            using_alignment = true;
+        } else {
+            using_alignment = false;
+        }
+
+        int strand_col = using_alignment ? ALIGNMENT_STRAND_COL : ASSIGNMENT_STRAND_COL;
+        int signal_col = using_alignment ? ALIGNMENT_SIGNAL_COL : ASSIGNMENT_SIGNAL_COL;
+        int kmer_col   = using_alignment ? ALIGNMENT_KMER_COL : ASSIGNMENT_KMER_COL;
+        
+        strand = (char*) stList_get(tokens, strand_col);
         
         if (strand_filter != NULL) {
             proceed = strcmp(strand, strand_filter);
         }
         
         if (proceed == 0) {
-            signal_str = (char*) stList_get(tokens, ALIGNMENT_SIGNAL_COL);
-            kmer = (char*) stList_get(tokens, ALIGNMENT_KMER_COL);
+            signal_str = (char*) stList_get(tokens, signal_col);
+            kmer = (char*) stList_get(tokens, kmer_col);
             
             signal_ptr = (double*) malloc(sizeof(double));
             dp_id_ptr = (int64_t*) malloc(sizeof(int64_t));
