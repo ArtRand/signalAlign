@@ -159,10 +159,10 @@ def cull_training_files(samples, training_amount, twoD):
         get_seq_len_fcn = get_2d_length if twoD else get_1d_length
         # loop over files and add them to training list, break when we have enough bases to complete a batch
         # make a list of tuples [(fast5_path, (plus_ref_seq, minus_ref_seq))]
-        for i in xrange(sample.getFiles()):
-            training_files.append((sample.getFiles()[i], sample.getReferenceMap()))
+        for f in sample.getFiles():
+            training_files.append((f, sample.getReferenceMap()))
             file_count += 1
-            total_amount += get_seq_len_fcn(sample.getFiles()[i])
+            total_amount += get_seq_len_fcn(f)
             if total_amount >= training_amount:
                 break
         print("Culled {file_count} training files, for {bases} from {sample}."
@@ -251,7 +251,7 @@ def build_hdp(template_hdp_path, complement_hdp_path, template_assignments, comp
 
 def validateConfig(config):
     # check for inputs
-    if config["fast5s_dir"] is None and config["fofn"] is None:
+    if config["fast5_dir"] is None and config["fofn"] is None:
         raise RuntimeError("Need to provide a directory of Fast5 files or a file of filenames (fofn)")
 
     # check for valid paths (if local)
@@ -262,14 +262,53 @@ def validateConfig(config):
     return
 
 
-def TrainModels(config):
+def generateConfig(config_path):
+        if os.path.exists(config_path):
+            raise RuntimeError
+        config_content = textwrap.dedent("""\
+                # SignalAlign model training config file
+                output_dir:
+                samples: [
+                {
+                    fast5_dir:,
+                    fofn:,
+                    positions_file:,
+                    motif:,
+                    label:,
+                }
+                ]
+                reference:
+                bwt:
+                stateMachineType:
+                in_T_Hmm:
+                in_C_Hmm:
+                templateHdp:
+                complementHdp:
+                iterations:
+                training_bases:
+                job_count:
+                diagonal_expansion:
+                constraint_trim:
+                twoD:
+
+                DEBUG:
+                TEST:
+
+                """)
+        fH = open(config_path, "w")
+        fH.write(config_content)
+        fH.flush()
+        fH.close()
+
+
+def trainModelTransitions(config):
     def process_sample(sample):
-        options = dict(*DEFAULT_TRAINMODELS_OPTIONS)
+        options = dict(**DEFAULT_TRAINMODELS_OPTIONS)
         options.update(sample)
-        if options["fast5s_dir"] is None and options["fofn"] is None:
+        if options["fast5_dir"] is None and options["fofn"] is None:
             raise RuntimeError("Need to provide path to .fast5 files or file with filenames (fofn)")
         reference_map = processReferenceFasta(fasta=config["reference"],
-                                              working_folder=working_folder,
+                                              work_folder=working_folder,
                                               motif_key=options["motif"],
                                               sub_char=options["label"],
                                               positions_file=options["positions_file"])
@@ -277,7 +316,7 @@ def TrainModels(config):
             if options["fofn"] is not None:
                 print("WARNING Only using files is directory %s ignoring fofn %s"
                       % (options["files_dir"], options["fofn"]))
-            sample = Fast5Directory(options["files_dir"], reference_map)
+            sample = Fast5Directory(options["fast5_dir"], reference_map)
         else:
             sample = FileOfFilenames(options["fofn"], reference_map)
         return sample
@@ -427,21 +466,7 @@ def main():
                                 help='Path to the (filled in) config file, generated with "generate".')
         subparsers.add_parser("generate", help="generates a config file for your run, do this first")
         return parser.parse_args()
-
-    def generateConfig(config_path):
-        if os.path.exists(config_path):
-            raise RuntimeError
-        config_content = textwrap.dedent("""\
-                # SignalAlign model training config file
-                ok: true
-                """)
-        fH = open(config_path, "w")
-        fH.write(config_content)
-        fH.flush()
-        fH.close()
-
     args   = parse_args()
-
     if args.command == "generate":
         try:
             config_path = os.path.join(os.getcwd(), "trainModels-config.yaml")
@@ -449,14 +474,13 @@ def main():
         except RuntimeError:
             print("Using existing config file {}".format(config_path))
             pass
-
     elif args.command == "run":
         if not os.path.exists(args.config):
             print("{config} not found run generate-config".format(config=args.config))
             exit(1)
         # Parse config
         config = {x.replace('-', '_'): y for x, y in yaml.load(open(args.config).read()).iteritems()}
-        TrainModels(config)
+        trainModelTransitions(config)
 
 
 if __name__ == "__main__":
