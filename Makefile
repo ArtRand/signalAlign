@@ -19,6 +19,8 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${
 
 core : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
 
+install: all pip_install
+
 clean_light:
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
 	rm -f ${libPath}/signalAlignLib.a
@@ -28,6 +30,9 @@ clean :
 	#rm -r ${signalAlignBin}
 	rm -f ${libPath}/signalAlignLib.a
 	cd externalTools && make clean
+
+pip_install:
+	pip install -e .
 
 signalAlignLib : ${libPath}/signalAlignLib.a
 
