@@ -3,6 +3,14 @@ import re
 
 ALLOWED_FLAGS = (0, 16)
 
+DEFAULT_TRAINMODELS_OPTIONS = {
+    "fofn": None,
+    "fast5_dir": None,
+    "positions_file": None,
+    "motif": None,
+    "label": None,
+}
+
 
 def parseFofn(fofn_file):
     files = []
