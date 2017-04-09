@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
                 {0, 0, 0, 0} };
 
         int option_index = 0;
-        key = getopt_long(argc, argv, "h:a:o:q:p:T:C:l::v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
+        key = getopt_long(argc, argv, "h:a:o:q:p:T:C:l:v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
                           long_options, &option_index);
         if (key == -1) {
             //usage();
