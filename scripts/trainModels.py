@@ -5,6 +5,9 @@ from __future__ import print_function, division
 
 import sys
 import os
+import logging
+import textwrap
+import yaml
 import h5py
 
 from argparse import ArgumentParser
@@ -223,7 +226,7 @@ def build_hdp(template_hdp_path, complement_hdp_path, template_assignments, comp
     return
 
 
-def main(args):
+def trainModels(config):
     # parse command line arguments
     args = parse_args()
 
@@ -424,5 +427,47 @@ def main(args):
     print("trainModels - finished training routine", file=sys.stderr)
 
 
+def main():
+    def parse_args():
+        parser = ArgumentParser()
+        subparsers = parser.add_subparsers(dest="command")
+
+        # parsers for running the full pipeline
+        run_parser = subparsers.add_parser("run", help="runs full workflow ")
+        run_parser.add_argument('--config', default='trainModels-config.yaml', type=str,
+                                help='Path to the (filled in) config file, generated with "generate".')
+        subparsers.add_parser("generate", help="generates a config file for your run, do this first")
+        return parser.parse_args()
+
+    def generateConfig(config_path):
+        if os.path.exists(config_path):
+            raise RuntimeError
+        config_content = textwrap.dedent("""\
+                # SignalAlign model training config file
+                ok: true
+                """)
+        fH = open(config_path, "w")
+        fH.write(config_content)
+        fH.flush()
+        fH.close()
+
+    args   = parse_args()
+
+    if args.command == "generate":
+        try:
+            config_path = os.path.join(os.getcwd(), "trainModels-config.yaml")
+            generateConfig(config_path)
+        except RuntimeError:
+            print("Using existing config file {}".format(config_path))
+            pass
+
+    elif args.command == "run":
+        if not os.path.exists(args.config):
+            print("{config} not found run generate-config".format(config=args.config))
+            exit(1)
+        # Parse config
+        config = {x.replace('-', '_'): y for x, y in yaml.load(open(args.config).read()).iteritems()}
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    sys.exit(main())
