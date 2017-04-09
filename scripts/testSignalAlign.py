@@ -151,10 +151,7 @@ class signalAlign_EM_test(unittest.TestCase):
         shutil.rmtree("./signalAlign_unittest/")
 
     def test_EM(self):
-        em_command = "./trainModels --2d -d={reads} -r={ref} -o={testDir} -i=3 -a=10000  -smt=threeState " \
-                     "--test -T=../models/testModelR73_acegot_template.model " \
-                     "-C=../models/testModelR73_acegot_complement.model" \
-                     "".format(reads=ZYMO_C_READS, ref=ZYMO_REFERENCE, testDir="./signalAlign_unittest/")
+        em_command = "./trainModels run --config=../tests/trainModels-config.yaml"
         null_output = open(os.devnull, 'w')
         result = call(em_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
 
@@ -164,7 +161,7 @@ class signalAlign_EM_test(unittest.TestCase):
 
 def main():
     testSuite = unittest.TestSuite()
-    #testSuite.addTest(LibTest('test_signalAlign_library'))
+    testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))

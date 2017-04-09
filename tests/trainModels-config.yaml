@@ -1,0 +1,26 @@
+# SignalAlign model training config file
+output_dir: signalAlign_unittest/
+samples: [{
+    fast5_dir: ../tests/minion_test_reads/C/,
+    fofn:,
+    positions_file:,
+    motif:,
+    label:,
+}]
+reference: ../tests/test_sequences/zymo_sequence.fasta
+bwt:
+stateMachineType: threeState
+in_T_Hmm: ../models/testModelR73_acegot_template.model
+in_C_Hmm: ../models/testModelR73_acegot_complement.model
+templateHdp:
+complementHdp:
+iterations: 3
+training_bases: 10000
+job_count: 4
+diagonal_expansion:
+constraint_trim:
+twoD: true
+
+DEBUG:
+TEST: true
+
