@@ -67,8 +67,8 @@ def parse_args():
                         default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
-    parser.add_argument('--ambig_char', '-X', action='store', required=False, default="X", type=str, dest='ambig_char',
-                        help="Character to substitute at positions, default is 'X'.")
+    parser.add_argument('--ambig_char', '-X', action='store', required=False, default=None, type=str, dest='ambig_char',
+                        help="")
     parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
                         help="output format: full, variantCaller, or assignments. Default: full")
     parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)

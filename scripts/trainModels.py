@@ -267,31 +267,31 @@ def generateConfig(config_path):
             raise RuntimeError
         config_content = textwrap.dedent("""\
                 # SignalAlign model training config file
-                output_dir:
+                output_dir: ../tests/
                 samples: [
                 {
-                    fast5_dir:,
+                    fast5_dir:  ../tests/minion_test_reads/C/,
                     fofn:,
                     positions_file:,
                     motif:,
                     label:,
                 }
                 ]
-                reference:
+                reference:  ../tests/test_sequences/zymo_sequence.fasta
                 bwt:
-                stateMachineType:
-                in_T_Hmm:
-                in_C_Hmm:
+                stateMachineType: threeState
+                in_T_Hmm: ../models/testModelR73_acegot_template.model
+                in_C_Hmm: ../models/testModelR73_acegot_complement.model
                 templateHdp:
                 complementHdp:
-                iterations:
-                training_bases:
-                job_count:
+                iterations: 2
+                training_bases: 1000
+                job_count: 4
                 diagonal_expansion:
                 constraint_trim:
-                twoD:
+                twoD: true
 
-                DEBUG:
+                DEBUG: true
                 TEST:
 
                 """)
@@ -444,6 +444,7 @@ def trainModelTransitions(config):
                                                                i=i))
             if config["TEST"] and (len(template_model.running_likelihoods) >= 2) and \
                     (config["twoD"] and len(complement_model.running_likelihoods) >= 2):
+                print("TESTING")
                 assert (template_model.running_likelihoods[-2] < template_model.running_likelihoods[-1]) and \
                        (complement_model.running_likelihoods[-2] < complement_model.running_likelihoods[-1]), \
                     "Testing: Likelihood error, went up"

@@ -6,7 +6,47 @@
 #include "continuousHmm.h"
 
 void usage() {
-    fprintf(stderr, "USAGE: \n");
+    fprintf(stderr, "\n\tbuildHdpUtil - make a new hierarchical Dirichlet process model from an alignment file\n\n");
+    fprintf(stderr, "--help: display this message and exit\n");
+    fprintf(stderr, "--verbose: enable verbose Gibbs sampling output\n");
+    fprintf(stderr, "--oneD: flag for 1-D reads, only make a 'template' model\n");
+    fprintf(stderr, "-a: kmer length to use in the model (usually 5 or 6)\n");
+    fprintf(stderr, "-p: HDP type. Enum for the type of model to build (alphabet the model uses)\n");
+    fprintf(stderr, "\tMost people will use 10, 11, 12, or 13\n");
+    fprintf(stderr, "\t\t0: single level fixed (ACEGOT)\n");
+    fprintf(stderr, "\t\t1: single level prior (ACEGOT)\n");
+    fprintf(stderr, "\t\t2: multiset fixed (ACEGOT)\n");
+    fprintf(stderr, "\t\t3: multiset prior (ACEGOT)\n");
+    fprintf(stderr, "\t\t4: composiition fixed (ACEGOT)\n");
+    fprintf(stderr, "\t\t5: composiition prior (ACEGOT)\n");
+    fprintf(stderr, "\t\t6: middle nucleodides fixed (ACEGOT)\n");
+    fprintf(stderr, "\t\t7: middle nucleodides prior (ACEGOT)\n");
+    fprintf(stderr, "\t\t8: group multiset fixed (ACEGOT)\n");
+    fprintf(stderr, "\t\t9: group multiset prior (ACEGOT)\n");
+    fprintf(stderr, "\t\t10: single level prior (ACEGT)\n");
+    fprintf(stderr, "\t\t11: multiset prior (ACEGT)\n");
+    fprintf(stderr, "\t\t12: single level prior (ecoli) (ACEGIT)\n");
+    fprintf(stderr, "\t\t13: multiset prior (ecoli) (ACEGIT)\n");
+    fprintf(stderr, "-T: template lookup table (signalAlign HMM format)\n");
+    fprintf(stderr, "-C: complement lookup table (signalAlign HMM format)\n");
+    fprintf(stderr, "-l: alignments to take k-mer assignments from\n");
+    fprintf(stderr, "-v: template HDP output file path\n");
+    fprintf(stderr, "-w: complement HDP output file path\n");
+    fprintf(stderr, "-n: number of samples\n");
+    fprintf(stderr, "-I: burn in, samples to discard at the start\n");
+    fprintf(stderr, "-t: thinning\n");
+    fprintf(stderr, "-B: base gamma\n");
+    fprintf(stderr, "-M: middle gamma\n");
+    fprintf(stderr, "-L: leaf gamma\n");
+    fprintf(stderr, "-g: base gamma alpha\n");
+    fprintf(stderr, "-r: base gamma beta\n");
+    fprintf(stderr, "-j: middle gamma alpha\n");
+    fprintf(stderr, "-y: middle gamma beta\n");
+    fprintf(stderr, "-i: leaf gamma alpha\n");
+    fprintf(stderr, "-u: leaf gamma beta\n");
+    fprintf(stderr, "-s: sampling grid start\n");
+    fprintf(stderr, "-e: sampling grid end\n");
+    fprintf(stderr, "-k: sampling grid length\n");
     exit(1);
 }
 
@@ -76,8 +116,6 @@ int main(int argc, char *argv[]) {
                 {"templateLookupTable",         required_argument,  0,  'T'},
                 {"complementLookupTable",       required_argument,  0,  'C'},
                 {"alignments",                  required_argument,  0,  'l'},
-                {"templateExpectations",        required_argument,  0,  'E'},
-                {"complementExpectations",      required_argument,  0,  'W'},
                 {"templateHdp",                 required_argument,  0,  'v'},
                 {"complementHdp",               required_argument,  0,  'w'},
                 {"nbSamples",                   required_argument,  0,  'n'},
@@ -98,7 +136,7 @@ int main(int argc, char *argv[]) {
                 {0, 0, 0, 0} };
 
         int option_index = 0;
-        key = getopt_long(argc, argv, "h:a:o:q:p:T:C:l:E:W:v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
+        key = getopt_long(argc, argv, "h:a:o:q:p:T:C:l::v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
                           long_options, &option_index);
         if (key == -1) {
             //usage();
