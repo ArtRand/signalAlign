@@ -5,13 +5,14 @@ _Currently Refactoring for Toil_. Documentation is probably out of date.
 
 ### Cheat sheet/Quick Start
 
-### Pre-installation on `toil-box` (if you're using `cgcloud`) and getting BWA
-1. `apt-get update && apt-get install zlib1g-dev g++`
-2. `git clone git clone https://github.com/lh3/bwa.git`
-3. `cd bwa`
-4. `make`
-5. `export $PATH=$(pwd):$PATH`
+### Pre-installation on `toil-box` (if you're using `cgcloud`)
+1. `sudo apt-get update && sudo apt-get install zlib1g-dev g++ git`
 
+### Getting BWA
+1. `git clone https://github.com/lh3/bwa.git`
+2. `cd bwa`
+3. `make`
+4. `export $PATH=$(pwd):$PATH`
 
 ### Installation:
 1. Recursively clone this repo `git clone --recursive -b toil_refactor https://github.com/ArtRand/signalAlign.git`
