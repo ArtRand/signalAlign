@@ -140,7 +140,6 @@ class SignalAlignment(object):
                 posteriors_file_path = self.destination + read_label + model_label + ".assignments"
 
         # Alignment/Expectations routine
-        # containers and defaults
         path_to_signalAlign = "./signalMachine"
 
         # flags

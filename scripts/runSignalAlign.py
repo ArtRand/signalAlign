@@ -6,7 +6,7 @@ from __future__ import print_function
 import sys
 import os
 
-import pysam
+#import pysam
 
 from argparse import ArgumentParser
 from random import shuffle
@@ -17,6 +17,19 @@ from signalalign.utils import processReferenceFasta, parseFofn
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import getBwaIndex
 from signalalign.motif import getDegenerateEnum
+
+
+def signalAlignSourceDir():
+    return "/".join(os.path.abspath(__file__).split("/")[:-1])  # returns path without runSignalAlign
+
+
+def resolvePath(p):
+    if p is None:
+        return None
+    elif p.startswith("/"):
+        return p
+    else:
+        return os.path.abspath(p)
 
 
 def parse_args():
@@ -99,6 +112,18 @@ def main(args):
     command_line = " ".join(sys.argv[:])
     print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
+    # get absolute paths to inputs
+    args.files_dir           = resolvePath(args.files_dir)
+    args.ref                 = resolvePath(args.ref)
+    args.out                 = resolvePath(args.out)
+    args.bwt                 = resolvePath(args.bwt)
+    args.in_T_Hmm            = resolvePath(args.in_T_Hmm)
+    args.in_C_Hmm            = resolvePath(args.in_C_Hmm)
+    args.templateHDP         = resolvePath(args.templateHDP)
+    args.complementHDP       = resolvePath(args.complementHDP)
+    args.fofn                = resolvePath(args.fofn)
+    args.target_regions      = resolvePath(args.target_regions)
+    args.ambiguity_positions = resolvePath(args.ambiguity_positions)
     start_message = """
 #   Starting Signal Align
 #   Aligning files from: {fileDir}
@@ -127,7 +152,7 @@ def main(args):
 
     # make directory to put temporary files
     temp_folder = FolderHandler()
-    temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
+    temp_dir_path = temp_folder.open_folder(args.out + "/tempFiles_alignment")
 
     reference_map = processReferenceFasta(fasta=args.ref,
                                           motif_key=args.motif_key,
@@ -154,14 +179,19 @@ def main(args):
     if args.fofn is not None:
         fast5s = [x for x in parseFofn(args.fofn) if x.endswith(".fast5")]
     else:
-        fast5s = [args.files_dir + x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
+        fast5s = ["/".join([args.files_dir, x]) for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
 
     nb_files = args.nb_files
     if nb_files < len(fast5s):
         shuffle(fast5s)
         fast5s = fast5s[:nb_files]
+
+    # change paths to the source directory
+    os.chdir(signalAlignSourceDir())
+
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     for fast5 in fast5s:
+        print(fast5)
         alignment_args = {
             "reference_map": reference_map,
             "destination": temp_dir_path,

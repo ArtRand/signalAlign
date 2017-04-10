@@ -1,7 +1,18 @@
 ## SignalAlign
 
 #### MinION signal-level alignment and methylation detection using hidden Markov Models with hierarchical Dirichlet process kmer learning.
-_Currently Refactoring for Toil_
+_Currently Refactoring for Toil_. Documentation is probably out of date.
+
+### Cheat sheet/Quick Start
+
+### Installation:
+1. Recursively clone this repo `git clone --recursive -b toil_refactor https://github.com/ArtRand/signalAlign.git`
+2. `cd signalAlign && make`
+3. `pip install -e .`
+4. Test the installation by running `cd bin && ./testSignalAlign`
+5. All of the programs can be found in the `bin/` directory
+
+
 ### Introduction
 Nanopore sequencing is based on the principal of isolating a nanopore in a membrane separating buffered salt solutions, then applying a voltage across the membrane and monitoring the ionic current through the nanopore. The Oxford Nanopore Technologies (ONT) MinION sequences DNA by recording the ionic current as DNA strands are enzymatically guided through the nanopore. **SignalAlign** will align the ionic current from the MinION to a reference sequence using a trainable hidden Markov model (HMM). The emissions model for the HMM can either be the table of parametric normal distributions provided by ONT or a hierarchical Dirichlet process (HDP) mixture of normal distributions. The HDP models enable mapping of methylated bases to your reference sequence. Instructions for usage including building/training HDP models can be found in the [manual](https://github.com/ArtRand/signalAlign/blob/master/Manual.md).
 
@@ -14,11 +25,6 @@ Nanopore sequencing is based on the principal of isolating a nanopore in a membr
     * Needs to be in path
 * GCC 4.4.7 or newer (tested on 4.4.7 and 5.0)
 
-### Installation:
-1. Recursively clone this repo `git clone --recursive https://github.com/ArtRand/signalAlign.git`
-2. cd into the directory and run `make`
-3. Test the installation by running `make test`
-4. All of the programs can be found in the `/bin/` directory
 
 ### Using Docker
 These steps were tested in both a Linux and OS X Sierra environment using Docker: 

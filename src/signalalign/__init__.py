@@ -1,6 +1,7 @@
 import os
 import re
 
+
 ALLOWED_FLAGS = (0, 16)
 
 DEFAULT_TRAINMODELS_OPTIONS = {

@@ -26,4 +26,3 @@ WORKDIR /data
 ENV PATH "/opt/signalAlign/:$PATH"
 
 ENTRYPOINT ["sh", "/opt/signalAlign/wrapper.sh"]
-
